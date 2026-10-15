@@ -6,6 +6,7 @@ namespace CommerceKings\Notification\Model;
 use CommerceKings\Notification\Api\ContactRepositoryInterface;
 use Magento\Framework\App\ResourceConnection;
 
+/** Guest email addresses, one row per website and address; customers keep using their account email. */
 class ContactRepository implements ContactRepositoryInterface
 {
     public const TABLE = 'ck_notification_contact';

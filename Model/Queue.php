@@ -6,6 +6,7 @@ namespace CommerceKings\Notification\Model;
 use CommerceKings\Notification\Api\QueueInterface;
 use Magento\Framework\MessageQueue\PublisherInterface;
 
+/** Publishes "<type>|<reference>" to the shared topic; the consumer hands it to the registered type. */
 class Queue implements QueueInterface
 {
     public const TOPIC = 'commercekings.notification.send';

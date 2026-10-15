@@ -5,6 +5,7 @@ namespace CommerceKings\Notification\Model;
 
 use CommerceKings\Notification\Api\ContactReferenceInterface;
 
+/** Modules that point at contacts, registered in di.xml (array argument "references"); read by the cleanup. */
 class ContactReferencePool
 {
     /** @param array<string, ContactReferenceInterface> $references */
