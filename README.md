@@ -10,6 +10,12 @@ Shared email delivery for CommerceKings notifications (e.g. `commercekings/modul
 - **Recipient cooldown**: minimum gap between emails to the same address across all notifications that
   use it and all stores. Keyed hashes only (`ck_notification_cooldown`), never an address.
 
+- **Contacts**: guest email addresses, one per website and address (`ck_notification_contact`), via
+  `Api\ContactRepositoryInterface::save(websiteId, email)`. Customers keep using their account email.
+  Modules that store contact ids register an `Api\ContactReferenceInterface` (di.xml,
+  `Model\ContactReferencePool` "references"); cron `commercekings_notification_contact_cleanup` (daily 03:15)
+  removes contacts none of them uses after a 24-hour grace period (with nothing registered, nothing is removed).
+
 The module knows no consent and no feature: features check their own consent and pass their own
 unsubscribe URL.
 

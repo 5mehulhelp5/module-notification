@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace CommerceKings\Notification\Api\Data;
 
 /** One email for MailerInterface::send(). */
-final class Message
+class Message
 {
     /**
      * @param string $sender Magento sender identity (e.g. "general"), resolved for the store

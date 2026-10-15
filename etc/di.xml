@@ -3,6 +3,13 @@
     <preference for="CommerceKings\Notification\Api\MailerInterface" type="CommerceKings\Notification\Model\Mailer"/>
     <preference for="CommerceKings\Notification\Api\CooldownInterface" type="CommerceKings\Notification\Model\Cooldown"/>
     <preference for="CommerceKings\Notification\Api\QueueInterface" type="CommerceKings\Notification\Model\Queue"/>
+    <preference for="CommerceKings\Notification\Api\ContactRepositoryInterface" type="CommerceKings\Notification\Model\ContactRepository"/>
+    <!-- modules that point to contacts register a ContactReferenceInterface here, so unused contacts can be removed -->
+    <type name="CommerceKings\Notification\Model\ContactReferencePool">
+        <arguments>
+            <argument name="references" xsi:type="array"/>
+        </arguments>
+    </type>
     <!-- feature modules register their notification types here (argument "types": code => NotificationTypeInterface) -->
     <type name="CommerceKings\Notification\Model\TypePool">
         <arguments>

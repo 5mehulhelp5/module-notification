@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace CommerceKings\Notification\Api\Data;
 
-final class MessageContent
+class MessageContent
 {
     /**
      * @param array<string, mixed> $vars template variables

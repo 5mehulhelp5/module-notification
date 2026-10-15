@@ -11,5 +11,21 @@
         "index": {
             "CK_NOTIFICATION_COOLDOWN_SENT_AT": true
         }
+    },
+    "ck_notification_contact": {
+        "column": {
+            "contact_id": true,
+            "website_id": true,
+            "email": true,
+            "created_at": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "CK_NOTIFICATION_CONTACT_WEBSITE_ID_EMAIL": true,
+            "CK_NOTIFICATION_CONTACT_WEBSITE_ID_STORE_WEBSITE_WEBSITE_ID": true
+        },
+        "index": {
+            "CK_NOTIFICATION_CONTACT_CREATED_AT": true
+        }
     }
 }

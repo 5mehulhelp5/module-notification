@@ -91,6 +91,7 @@ trait DbTestTrait
         });
         $db->method('quoteInto')->willReturnCallback(fn ($text, $value) => str_replace('?', "'" . $value . "'", $text));
         $db->method('quote')->willReturnCallback(fn ($value) => "'" . $value . "'");
+        $db->method('quoteIdentifier')->willReturnArgument(0);
 
         $resource = $this->createStub(ResourceConnection::class);
         $resource->method('getConnection')->willReturn($db);
