@@ -73,4 +73,12 @@ class ConsumerTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $queue->publish('Bad Type', '1');
     }
+
+    public function testEmptyQueueReferenceIsRejectedBeforePublishing(): void
+    {
+        $publisher = $this->createMock(PublisherInterface::class);
+        $publisher->expects($this->never())->method('publish');
+        $this->expectException(\InvalidArgumentException::class);
+        (new Queue($publisher))->publish('cart_reminder', '');
+    }
 }

@@ -124,6 +124,24 @@ class MailerTest extends TestCase
         $this->assertSame(['start 3', 'stop'], $this->emulated);
     }
 
+    public function testRecipientCheckFailureReleasesTheClaimBeforeRenderingOrSending(): void
+    {
+        $error = new \RuntimeException('Recipient lookup unavailable');
+        $mailer = $this->mailer();
+        try {
+            $mailer->send($this->message(current: static function () use ($error): bool { throw $error; }));
+            $this->fail('Recipient lookup failure must stop delivery.');
+        } catch (\RuntimeException $caught) {
+            $this->assertSame($error, $caught);
+        }
+        $this->assertSame([['a@test.com', 'token']], $this->released);
+        $this->assertSame(0, $this->sent);
+        $this->assertSame([], $this->mail);
+        $this->assertSame([], $this->emulated);
+        $this->assertSame(MailerInterface::SENT, $mailer->send($this->message()));
+        $this->assertSame(1, $this->sent);
+    }
+
     public function testFailureAfterHandoffKeepsTheClaimAndSaysSent(): void
     {
         try {

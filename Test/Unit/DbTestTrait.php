@@ -32,6 +32,7 @@ trait DbTestTrait
     /** raw query() calls: [sql, bind]; queued rowCount() results, default 1 */
     private array $queries = [];
     private array $queryRowCounts = [];
+    private ?\Throwable $queryFailure = null;
     private array $transactionEvents = [];
     private array $rowLocks = [];
 
@@ -85,6 +86,9 @@ trait DbTestTrait
         $db->method('fetchPairs')->willReturnCallback(fn () => $this->fetchPairsResults ? array_shift($this->fetchPairsResults) : []);
         $db->method('query')->willReturnCallback(function ($sql, $bind = []) {
             $this->queries[] = [$sql, $bind];
+            if ($this->queryFailure !== null) {
+                throw $this->queryFailure;
+            }
             $statement = $this->createStub(\Zend_Db_Statement_Interface::class);
             $statement->method('rowCount')->willReturn($this->queryRowCounts ? array_shift($this->queryRowCounts) : 1);
             return $statement;

@@ -32,6 +32,7 @@ class SubscriptionManagementTest extends TestCase
     private array $authorized = [];
     private array $consentReads = [];
     private array $contacts = [];
+    private ?\Throwable $contactFailure = null;
 
     protected function setUp(): void
     {
@@ -66,6 +67,9 @@ class SubscriptionManagementTest extends TestCase
         $contacts = $this->createStub(ContactRepositoryInterface::class);
         $contacts->method('save')->willReturnCallback(function ($website, $email) {
             $this->contacts[] = [$website, $email];
+            if ($this->contactFailure !== null) {
+                throw $this->contactFailure;
+            }
             return 5;
         });
         $store = $this->createStub(StoreInterface::class);
@@ -83,6 +87,53 @@ class SubscriptionManagementTest extends TestCase
         $this->assertSame([], $this->queries);
         $this->assertSame([], $this->deletes);
         $this->assertSame([], $this->contacts);
+    }
+
+    public function testContactPersistenceFailureIsNotAcknowledgedAndCanBeRetried(): void
+    {
+        $this->contactFailure = new \RuntimeException('Contact storage unavailable');
+        $management = $this->management();
+        try {
+            $management->subscribeGuest('test_type', 'masked', 'guest@example.test');
+            $this->fail('An unstored contact must not be acknowledged.');
+        } catch (\RuntimeException $error) {
+            $this->assertSame($this->contactFailure, $error);
+        }
+        $this->assertSame([], $this->queries, 'no subscription can be written without a contact');
+        $this->assertSame([], $this->deletes, 'a failed save must not unsubscribe the previous recipient');
+        $this->contactFailure = null;
+        $this->assertTrue($management->subscribeGuest('test_type', 'masked', 'guest@example.test'));
+        $this->assertCount(1, $this->queries);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('subscriberKinds')]
+    public function testSubscriptionPersistenceFailureIsNotAcknowledgedAndCanBeRetried(bool $guest): void
+    {
+        $this->queryFailure = new \RuntimeException('Subscription storage unavailable');
+        $management = $this->management();
+        $subscribe = fn () => $guest
+            ? $management->subscribeGuest('test_type', 'masked', 'guest@example.test')
+            : $management->subscribeCustomer(9, 'test_type', '42');
+        try {
+            $subscribe();
+            $this->fail('An unstored subscription must not be acknowledged.');
+        } catch (\RuntimeException $error) {
+            $this->assertSame($this->queryFailure, $error);
+        }
+        $this->assertCount($guest ? 1 : 0, $this->contacts);
+        $this->assertCount(1, $this->queries);
+        $this->assertStringContainsString('INSERT INTO ck_notification_subscription', $this->queries[0][0]);
+        $this->assertSame([], $this->deletes);
+        $this->assertSame([], $this->updates);
+        $this->queryFailure = null;
+        $this->assertTrue($subscribe());
+        $this->assertCount(2, $this->queries);
+        $this->assertSame($this->queries[0], $this->queries[1], 'retry preserves the authorized scope and guards');
+    }
+
+    public static function subscriberKinds(): array
+    {
+        return ['guest' => [true], 'customer' => [false]];
     }
 
     public function testGuestSubscribesWithOneGuardedInsertAfterAllChecks(): void

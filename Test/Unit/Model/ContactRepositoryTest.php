@@ -43,6 +43,24 @@ class ContactRepositoryTest extends TestCase
         (new ContactRepository($this->resource()))->save(1, '   ');
     }
 
+    #[\PHPUnit\Framework\Attributes\DataProvider('invalidWebsiteIds')]
+    public function testInvalidWebsiteWritesNoContact(int $websiteId): void
+    {
+        try {
+            (new ContactRepository($this->resource()))->save($websiteId, 'guest@example.test');
+            $this->fail('An invalid website must not create a contact.');
+        } catch (\InvalidArgumentException) {
+            $this->assertSame([], $this->queries);
+            $this->assertSame([], $this->inserts);
+            $this->assertSame([], $this->updates);
+        }
+    }
+
+    public static function invalidWebsiteIds(): array
+    {
+        return [[0], [-1]];
+    }
+
     public function testGetEmail(): void
     {
         $this->fetchOneResult = 'guest@example.test';
