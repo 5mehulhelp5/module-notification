@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace CommerceKings\Notification\Model;
 
 use CommerceKings\Notification\Api\Data\Permission;
+use CommerceKings\Notification\Api\Data\Subscription;
 use CommerceKings\Notification\Api\Data\Target;
 use CommerceKings\Notification\Api\SubscriptionPermissionInterface;
 use CommerceKings\Notification\Api\SubscriptionTypeInterface;
@@ -33,5 +34,16 @@ class OpenPermission implements SubscriptionPermissionInterface
     public function isCurrentVisitor(string $reference): bool
     {
         return false;
+    }
+
+    public function isValidFor(string $reference, string $purpose, int $storeId): bool
+    {
+        return true;
+    }
+
+    /** None: an opt-out module supplies the unsubscribe page (Api\SubscriptionRemovalInterface::remove()). */
+    public function getUnsubscribeUrl(Subscription $subscription): ?string
+    {
+        return null;
     }
 }

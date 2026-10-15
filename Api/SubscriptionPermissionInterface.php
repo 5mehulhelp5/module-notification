@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace CommerceKings\Notification\Api;
 
 use CommerceKings\Notification\Api\Data\Permission;
+use CommerceKings\Notification\Api\Data\Subscription;
 use CommerceKings\Notification\Api\Data\Target;
 
 /**
@@ -32,4 +33,13 @@ interface SubscriptionPermissionInterface
 
     /** Is the current visitor the one who gave this permission? false when it cannot tell. */
     public function isCurrentVisitor(string $reference): bool;
+
+    /**
+     * Send-time recheck in PHP (the SQL condition repeats it in the claim): is the stored permission still valid for
+     * this purpose (SubscriptionTypeInterface::getPurpose()) and the store the email is sent from?
+     */
+    public function isValidFor(string $reference, string $purpose, int $storeId): bool;
+
+    /** A link that revokes this subscription's permission (e.g. a signed withdrawal page), null when there is none. */
+    public function getUnsubscribeUrl(Subscription $subscription): ?string;
 }

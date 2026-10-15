@@ -120,6 +120,10 @@ send-time check (`SubscriptionGuardInterface`) contain, so a revocation at the s
 permission (e.g. Consent compares the browser the consent was given in); a feature hands over something the
 subscriber owns only when it can tell. When a permission is revoked or the shopper unsubscribes,
 call `Api\SubscriptionRemovalInterface` (`removeByPermission($references)`, `remove($subscriptionId)`).
+At send time `isValidFor($reference, $purpose, $storeId)` rechecks a stored reference in PHP, and
+`getUnsubscribeUrl($subscription)` gives the permission's own unsubscribe link (null when it has none). In the
+storefront, ask `CommerceKings_Notification/js/permission` (`hasPermission(purpose)`, `onChange(purpose, callback)`)
+before subscribing; a permission module maps it to its own with requirejs `map`.
 The default, `Model\OpenPermission`, allows every authorized subscription until it is removed (opt-out) and cannot
 identify visitors. `commercekings/module-consent-notification` replaces it with CommerceKings_Consent: a subscription
 needs a valid consent for the type's purpose, and withdrawing that consent removes it.
