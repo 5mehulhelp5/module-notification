@@ -22,8 +22,9 @@ First release. Features:
   Consent directly. Subscriptions store no browser. The default `OpenPermission` allows every authorized
   subscription (opt-out); `commercekings/module-consent-notification` replaces it with Consent and registers the
   withdrawal handler. The subscription stores the permission's reference in `permission_ref` (renamed from
-  `consent_id`, data kept); `Subscription::$permissionRef`. The permission also rechecks a stored reference at send time (`isValidFor()`) and
-  gives its unsubscribe link (`getUnsubscribeUrl()`); the storefront asks `CommerceKings_Notification/js/permission`.
+  `consent_id`, data kept); `Subscription::$permissionRef`. The permission also rechecks a stored reference at send time (`isValidFor()`);
+  `SubscriberInterface` says whether the current visitor is the subscriber and gives the unsubscribe link (default
+  `AnonymousSubscriber`: neither); the storefront asks `CommerceKings_Notification/js/permission`.
 - **Guest contacts** (`ck_notification_contact`, `ContactRepositoryInterface`) shared by notification
   features, keyed by an exact normalized address (`email_key`), with reference-based cleanup of unused contacts.
 

@@ -261,7 +261,16 @@ class SubscriptionManagementTest extends TestCase
         $open = new \CommerceKings\Notification\Model\OpenPermission();
         $this->assertSame('', $open->check($this->createStub(SubscriptionTypeInterface::class), $this->target)->reference);
         $this->assertSame('1 = 1', $open->validCondition('x'));
-        $this->assertFalse($open->identifiesVisitor());
-        $this->assertFalse($open->isCurrentVisitor(''));
+        $this->assertTrue($open->isValidFor('', 'test_purpose', 1));
+    }
+
+    /** ...and its subscriber cannot be recognized and has no unsubscribe link. */
+    public function testAnonymousSubscriberIsNeitherRecognizedNorLinked(): void
+    {
+        $anonymous = new \CommerceKings\Notification\Model\AnonymousSubscriber();
+        $this->assertFalse($anonymous->identifiesVisitor());
+        $this->assertFalse($anonymous->isCurrentVisitor('any'));
+        $this->assertNull($anonymous->getUnsubscribeUrl(new \CommerceKings\Notification\Api\Data\Subscription(7, 'test_type',
+            42, 1, 5, null, '', '2026-01-01 00:00:00')));
     }
 }

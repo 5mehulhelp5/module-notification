@@ -10,6 +10,8 @@
     <preference for="CommerceKings\Notification\Api\SubscriptionRemovalInterface" type="CommerceKings\Notification\Model\SubscriptionRemoval"/>
     <!-- who may subscribe: everyone (opt-out) unless a permission module replaces it, e.g. the consent bridge -->
     <preference for="CommerceKings\Notification\Api\SubscriptionPermissionInterface" type="CommerceKings\Notification\Model\OpenPermission"/>
+    <!-- the subscriber behind it: not recognizable, no unsubscribe link - replaced together with the permission -->
+    <preference for="CommerceKings\Notification\Api\SubscriberInterface" type="CommerceKings\Notification\Model\AnonymousSubscriber"/>
     <!-- modules that point to contacts register a ContactReferenceInterface here, so unused contacts can be removed -->
     <type name="CommerceKings\Notification\Model\ContactReferencePool">
         <arguments>

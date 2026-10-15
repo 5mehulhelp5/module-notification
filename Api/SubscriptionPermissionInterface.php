@@ -4,12 +4,12 @@ declare(strict_types=1);
 namespace CommerceKings\Notification\Api;
 
 use CommerceKings\Notification\Api\Data\Permission;
-use CommerceKings\Notification\Api\Data\Subscription;
 use CommerceKings\Notification\Api\Data\Target;
 
 /**
  * May the current visitor subscribe, and is a stored subscription still allowed? Replace it through a DI
- * preference (e.g. with a consent module) to put a requirement on subscriptions.
+ * preference (e.g. with a consent module) to put a requirement on subscriptions. Who the subscriber is and how they
+ * unsubscribe is SubscriberInterface.
  *
  * @api
  */
@@ -26,20 +26,8 @@ interface SubscriptionPermissionInterface
     public function validCondition(string $referenceColumn): string;
 
     /**
-     * Can isCurrentVisitor() tell who gave a permission? A feature hands a visitor something the subscriber owns
-     * (e.g. a saved cart) only when it can.
-     */
-    public function identifiesVisitor(): bool;
-
-    /** Is the current visitor the one who gave this permission? false when it cannot tell. */
-    public function isCurrentVisitor(string $reference): bool;
-
-    /**
      * Send-time recheck in PHP (the SQL condition repeats it in the claim): is the stored permission still valid for
      * this purpose (SubscriptionTypeInterface::getPurpose()) and the store the email is sent from?
      */
     public function isValidFor(string $reference, string $purpose, int $storeId): bool;
-
-    /** A link that revokes this subscription's permission (e.g. a signed withdrawal page), null when there is none. */
-    public function getUnsubscribeUrl(Subscription $subscription): ?string;
 }

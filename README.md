@@ -116,17 +116,22 @@ Who may subscribe is `Api\SubscriptionPermissionInterface`: `check($type, $targe
 (granted with a reference stored on the subscription, absent – a guest's single subscription is removed – or
 refused – nothing changes), and `validCondition($referenceColumn)` is the SQL that the subscribe INSERT and every
 send-time check (`SubscriptionGuardInterface`) contain, so a revocation at the same moment wins.
+`isValidFor($reference, $purpose, $storeId)` rechecks a stored reference at send time.
+
+The subscriber behind a permission is `Api\SubscriberInterface`, replaced together with the permission:
 `identifiesVisitor()` / `isCurrentVisitor($reference)` say whether the current visitor is the one who gave a
-permission (e.g. Consent compares the browser the consent was given in); a feature hands over something the
-subscriber owns only when it can tell. When a permission is revoked or the shopper unsubscribes,
+permission (e.g. Consent compares the browser the consent was given in) – a feature hands over something the
+subscriber owns only when it can tell – and `getUnsubscribeUrl($subscription)` is its unsubscribe link (null when
+there is none). Defaults: `Model\OpenPermission` and `Model\AnonymousSubscriber`.
+When a permission is revoked or the shopper unsubscribes,
 call `Api\SubscriptionRemovalInterface` (`removeByPermission($references)`, `remove($subscriptionId)`).
-At send time `isValidFor($reference, $purpose, $storeId)` rechecks a stored reference in PHP, and
-`getUnsubscribeUrl($subscription)` gives the permission's own unsubscribe link (null when it has none). In the
-storefront, ask `CommerceKings_Notification/js/permission` (`hasPermission(purpose)`, `onChange(purpose, callback)`)
-before subscribing; a permission module maps it to its own with requirejs `map`.
-The default, `Model\OpenPermission`, allows every authorized subscription until it is removed (opt-out) and cannot
-identify visitors. `commercekings/module-consent-notification` replaces it with CommerceKings_Consent: a subscription
-needs a valid consent for the type's purpose, and withdrawing that consent removes it.
+In the storefront, ask `CommerceKings_Notification/js/permission` (`hasPermission(purpose)`,
+`onChange(purpose, callback)`) before subscribing; a permission module maps it to its own with requirejs `map`.
+
+`Model\OpenPermission` allows every authorized subscription until it is removed (opt-out).
+`commercekings/module-consent-notification` replaces both defaults with CommerceKings_Consent: a subscription needs a
+valid consent for the type's purpose, withdrawing that consent removes it, the subscriber is the browser the consent
+was given in, and the unsubscribe link is Consent's signed withdrawal page.
 
 ### Subscription types
 
