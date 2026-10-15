@@ -3,26 +3,21 @@ declare(strict_types=1);
 
 namespace CommerceKings\Notification\Test\Unit\Model;
 
-use CommerceKings\Consent\Api\ConsentGuardInterface;
-use CommerceKings\Consent\Api\ConsentInterface;
-use CommerceKings\Consent\Api\Data\WithdrawalContext;
 use CommerceKings\Notification\Api\ContactRepositoryInterface;
 use CommerceKings\Notification\Api\Data\Subscription;
+use CommerceKings\Notification\Api\SubscriptionPermissionInterface;
 use CommerceKings\Notification\Api\SubscriptionTypeInterface;
 use CommerceKings\Notification\Cron\CleanUpSubscriptions;
 use CommerceKings\Notification\Api\Data\Permission;
 use CommerceKings\Notification\Model\SubscriptionTypePool;
 use CommerceKings\Notification\Model\SubscriptionContactReference;
-use CommerceKings\Notification\Model\Consent\ConsentPermission;
 use CommerceKings\Notification\Model\SubscriptionGuard;
 use CommerceKings\Notification\Model\SubscriptionRemoval;
 use CommerceKings\Notification\Model\SubscriptionRepository;
-use CommerceKings\Notification\Model\WithdrawalHandler;
 use CommerceKings\Notification\Test\Unit\DbTestTrait;
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Framework\Exception\NoSuchEntityException;
-use Magento\Store\Model\StoreManagerInterface;
 use PHPUnit\Framework\TestCase;
 
 /** Guard, withdrawal, contact reference and repository around ck_notification_subscription. */
@@ -32,12 +27,9 @@ class SubscriptionTest extends TestCase
 
     private function guard(): SubscriptionGuard
     {
-        $consentGuard = $this->createStub(ConsentGuardInterface::class);
-        $consentGuard->method('validCondition')->willReturnCallback(fn ($column) => 'VALID(' . $column . ')');
-        return new SubscriptionGuard($this->resource(), new ConsentPermission($this->createStub(ConsentInterface::class),
-            $consentGuard, $this->createStub(StoreManagerInterface::class),
-            $this->createStub(\CommerceKings\Consent\Api\BrowserIdentityInterface::class),
-            $this->createStub(\CommerceKings\Consent\Model\ConsentStore::class)));
+        $permission = $this->createStub(SubscriptionPermissionInterface::class);
+        $permission->method('validCondition')->willReturnCallback(fn ($column) => 'VALID(' . $column . ')');
+        return new SubscriptionGuard($this->resource(), $permission);
     }
 
     public function testGuardConditionNeedsTheRowAndAValidConsent(): void
@@ -56,13 +48,17 @@ class SubscriptionTest extends TestCase
         $this->assertFalse($this->guard()->isValid(7, 'test_type'));
     }
 
-    public function testWithdrawalDeletesTheSubscriptionsOfEveryType(): void
+    public function testRevokedPermissionsRemoveTheSubscriptionsOfEveryType(): void
     {
-        $handler = new WithdrawalHandler(new SubscriptionRemoval($this->resource()));
-        $handler->execute(new WithdrawalContext('test_purpose', ['a', 'b'], 1, 'browser', 'banner'));
-        $handler->execute(new WithdrawalContext('test_purpose', [], 1, 'browser', 'banner'));
-        $this->assertSame([['table' => 'ck_notification_subscription', 'where' => ['consent_id IN (?)' => ['a', 'b']]]],
-            $this->deletes);
+        $removal = new SubscriptionRemoval($this->resource());
+        $removal->removeByPermission(['a', 'b']);
+        $this->assertSame(0, $removal->removeByPermission([]));
+        $this->assertSame(0, $removal->removeByPermission(['']), '"no reference" is shared - never a removal key');
+        $removal->removeByPermission(['', 'c']);
+        $this->assertSame([
+            ['table' => 'ck_notification_subscription', 'where' => ['consent_id IN (?)' => ['a', 'b']]],
+            ['table' => 'ck_notification_subscription', 'where' => ['consent_id IN (?)' => ['c']]],
+        ], $this->deletes);
     }
 
     public function testASingleSubscriptionCanBeRemoved(): void
@@ -73,25 +69,6 @@ class SubscriptionTest extends TestCase
             $this->deletes);
         $this->deleteResult = 0;
         $this->assertFalse((new SubscriptionRemoval($this->resource()))->remove(7), 'already gone');
-    }
-
-    /** Consent identifies the visitor by the browser the consent was given in. */
-    public function testConsentIdentifiesTheVisitorByTheConsentsBrowser(): void
-    {
-        $browser = $this->createStub(\CommerceKings\Consent\Api\BrowserIdentityInterface::class);
-        $browser->method('hash')->willReturnOnConsecutiveCalls('aaa', 'bbb', '', 'aaa', 'aaa');
-        $records = $this->createStub(\CommerceKings\Consent\Model\ConsentStore::class);
-        $records->method('load')->willReturnCallback(fn ($id) => match ($id) {
-            'mine' => ['browser_hash' => 'aaa'], 'blank' => ['browser_hash' => ''], default => null,
-        });
-        $permission = new ConsentPermission($this->createStub(ConsentInterface::class),
-            $this->createStub(ConsentGuardInterface::class), $this->createStub(StoreManagerInterface::class), $browser, $records);
-        $this->assertTrue($permission->identifiesVisitor());
-        $this->assertTrue($permission->isCurrentVisitor('mine'), 'same browser');
-        $this->assertFalse($permission->isCurrentVisitor('mine'), 'another browser');
-        $this->assertFalse($permission->isCurrentVisitor('mine'), 'a browser without an id');
-        $this->assertFalse($permission->isCurrentVisitor('blank'), 'a consent without a browser');
-        $this->assertFalse($permission->isCurrentVisitor('gone'), 'a deleted consent');
     }
 
     /** The permission states SubscriptionManagement relies on. */

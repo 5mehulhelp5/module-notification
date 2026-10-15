@@ -11,7 +11,7 @@ namespace CommerceKings\Notification\Api;
 interface SubscriptionRemovalInterface
 {
     /**
-     * @param string[] $references permission references (SubscriptionPermissionInterface)
+     * @param string[] $references permission references (SubscriptionPermissionInterface); '' is ignored
      * @return int subscriptions removed
      */
     public function removeByPermission(array $references): int;

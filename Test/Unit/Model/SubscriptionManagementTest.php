@@ -3,15 +3,11 @@ declare(strict_types=1);
 
 namespace CommerceKings\Notification\Test\Unit\Model;
 
-use CommerceKings\Consent\Api\BrowserIdentityInterface;
-use CommerceKings\Consent\Api\ConsentGuardInterface;
-use CommerceKings\Consent\Api\ConsentInterface;
-use CommerceKings\Consent\Api\Data\Consent;
-use CommerceKings\Consent\Model\ConsentStore;
 use CommerceKings\Notification\Api\ContactRepositoryInterface;
+use CommerceKings\Notification\Api\Data\Permission;
 use CommerceKings\Notification\Api\Data\Target;
+use CommerceKings\Notification\Api\SubscriptionPermissionInterface;
 use CommerceKings\Notification\Api\SubscriptionTypeInterface;
-use CommerceKings\Notification\Model\Consent\ConsentPermission;
 use CommerceKings\Notification\Model\SubscriptionManagement;
 use CommerceKings\Notification\Model\SubscriptionTypePool;
 use CommerceKings\Notification\Test\Unit\DbTestTrait;
@@ -30,8 +26,10 @@ class SubscriptionManagementTest extends TestCase
 
     private ?Target $target;
     private bool $single = true;
-    private ?Consent $current;
+    /** the permission's answer */
+    private Permission $current;
     private array $authorized = [];
+    /** purposes the permission was asked about */
     private array $consentReads = [];
     private array $contacts = [];
     private ?\Throwable $contactFailure = null;
@@ -39,13 +37,7 @@ class SubscriptionManagementTest extends TestCase
     protected function setUp(): void
     {
         $this->target = new Target(42, 1, true, 'STILL_YOURS');
-        $this->current = $this->consent();
-    }
-
-    private function consent(int $website = 1, string $purpose = 'test_purpose'): Consent
-    {
-        return new Consent('new-consent', $purpose, $website, 'banner', 'choice', '2026-01-01 00:00:00', '1', '1',
-            '2026-01-01 00:00:00', '2027-01-01 00:00:00');
+        $this->current = Permission::granted('new-consent');
     }
 
     private function management(): SubscriptionManagement
@@ -57,13 +49,12 @@ class SubscriptionManagementTest extends TestCase
             $this->authorized[] = [$reference, $customerId];
             return $this->target;
         });
-        $consent = $this->createStub(ConsentInterface::class);
-        $consent->method('getCurrent')->willReturnCallback(function ($purpose) {
-            $this->consentReads[] = $purpose;
+        $permission = $this->createStub(SubscriptionPermissionInterface::class);
+        $permission->method('check')->willReturnCallback(function (SubscriptionTypeInterface $type) {
+            $this->consentReads[] = $type->getPurpose();
             return $this->current;
         });
-        $guard = $this->createStub(ConsentGuardInterface::class);
-        $guard->method('validCondition')->willReturnCallback(fn ($column) => 'VALID(' . $column . ')');
+        $permission->method('validCondition')->willReturnCallback(fn ($column) => 'VALID(' . $column . ')');
         $contacts = $this->createStub(ContactRepositoryInterface::class);
         $contacts->method('save')->willReturnCallback(function ($website, $email) {
             $this->contacts[] = [$website, $email];
@@ -79,15 +70,8 @@ class SubscriptionManagementTest extends TestCase
         $filters = $this->createStub(FilterManager::class);
         $filters->method('get')->willReturn(new StringTrim());
         return new SubscriptionManagement($this->resource(), new SubscriptionTypePool(['test_type' => $type]),
-            $this->permission($consent, $guard, $stores), $contacts, $stores,
+            $permission, $contacts, $stores,
             new EmailAddress(), new StringLength(['max' => 255]), $filters);
-    }
-
-    private function permission(ConsentInterface $consent, ConsentGuardInterface $guard,
-        StoreManagerInterface $stores): ConsentPermission
-    {
-        return new ConsentPermission($consent, $guard, $stores, $this->createStub(BrowserIdentityInterface::class),
-            $this->createStub(ConsentStore::class));
     }
 
     private function assertNothingWritten(): void
@@ -233,7 +217,7 @@ class SubscriptionManagementTest extends TestCase
     {
         $this->assertFalse($this->management()->subscribeGuest('test_type', 'masked', '  '));
         $this->assertSame([], $this->consentReads, 'unsubscribing records no consent');
-        $this->current = null;
+        $this->current = Permission::absent();
         $this->assertFalse($this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test'));
         $this->target = new Target(42, 1, false, 'STILL_YOURS');
         $this->assertFalse($this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test'));
@@ -253,7 +237,7 @@ class SubscriptionManagementTest extends TestCase
 
     public function testCustomerWithoutConsentHereOrAcceptingTypeChangesNothing(): void
     {
-        $this->current = null;
+        $this->current = Permission::absent();
         $this->assertFalse($this->management()->subscribeCustomer(9, 'test_type', '42'));
         $this->target = new Target(42, 1, false);
         $this->assertFalse($this->management()->subscribeCustomer(9, 'test_type', '42'));
@@ -262,13 +246,22 @@ class SubscriptionManagementTest extends TestCase
         $this->assertNothingWritten();
     }
 
-    public function testConsentOfAnotherWebsiteOrPurposeIsRefused(): void
+    /** e.g. a consent of another website or purpose (consent bridge) */
+    public function testARefusedPermissionChangesNothing(): void
     {
-        foreach ([$this->consent(2), $this->consent(1, 'other')] as $consent) {
-            $this->current = $consent;
-            $this->assertFalse($this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test'));
-            $this->assertFalse($this->management()->subscribeCustomer(9, 'test_type', '42'));
-        }
+        $this->current = Permission::refused();
+        $this->assertFalse($this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test'));
+        $this->assertFalse($this->management()->subscribeCustomer(9, 'test_type', '42'));
         $this->assertNothingWritten();
+    }
+
+    /** Notification alone: every authorized subscription is allowed, with no reference and no SQL requirement. */
+    public function testOpenPermissionSubscribesWithoutAReference(): void
+    {
+        $open = new \CommerceKings\Notification\Model\OpenPermission();
+        $this->assertSame('', $open->check($this->createStub(SubscriptionTypeInterface::class), $this->target)->reference);
+        $this->assertSame('1 = 1', $open->validCondition('x'));
+        $this->assertFalse($open->identifiesVisitor());
+        $this->assertFalse($open->isCurrentVisitor(''));
     }
 }

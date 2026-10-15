@@ -8,8 +8,8 @@
     <preference for="CommerceKings\Notification\Api\SubscriptionRepositoryInterface" type="CommerceKings\Notification\Model\SubscriptionRepository"/>
     <preference for="CommerceKings\Notification\Api\SubscriptionGuardInterface" type="CommerceKings\Notification\Model\SubscriptionGuard"/>
     <preference for="CommerceKings\Notification\Api\SubscriptionRemovalInterface" type="CommerceKings\Notification\Model\SubscriptionRemoval"/>
-    <!-- who may subscribe: CommerceKings_Consent for now (moves to the consent bridge) -->
-    <preference for="CommerceKings\Notification\Api\SubscriptionPermissionInterface" type="CommerceKings\Notification\Model\Consent\ConsentPermission"/>
+    <!-- who may subscribe: everyone (opt-out) unless a permission module replaces it, e.g. the consent bridge -->
+    <preference for="CommerceKings\Notification\Api\SubscriptionPermissionInterface" type="CommerceKings\Notification\Model\OpenPermission"/>
     <!-- modules that point to contacts register a ContactReferenceInterface here, so unused contacts can be removed -->
     <type name="CommerceKings\Notification\Model\ContactReferencePool">
         <arguments>
@@ -19,7 +19,7 @@
         </arguments>
     </type>
     <!-- feature modules register who may subscribe here (argument "types": code => SubscriptionTypeInterface),
-         and CommerceKings\Notification\Model\WithdrawalHandler in Consent's WithdrawalPool under their purpose -->
+         (with commercekings/module-consent-notification, withdrawing the purpose's consent removes the subscriptions) -->
     <type name="CommerceKings\Notification\Model\SubscriptionTypePool">
         <arguments>
             <argument name="types" xsi:type="array"/>

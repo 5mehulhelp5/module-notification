@@ -14,11 +14,13 @@ class SubscriptionRemoval implements SubscriptionRemovalInterface
 
     public function removeByPermission(array $references): int
     {
+        // '' is "no reference" (e.g. OpenPermission) - shared by every such subscription, never a key to remove
+        $references = array_values(array_filter(array_map('strval', $references), fn ($reference) => $reference !== ''));
         if (!$references) {
             return 0;
         }
         return $this->resource->getConnection()->delete($this->resource->getTableName(SubscriptionManagement::TABLE),
-            ['consent_id IN (?)' => array_values($references)]);
+            ['consent_id IN (?)' => $references]);
     }
 
     public function remove(int $subscriptionId): bool

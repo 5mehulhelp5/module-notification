@@ -3,23 +3,18 @@ declare(strict_types=1);
 
 namespace CommerceKings\Notification\Test\Integration;
 
-use CommerceKings\Consent\Api\BrowserIdentityInterface;
-use CommerceKings\Consent\Api\ConsentGuardInterface;
-use CommerceKings\Consent\Api\ConsentInterface;
-use CommerceKings\Consent\Api\Data\Consent;
-use CommerceKings\Consent\Api\Data\WithdrawalContext;
 use CommerceKings\Notification\Api\ContactRepositoryInterface;
+use CommerceKings\Notification\Api\Data\Permission;
+use CommerceKings\Notification\Api\SubscriptionPermissionInterface;
 use CommerceKings\Notification\Api\Data\Target;
 use CommerceKings\Notification\Api\SubscriptionTypeInterface;
 use CommerceKings\Notification\Cron\CleanUpSubscriptions;
 use CommerceKings\Notification\Model\ContactReferencePool;
 use CommerceKings\Notification\Model\ContactRepository;
-use CommerceKings\Notification\Model\Consent\ConsentPermission;
 use CommerceKings\Notification\Model\SubscriptionGuard;
 use CommerceKings\Notification\Model\SubscriptionRemoval;
 use CommerceKings\Notification\Model\SubscriptionManagement;
 use CommerceKings\Notification\Model\SubscriptionTypePool;
-use CommerceKings\Notification\Model\WithdrawalHandler;
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Api\Data\CustomerInterfaceFactory;
 use Magento\Framework\App\Bootstrap;
@@ -112,27 +107,19 @@ class SubscriptionTest extends TestCase
         $type->method('isSingle')->willReturnCallback(fn () => $this->single);
         $type->method('authorize')->willReturnCallback(fn () => new Target($this->reference, $this->storeId, true, $this->condition));
         $type->method('orphanCondition')->willReturnCallback(fn ($column) => $column . ' = ' . $this->orphan);
-        $consent = $this->createStub(ConsentInterface::class);
-        $consent->method('getCurrent')->willReturnCallback(fn () => new Consent($this->consentId, 'test_purpose',
-            (int)$this->stores->getStore($this->storeId)->getWebsiteId(), 'banner', 'choice', '2026-01-01 00:00:00',
-            '1', '1', '2026-01-01 00:00:00', '2027-01-01 00:00:00'));
         $filters = $this->om->create(FilterManager::class);
         return new SubscriptionManagement($this->resource, new SubscriptionTypePool([$this->type => $type]),
-            $this->permission($consent), $this->om->get(ContactRepositoryInterface::class), $this->stores,
+            $this->permission(), $this->om->get(ContactRepositoryInterface::class), $this->stores,
             new EmailAddress(), new StringLength(['max' => 255]), $filters);
     }
 
-    private function permission(?ConsentInterface $consent = null): ConsentPermission
+    /** grants the current $consentId; the reference 'withdrawn' is revoked */
+    private function permission(): SubscriptionPermissionInterface
     {
-        return new ConsentPermission($consent ?? $this->createStub(ConsentInterface::class), $this->guard(), $this->stores,
-            $this->createStub(BrowserIdentityInterface::class), $this->createStub(\CommerceKings\Consent\Model\ConsentStore::class));
-    }
-
-    private function guard(): ConsentGuardInterface
-    {
-        $guard = $this->createStub(ConsentGuardInterface::class);
-        $guard->method('validCondition')->willReturnCallback(fn ($column) => '(' . $column . " <> 'withdrawn')");
-        return $guard;
+        $permission = $this->createStub(SubscriptionPermissionInterface::class);
+        $permission->method('check')->willReturnCallback(fn () => Permission::granted($this->consentId));
+        $permission->method('validCondition')->willReturnCallback(fn ($column) => '(' . $column . " <> 'withdrawn')");
+        return $permission;
     }
 
     /** @return array<int, array<string, mixed>> this test's rows with their contact email */
@@ -233,8 +220,8 @@ class SubscriptionTest extends TestCase
         $unused = $contacts->save($website, $this->email('retyped'));
         $this->assertSame([$unused], $this->unusedContacts([$used, $unused]));
 
-        (new WithdrawalHandler(new SubscriptionRemoval($this->resource)))->execute(new WithdrawalContext('test_purpose', ['consent-a'], $website,
-            str_repeat('b', 64), 'banner'));
+        // the permission 'consent-a' is revoked (with the consent bridge: its withdrawal handler does this)
+        (new SubscriptionRemoval($this->resource))->removeByPermission(['consent-a']);
         $this->assertSame([], $this->rows());
         $this->assertFalse($guard->isValid($id, $this->type));
         $this->assertSame([$used, $unused], $this->unusedContacts([$used, $unused]));

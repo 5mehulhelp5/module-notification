@@ -120,15 +120,16 @@ send-time check (`SubscriptionGuardInterface`) contain, so a revocation at the s
 permission (e.g. Consent compares the browser the consent was given in); a feature hands over something the
 subscriber owns only when it can tell. When a permission is revoked or the shopper unsubscribes,
 call `Api\SubscriptionRemovalInterface` (`removeByPermission($references)`, `remove($subscriptionId)`).
-Today both preferences point to CommerceKings_Consent (`Model\Consent\*`); they move to a separate consent bridge
-so Notification can run without the consent core.
+The default, `Model\OpenPermission`, allows every authorized subscription until it is removed (opt-out) and cannot
+identify visitors. `commercekings/module-consent-notification` replaces it with CommerceKings_Consent: a subscription
+needs a valid consent for the type's purpose, and withdrawing that consent removes it.
 
 ### Subscription types
 
 For notifications a visitor signs up for, also:
 
 1. Implement `Api\SubscriptionTypeInterface`:
-   - `getPurpose()`: the Consent purpose (declared by your module);
+   - `getPurpose()`: what the subscription is for (with the consent bridge: the Consent purpose your module declares);
    - `isSingle()`: one subscription per reference (a new email replaces it) or one per person;
    - `authorize($reference, $customerId)`: `null` when the visitor may not touch it, else a `Data\Target`
      with your id, the store, whether it accepts subscriptions now, and an optional trusted SQL condition
@@ -136,7 +137,7 @@ For notifications a visitor signs up for, also:
    - `orphanCondition($referenceIdColumn)`: SQL true once your item is gone (e.g. Magento deleted the cart).
      Notification has no foreign key to your table; this is how a deleted item's subscriptions, and then the
      guest's address, are removed.
-2. Register it under the same code, and Notification's withdrawal handler under your purpose:
+2. Register it under the same code:
    ```xml
    <type name="CommerceKings\Notification\Model\SubscriptionTypePool">
        <arguments>
@@ -145,22 +146,13 @@ For notifications a visitor signs up for, also:
            </argument>
        </arguments>
    </type>
-   <type name="CommerceKings\Consent\Model\WithdrawalPool">
-       <arguments>
-           <argument name="handlers" xsi:type="array">
-               <item name="my_purpose" xsi:type="array">
-                   <item name="notification_subscriptions" xsi:type="object">CommerceKings\Notification\Model\WithdrawalHandler</item>
-               </item>
-           </argument>
-       </arguments>
-   </type>
    ```
-   Without the handler nothing is sent anyway (the consumer and claims check the consent); only cleanup waits.
+   With the consent bridge, withdrawing your purpose's consent removes the subscriptions; nothing else to register.
 3. Queue the **subscription id**; read it with `Api\SubscriptionRepositoryInterface` (`getEmail()` gives the
    contact's address or the customer's current one). Repeat the check inside your atomic claim: without the
    subscription table in the UPDATE, add `Api\SubscriptionGuardInterface::validCondition('<subscription id>')`;
    with it joined (e.g. `… JOIN ck_notification_subscription AS s`), check the same row (`s.subscription_id = ?`)
-   and `CommerceKings\Consent\Api\ConsentGuardInterface::validCondition('s.consent_id')` instead - MySQL does
+   and `Api\SubscriptionPermissionInterface::validCondition('s.consent_id')` instead - MySQL does
    not allow a subquery on a table the UPDATE itself joins (error 1093).
 4. Keep your send history keyed by what "once" means for you (e.g. the cart), never by the subscription id:
    a withdrawal deletes the subscription, and subscribing again creates a new one.
