@@ -40,11 +40,13 @@
             "contact_id": true,
             "customer_id": true,
             "consent_id": true,
+            "permission_ref": true,
             "browser_hash": true,
             "captured_at": true
         },
         "index": {
             "CK_NOTIFICATION_SUBSCRIPTION_CONSENT_ID": true,
+            "CK_NOTIFICATION_SUBSCRIPTION_PERMISSION_REF": true,
             "CK_NOTIFICATION_SUBSCRIPTION_CONTACT_ID": true,
             "CK_NOTIFICATION_SUBSCRIPTION_CUSTOMER_ID": true
         },

@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace CommerceKings\Notification\Api\Data;
 
 /**
- * One visitor's subscription to one reference of a type, with the consent it was given under.
+ * One visitor's subscription to one reference of a type, with the permission it was given under.
  * A guest has a contact, a customer a customer id (their current account email is used).
  *
  * @api
@@ -18,7 +18,8 @@ class Subscription
         public readonly int $storeId,
         public readonly ?int $contactId,
         public readonly ?int $customerId,
-        public readonly string $consentId,
+        /** SubscriptionPermissionInterface's reference (e.g. a consent id), '' when none */
+        public readonly string $permissionRef,
         public readonly string $capturedAt
     ) {
     }

@@ -124,24 +124,24 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         return $conditions;
     }
 
-    private function store(string $code, SubscriptionTypeInterface $type, Target $target, string $consentId,
+    private function store(string $code, SubscriptionTypeInterface $type, Target $target, string $reference,
         ?int $contactId, ?int $customerId): bool
     {
         $db = $this->resource->getConnection();
         $subjectKey = $this->subjectKey($type, $contactId, $customerId);
-        $conditions = $this->conditions($consentId, $target);
+        $conditions = $this->conditions($reference, $target);
         $statement = $db->query(sprintf(
-            'INSERT INTO %s (type, reference_id, store_id, subject_key, contact_id, customer_id, consent_id, captured_at)'
+            'INSERT INTO %s (type, reference_id, store_id, subject_key, contact_id, customer_id, permission_ref, captured_at)'
             . ' SELECT ?, ?, ?, ?, ?, ?, ?, NOW() FROM DUAL WHERE %s ON DUPLICATE KEY UPDATE'
             // MySQL assigns in order: compare the old values before replacing them. A change restarts the delay.
-            . ' captured_at = IF(contact_id <=> ? AND customer_id <=> ? AND consent_id = ?, captured_at, NOW()),'
-            . ' store_id = ?, contact_id = ?, customer_id = ?, consent_id = ?',
+            . ' captured_at = IF(contact_id <=> ? AND customer_id <=> ? AND permission_ref = ?, captured_at, NOW()),'
+            . ' store_id = ?, contact_id = ?, customer_id = ?, permission_ref = ?',
             $db->quoteIdentifier($this->resource->getTableName(self::TABLE)),
             implode(' AND ', $conditions)
         ), [
-            $code, $target->referenceId, $target->storeId, $subjectKey, $contactId, $customerId, $consentId,
-            $contactId, $customerId, $consentId,
-            $target->storeId, $contactId, $customerId, $consentId,
+            $code, $target->referenceId, $target->storeId, $subjectKey, $contactId, $customerId, $reference,
+            $contactId, $customerId, $reference,
+            $target->storeId, $contactId, $customerId, $reference,
         ]);
         if ($statement->rowCount() > 0) {
             return true;
@@ -149,7 +149,7 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         // Zero rows: refused, or an identical retry of an acknowledged-but-lost response.
         $select = $db->select()->from($this->resource->getTableName(self::TABLE), 'subscription_id')
             ->where('type = ?', $code)->where('reference_id = ?', $target->referenceId)
-            ->where('subject_key = ?', $subjectKey)->where('consent_id = ?', $consentId)
+            ->where('subject_key = ?', $subjectKey)->where('permission_ref = ?', $reference)
             ->where($contactId === null ? 'contact_id IS NULL' : $db->quoteInto('contact_id = ?', $contactId))
             ->where($customerId === null ? 'customer_id IS NULL' : $db->quoteInto('customer_id = ?', $customerId));
         foreach ($conditions as $condition) {

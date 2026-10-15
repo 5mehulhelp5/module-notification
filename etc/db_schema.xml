@@ -35,7 +35,7 @@
             <column name="created_at"/>
         </index>
     </table>
-    <!-- who wants which notification, under which consent; no row = not subscribed -->
+    <!-- who wants which notification, under which permission; no row = not subscribed -->
     <table name="ck_notification_subscription" resource="default" engine="innodb" comment="CK notification: subscriptions">
         <column xsi:type="int" name="subscription_id" unsigned="true" nullable="false" identity="true" comment="Subscription ID"/>
         <column xsi:type="varchar" name="type" nullable="false" length="64" comment="Notification type code"/>
@@ -44,7 +44,8 @@
         <column xsi:type="varchar" name="subject_key" nullable="false" length="32" default="" comment="'' for single types, else c:contact or u:customer"/>
         <column xsi:type="int" name="contact_id" unsigned="true" nullable="true" comment="Guest contact"/>
         <column xsi:type="int" name="customer_id" unsigned="true" nullable="true" comment="Customer"/>
-        <column xsi:type="varchar" name="consent_id" nullable="false" length="32" comment="CommerceKings_Consent consent"/>
+        <column xsi:type="varchar" name="permission_ref" nullable="false" length="64" default="" onCreate="migrateDataFrom(consent_id)"
+                comment="Permission reference (SubscriptionPermissionInterface), '' when none"/>
         <column xsi:type="timestamp" name="captured_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="Created or last changed"/>
         <constraint xsi:type="primary" referenceId="PRIMARY">
             <column name="subscription_id"/>
@@ -63,8 +64,8 @@
         <constraint xsi:type="foreign" referenceId="CK_NOTIFICATION_SUBSCRIPTION_CUSTOMER_ID_CUSTOMER_ENTITY_ENTITY_ID"
                     table="ck_notification_subscription" column="customer_id" referenceTable="customer_entity"
                     referenceColumn="entity_id" onDelete="CASCADE"/>
-        <index referenceId="CK_NOTIFICATION_SUBSCRIPTION_CONSENT_ID" indexType="btree">
-            <column name="consent_id"/>
+        <index referenceId="CK_NOTIFICATION_SUBSCRIPTION_PERMISSION_REF" indexType="btree">
+            <column name="permission_ref"/>
         </index>
         <index referenceId="CK_NOTIFICATION_SUBSCRIPTION_CONTACT_ID" indexType="btree">
             <column name="contact_id"/>

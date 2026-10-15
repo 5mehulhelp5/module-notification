@@ -20,7 +20,7 @@ class SubscriptionRemoval implements SubscriptionRemovalInterface
             return 0;
         }
         return $this->resource->getConnection()->delete($this->resource->getTableName(SubscriptionManagement::TABLE),
-            ['consent_id IN (?)' => $references]);
+            ['permission_ref IN (?)' => $references]);
     }
 
     public function remove(int $subscriptionId): bool

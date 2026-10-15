@@ -6,7 +6,7 @@ namespace CommerceKings\Notification\Api;
 use CommerceKings\Notification\Api\Data\Subscription;
 
 /**
- * Read subscriptions. Rows exist only with a consent; validity at send time is
+ * Read subscriptions. Rows exist only with a permission; validity at send time is
  * SubscriptionGuardInterface's job.
  *
  * @api

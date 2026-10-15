@@ -152,7 +152,7 @@ For notifications a visitor signs up for, also:
    contact's address or the customer's current one). Repeat the check inside your atomic claim: without the
    subscription table in the UPDATE, add `Api\SubscriptionGuardInterface::validCondition('<subscription id>')`;
    with it joined (e.g. `… JOIN ck_notification_subscription AS s`), check the same row (`s.subscription_id = ?`)
-   and `Api\SubscriptionPermissionInterface::validCondition('s.consent_id')` instead - MySQL does
+   and `Api\SubscriptionPermissionInterface::validCondition('s.permission_ref')` instead - MySQL does
    not allow a subquery on a table the UPDATE itself joins (error 1093).
 4. Keep your send history keyed by what "once" means for you (e.g. the cart), never by the subscription id:
    a withdrawal deletes the subscription, and subscribing again creates a new one.

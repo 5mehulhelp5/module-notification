@@ -35,14 +35,14 @@ class SubscriptionTest extends TestCase
     public function testGuardConditionNeedsTheRowAndAValidConsent(): void
     {
         $this->assertSame('EXISTS (SELECT 1 FROM ck_notification_subscription AS ck_ns WHERE ck_ns.subscription_id = c.subscription_id'
-            . ' AND VALID(ck_ns.consent_id))', $this->guard()->validCondition('c.subscription_id'));
+            . ' AND VALID(ck_ns.permission_ref))', $this->guard()->validCondition('c.subscription_id'));
     }
 
     public function testGuardChecksIdTypeAndConsent(): void
     {
         $this->fetchOneResult = '7';
         $this->assertTrue($this->guard()->isValid(7, 'test_type'));
-        $this->assertSame([['ck_ns.subscription_id = ?', 7], ['ck_ns.type = ?', 'test_type'], ['VALID(ck_ns.consent_id)', null]],
+        $this->assertSame([['ck_ns.subscription_id = ?', 7], ['ck_ns.type = ?', 'test_type'], ['VALID(ck_ns.permission_ref)', null]],
             $this->selectWhere);
         $this->fetchOneResult = false;
         $this->assertFalse($this->guard()->isValid(7, 'test_type'));
@@ -56,8 +56,8 @@ class SubscriptionTest extends TestCase
         $this->assertSame(0, $removal->removeByPermission(['']), '"no reference" is shared - never a removal key');
         $removal->removeByPermission(['', 'c']);
         $this->assertSame([
-            ['table' => 'ck_notification_subscription', 'where' => ['consent_id IN (?)' => ['a', 'b']]],
-            ['table' => 'ck_notification_subscription', 'where' => ['consent_id IN (?)' => ['c']]],
+            ['table' => 'ck_notification_subscription', 'where' => ['permission_ref IN (?)' => ['a', 'b']]],
+            ['table' => 'ck_notification_subscription', 'where' => ['permission_ref IN (?)' => ['c']]],
         ], $this->deletes);
     }
 
@@ -129,7 +129,7 @@ class SubscriptionTest extends TestCase
     public function testGetMapsTheRow(): void
     {
         $this->fetchRowResult = ['subscription_id' => '7', 'type' => 'test_type', 'reference_id' => '42', 'store_id' => '1',
-            'subject_key' => '', 'contact_id' => null, 'customer_id' => '9', 'consent_id' => 'consent',
+            'subject_key' => '', 'contact_id' => null, 'customer_id' => '9', 'permission_ref' => 'consent',
             'captured_at' => '2026-01-01 00:00:00'];
         $repository = new SubscriptionRepository($this->resource(), $this->createStub(ContactRepositoryInterface::class),
             $this->createStub(CustomerRepositoryInterface::class));

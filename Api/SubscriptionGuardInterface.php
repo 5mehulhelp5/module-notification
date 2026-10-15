@@ -15,7 +15,7 @@ namespace CommerceKings\Notification\Api;
 interface SubscriptionGuardInterface
 {
     /**
-     * SQL condition: the subscription exists and its consent is valid (CommerceKings_Consent rules).
+     * SQL condition: the subscription exists and its permission is valid (SubscriptionPermissionInterface).
      * @param string $subscriptionIdColumn trusted SQL identifier/expression or an adapter-quoted value
      */
     public function validCondition(string $subscriptionIdColumn): string;

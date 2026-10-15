@@ -5,15 +5,15 @@ namespace CommerceKings\Notification\Api;
 
 /**
  * The only way a visitor subscribes to a notification. Order: email rules, the type's authorize(),
- * consent for the type's purpose (CommerceKings_Consent, read server-side), the contact, then one
- * INSERT that also checks the consent is still valid - a withdrawal at the same moment wins.
+ * the permission (SubscriptionPermissionInterface, read server-side), the contact, then one INSERT that
+ * also checks the permission is still valid - a revocation at the same moment wins.
  *
  * @api
  */
 interface SubscriptionManagementInterface
 {
     /**
-     * Guest. An empty email, missing consent or a type that is not accepting removes the guest's
+     * Guest. An empty email, an absent permission or a type that is not accepting removes the guest's
      * subscription of a single type (a type with one subscription per person keeps it; withdrawal
      * links remove those).
      *
@@ -26,8 +26,8 @@ interface SubscriptionManagementInterface
     public function subscribeGuest(string $type, string $reference, mixed $email): bool;
 
     /**
-     * Logged-in customer; the email comes from the account. Without consent in this browser nothing
-     * changes (a consent from another device stays); withdrawals remove it.
+     * Logged-in customer; the email comes from the account. Without a permission nothing changes
+     * (e.g. a consent from another device stays); revoking the permission removes it.
      *
      * @param int $customerId forced from the session or token
      * @param string $type notification type code
