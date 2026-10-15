@@ -2,11 +2,11 @@
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
     <system>
-        <section id="commercekings_notification" translate="label" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+        <section id="commercekings_notification" translate="label" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
             <label>Notifications</label>
             <tab>commercekings</tab>
             <resource>CommerceKings_Notification::config</resource>
-            <group id="general" translate="label comment" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
+            <group id="general" translate="label comment" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
                 <label>Email delivery</label>
                 <fieldset_css>commercekings-config-section</fieldset_css>
                 <comment>Shared by all CommerceKings notifications.</comment>
@@ -14,6 +14,11 @@
                     <label>Email cooldown (days)</label>
                     <comment>Minimum gap between emails to the same address, across all notifications that use it and all stores. 0 turns it off. Default: 7 days.</comment>
                     <validate>required-entry validate-digits</validate>
+                </field>
+                <field id="one_click_unsubscribe" translate="label comment" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>One-click unsubscribe</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment><![CDATA[Adds an unsubscribe option in supported email apps, alongside the unsubscribe link in the email. Requires DKIM signing by your mail provider. See <a href="https://www.rfc-editor.org/rfc/rfc8058" target="_blank" rel="noopener noreferrer">RFC 8058</a>.]]></comment>
                 </field>
             </group>
         </section>

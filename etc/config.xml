@@ -5,6 +5,7 @@
         <commercekings_notification>
             <general>
                 <cooldown_days>7</cooldown_days>
+                <one_click_unsubscribe>0</one_click_unsubscribe>
             </general>
         </commercekings_notification>
     </default>

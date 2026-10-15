@@ -22,4 +22,14 @@ class ConfigTest extends TestCase
         $scope->method('getValue')->willReturnCallback(fn ($path) => $path === 'commercekings_notification/general/cooldown_days' ? $stored : null);
         $this->assertSame($expected, (new Config($scope))->getCooldownDays());
     }
+
+    public function testOneClickFlagIsReadForTheMessagesStore(): void
+    {
+        $scope = $this->createMock(ScopeConfigInterface::class);
+        $scope->expects($this->exactly(2))->method('isSetFlag')
+            ->with('commercekings_notification/general/one_click_unsubscribe', 'store', 3)->willReturnOnConsecutiveCalls(false, true);
+        $config = new Config($scope);
+        $this->assertFalse($config->isOneClickUnsubscribeEnabled(3));
+        $this->assertTrue($config->isOneClickUnsubscribeEnabled(3));
+    }
 }

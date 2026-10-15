@@ -37,14 +37,17 @@ Each module answers one question:
   for subscription types the reference is the subscription id, and only a subscription that still exists with
   a valid consent is handed over.
 - **Mailer**: optional recipient cooldown, recipient re-check, content built in the message's store,
-  optional RFC 8058 one-click unsubscribe headers. A failure before the mail server accepted the email
+  optional RFC 8058 one-click unsubscribe headers (**One-click unsubscribe**, Yes/No per website, default No; the
+  type's unsubscribe link must accept the mail client's POST). A failure before the mail server accepted the email
   releases the cooldown claim; a failure after it surfaces as `MessageSentException` so it is never sent twice.
 - **Recipient cooldown**: minimum gap between emails to the same address across all notifications that
   use it and all stores. Keyed hashes only (`ck_notification_cooldown`), never an address.
 
 ## Subscribe
 
-Not done (yet): rate limiting or a captcha on the guest endpoint, and confirming the address (double opt-in).
+Abuse protection for the anonymous guest endpoint belongs to your infrastructure – see *Rate limiting* below.
+Without it, the recipient cooldown (one email per address per configured days) and the feature's own sending
+limits cap how often a stranger's address can be mailed, but not how fast a script can subscribe addresses.
 
 | Endpoint | Who | Body |
 | --- | --- | --- |
@@ -59,6 +62,32 @@ type or invalid email is Magento's 400 without echoing the address.
 - **Customer:** without a consent in this browser nothing changes; a consent from another device stays.
 - A change of contact, customer, consent or browser sets `captured_at` (a type may use it to restart a delay);
   an identical retry does not.
+
+## Rate limiting
+
+Rate-limit `POST /rest/<store>/V1/ck-notification/subscriptions` per client IP in front of Magento – it then never
+starts for a flood. The storefront scripts treat HTTP 429 as temporary and retry with back-off, so shoppers are not
+affected. A checkout sends a few requests per minute at most; suggested: 10 per minute per IP with a small burst.
+
+nginx (keep your usual Magento REST handling in the location):
+
+```nginx
+# http {}
+limit_req_zone $binary_remote_addr zone=ck_subscribe:10m rate=10r/m;
+
+# server {}
+location ~ ^/rest/[^/]+/V1/ck-notification/subscriptions {
+    limit_req zone=ck_subscribe burst=5 nodelay;
+    limit_req_status 429;
+    try_files $uri $uri/ /index.php$is_args$args;
+}
+```
+
+Behind Cloudflare or another proxy, restore the client IP first (`set_real_ip_from` with the proxy's ranges and
+`real_ip_header CF-Connecting-IP`), or use the proxy's own rate-limiting rule on the same path with status 429.
+A request rate cannot see what a request contains: a slow script can still try many addresses, so also keep the
+recipient cooldown on and set the feature's hourly sending limit (e.g. abandoned cart's *Maximum reminders per hour*).
+A bot challenge (e.g. Cloudflare Turnstile) can be added at the same layer; none is shipped.
 
 ## For module authors
 
@@ -126,7 +155,8 @@ For notifications a visitor signs up for, also:
 ## Admin
 
 **Stores > Configuration > CommerceKings > Notifications**: *Email cooldown (days)*, default 7,
-**0 turns it off**.
+**0 turns it off** (global); *One-click unsubscribe*, default No (per website) – RFC 8058 headers on every
+notification whose content passes an HTTPS unsubscribe URL; that URL must accept the mail client's POST.
 
 ## Operation
 
