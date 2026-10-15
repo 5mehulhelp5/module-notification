@@ -244,6 +244,26 @@ class SubscriptionTest extends TestCase
             ->where('n.contact_id IN (?)', $ids)->where('NOT (' . implode(' OR ', $used) . ')')->order('n.contact_id')));
     }
 
+    public function testDistinctAddressesNeverShareAContactOrARecipient(): void
+    {
+        $contacts = $this->om->get(ContactRepositoryInterface::class);
+        $website = (int)$this->stores->getStore()->getWebsiteId();
+        $plain = 'person.' . $this->type . '@example.com';
+        $accented = 'person.' . $this->type . '@exámple.com';
+        $plainId = $contacts->save($website, $plain);
+        $accentedId = $contacts->save($website, $accented);
+        $this->assertNotSame($plainId, $accentedId, 'the email column\'s collation would match these');
+        $this->assertSame($plainId, $contacts->save($website, '  ' . strtoupper($plain) . ' '), 'case and spaces are one address');
+        $this->assertSame($accented, $contacts->getEmail($accentedId));
+
+        $this->single = false;
+        $management = $this->management();
+        $this->assertTrue($management->subscribeGuest($this->type, 'ref', $plain));
+        $this->assertTrue($management->subscribeGuest($this->type, 'ref', $accented));
+        $this->assertSame([$plain, $accented], array_column($this->rows(), 'email'), 'each subscription mails its own address');
+        $this->resource->getConnection()->delete($this->table(ContactRepository::TABLE), ['contact_id IN (?)' => [$plainId, $accentedId]]);
+    }
+
     public function testCleanupRemovesOnlyOrphanedSubscriptionsOfRegisteredTypes(): void
     {
         $this->single = false;

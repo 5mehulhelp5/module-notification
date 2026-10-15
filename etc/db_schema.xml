@@ -17,14 +17,16 @@
     <table name="ck_notification_contact" resource="default" engine="innodb" comment="CK notification: guest contacts">
         <column xsi:type="int" name="contact_id" unsigned="true" nullable="false" identity="true" comment="Contact ID"/>
         <column xsi:type="smallint" name="website_id" unsigned="true" nullable="false" comment="Website"/>
-        <column xsi:type="varchar" name="email" nullable="false" length="255" comment="Email address"/>
+        <column xsi:type="varchar" name="email" nullable="false" length="255" comment="Email address, as first entered"/>
+        <!-- the identity (ContactRepository::key()): the email column's collation ignores case and accents -->
+        <column xsi:type="varchar" name="email_key" nullable="false" length="64" comment="sha256 of the normalized address"/>
         <column xsi:type="timestamp" name="created_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="First seen"/>
         <constraint xsi:type="primary" referenceId="PRIMARY">
             <column name="contact_id"/>
         </constraint>
-        <constraint xsi:type="unique" referenceId="CK_NOTIFICATION_CONTACT_WEBSITE_ID_EMAIL">
+        <constraint xsi:type="unique" referenceId="CK_NOTIFICATION_CONTACT_WEBSITE_ID_EMAIL_KEY">
             <column name="website_id"/>
-            <column name="email"/>
+            <column name="email_key"/>
         </constraint>
         <constraint xsi:type="foreign" referenceId="CK_NOTIFICATION_CONTACT_WEBSITE_ID_STORE_WEBSITE_WEBSITE_ID"
                     table="ck_notification_contact" column="website_id" referenceTable="store_website"

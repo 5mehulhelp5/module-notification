@@ -16,6 +16,6 @@ First release. Features:
   one withdrawal handler for every type; the consumer only hands over valid subscriptions; a daily cleanup
   removes subscriptions whose item is gone (`orphanCondition()`).
 - **Guest contacts** (`ck_notification_contact`, `ContactRepositoryInterface`) shared by notification
-  features, with reference-based cleanup of unused contacts.
+  features, keyed by an exact normalized address (`email_key`), with reference-based cleanup of unused contacts.
 
 No public release has been tagged or published yet.

@@ -19,11 +19,22 @@ class ContactRepositoryTest extends TestCase
         $this->fetchOneResult = '5';
         $this->assertSame(5, (new ContactRepository($this->resource()))->save(1, '  Guest@Example.Test '));
         [$sql, $bind] = $this->queries[0];
-        $this->assertStringContainsString('INSERT INTO ck_notification_contact (website_id, email) VALUES (?, ?)', $sql);
+        $this->assertStringContainsString('INSERT INTO ck_notification_contact (website_id, email, email_key) VALUES (?, ?, ?)', $sql);
         $this->assertStringContainsString('ON DUPLICATE KEY UPDATE contact_id = contact_id', $sql);
-        $this->assertSame([1, 'Guest@Example.Test'], $bind, 'trimmed; case is kept, the unique key ignores it');
+        $key = hash('sha256', 'guest@example.test');
+        $this->assertSame([1, 'Guest@Example.Test', $key], $bind, 'trimmed and kept as entered; identity is the key');
         $this->assertContains(['website_id = ?', 1], $this->selectWhere);
-        $this->assertContains(['email = ?', 'Guest@Example.Test'], $this->selectWhere);
+        $this->assertContains(['email_key = ?', $key], $this->selectWhere, 'looked up by key, never by the email column');
+    }
+
+    public function testKeyIgnoresCaseAndUnicodeFormButNotAccents(): void
+    {
+        $this->assertSame(ContactRepository::key('Person@Example.com'), ContactRepository::key(' person@example.com '));
+        $this->assertNotSame(ContactRepository::key('person@example.com'), ContactRepository::key('person@exámple.com'));
+        // the same accented address, precomposed (NFC) and decomposed (NFD), is one identity
+        $this->assertSame(ContactRepository::key("person@ex\u{00E1}mple.com"), ContactRepository::key("person@exa\u{0301}mple.com"));
+        $this->assertSame(ContactRepository::key('PERSON@EXÁMPLE.COM'), ContactRepository::key('person@exámple.com'));
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{64}$/', ContactRepository::key('person@example.com'));
     }
 
     public function testSaveNeedsAWebsiteAndAnAddress(): void

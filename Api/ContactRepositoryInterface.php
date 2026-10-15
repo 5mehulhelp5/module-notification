@@ -10,7 +10,10 @@ namespace CommerceKings\Notification\Api;
  */
 interface ContactRepositoryInterface
 {
-    /** The contact for this address, created on first use. */
+    /**
+     * The contact for this address, created on first use. One contact per website and address: letter case and
+     * surrounding spaces are ignored, every other difference (e.g. an accent) is another address.
+     */
     public function save(int $websiteId, string $email): int;
 
     public function getEmail(int $contactId): ?string;

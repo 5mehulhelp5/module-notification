@@ -27,7 +27,9 @@ Each module answers one question:
   `authorize()` → consent for the type's purpose and website → contact → one INSERT that repeats the consent
   check and the type's condition, so a withdrawal or a changed reference at the same moment wins.
 - **Withdrawal**: one handler removes the subscriptions of withdrawn consents for every type.
-- **Contacts**: guest email addresses, one per website and address (`ck_notification_contact`).
+- **Contacts**: guest email addresses, one per website and address (`ck_notification_contact`). Identity is
+  `email_key`, a hash of the trimmed, Unicode-normalized, lower-cased address: letter case is ignored, an
+  accent or any other character makes another address (the `email` column's collation would merge them).
   Customers use their account email. Cron `commercekings_notification_contact_cleanup` (daily 03:15) removes
   contacts nothing uses after a 24-hour grace period; modules that store contact ids themselves register an
   `Api\ContactReferenceInterface` (`Model\ContactReferencePool` "references").
