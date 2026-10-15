@@ -42,6 +42,8 @@ Each module answers one question:
 
 ## Subscribe
 
+Not done (yet): rate limiting or a captcha on the guest endpoint, and confirming the address (double opt-in).
+
 | Endpoint | Who | Body |
 | --- | --- | --- |
 | `POST /rest/V1/ck-notification/subscriptions` (anonymous) | guest | `{"type", "reference", "email"}`; `""` unsubscribes |
@@ -86,7 +88,10 @@ For notifications a visitor signs up for, also:
    - `isSingle()`: one subscription per reference (a new email replaces it) or one per person;
    - `authorize($reference, $customerId)`: `null` when the visitor may not touch it, else a `Data\Target`
      with your id, the store, whether it accepts subscriptions now, and an optional trusted SQL condition
-     repeated in the write (e.g. "the cart is still active in this store").
+     repeated in the write (e.g. "the cart is still active in this store");
+   - `orphanCondition($referenceIdColumn)`: SQL true once your item is gone (e.g. Magento deleted the cart).
+     Notification has no foreign key to your table; this is how a deleted item's subscriptions, and then the
+     guest's address, are removed.
 2. Register it under the same code, and Notification's withdrawal handler under your purpose:
    ```xml
    <type name="CommerceKings\Notification\Model\SubscriptionTypePool">
@@ -108,8 +113,11 @@ For notifications a visitor signs up for, also:
    ```
    Without the handler nothing is sent anyway (the consumer and claims check the consent); only cleanup waits.
 3. Queue the **subscription id**; read it with `Api\SubscriptionRepositoryInterface` (`getEmail()` gives the
-   contact's address or the customer's current one) and put `Api\SubscriptionGuardInterface::validCondition()`
-   into your atomic claim.
+   contact's address or the customer's current one). Repeat the check inside your atomic claim: without the
+   subscription table in the UPDATE, add `Api\SubscriptionGuardInterface::validCondition('<subscription id>')`;
+   with it joined (e.g. `… JOIN ck_notification_subscription AS s`), check the same row (`s.subscription_id = ?`)
+   and `CommerceKings\Consent\Api\ConsentGuardInterface::validCondition('s.consent_id')` instead - MySQL does
+   not allow a subquery on a table the UPDATE itself joins (error 1093).
 4. Keep your send history keyed by what "once" means for you (e.g. the cart), never by the subscription id:
    a withdrawal deletes the subscription, and subscribing again creates a new one.
 
@@ -125,6 +133,9 @@ For notifications a visitor signs up for, also:
   again on the next cron run. `queue/consumers_wait_for_messages` controls whether it waits for more
   messages when the queue is empty.
 - Cron `commercekings_notification_cooldown_cleanup` (daily 03:00) removes expired cooldown rows.
+- Cron `commercekings_notification_subscription_cleanup` (daily 03:10) removes subscriptions whose item is gone
+  (each type's `orphanCondition()`); subscriptions of a type that is no longer registered are left alone.
+  The contact cleanup (03:15) then removes addresses nothing uses.
 
 ## Queue transport
 

@@ -13,7 +13,8 @@ First release. Features:
 - **Subscriptions** (`ck_notification_subscription`): one subscribe endpoint for every type
   (`/V1/ck-notification/subscriptions`, `/mine` for customers) with shared email rules, the type's
   authorization, consent for its purpose (requires `commercekings/module-consent`) and one guarded write;
-  one withdrawal handler for every type; the consumer only hands over valid subscriptions.
+  one withdrawal handler for every type; the consumer only hands over valid subscriptions; a daily cleanup
+  removes subscriptions whose item is gone (`orphanCondition()`).
 - **Guest contacts** (`ck_notification_contact`, `ContactRepositoryInterface`) shared by notification
   features, with reference-based cleanup of unused contacts.
 

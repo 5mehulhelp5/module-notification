@@ -11,6 +11,7 @@ use CommerceKings\Consent\Api\Data\WithdrawalContext;
 use CommerceKings\Notification\Api\ContactRepositoryInterface;
 use CommerceKings\Notification\Api\Data\Target;
 use CommerceKings\Notification\Api\SubscriptionTypeInterface;
+use CommerceKings\Notification\Cron\CleanUpSubscriptions;
 use CommerceKings\Notification\Model\ContactReferencePool;
 use CommerceKings\Notification\Model\ContactRepository;
 use CommerceKings\Notification\Model\SubscriptionGuard;
@@ -44,6 +45,8 @@ class SubscriptionTest extends TestCase
     private string $consentId = 'consent-a';
     private string $condition = '1 = 1';
     private bool $single = true;
+    /** the reference the test type reports as deleted */
+    private int $orphan = 0;
     private int $storeId;
     private array $customers = [];
     private array $websites = [];
@@ -106,6 +109,7 @@ class SubscriptionTest extends TestCase
         $type->method('getPurpose')->willReturn('test_purpose');
         $type->method('isSingle')->willReturnCallback(fn () => $this->single);
         $type->method('authorize')->willReturnCallback(fn () => new Target($this->reference, $this->storeId, true, $this->condition));
+        $type->method('orphanCondition')->willReturnCallback(fn ($column) => $column . ' = ' . $this->orphan);
         $consent = $this->createStub(ConsentInterface::class);
         $consent->method('getCurrent')->willReturnCallback(fn () => new Consent($this->consentId, 'test_purpose',
             (int)$this->stores->getStore($this->storeId)->getWebsiteId(), 'banner', 'choice', '2026-01-01 00:00:00',
@@ -238,6 +242,24 @@ class SubscriptionTest extends TestCase
             $this->om->get(ContactReferencePool::class)->getAll());
         return array_map('intval', $db->fetchCol($db->select()->from(['n' => $this->table(ContactRepository::TABLE)], 'contact_id')
             ->where('n.contact_id IN (?)', $ids)->where('NOT (' . implode(' OR ', $used) . ')')->order('n.contact_id')));
+    }
+
+    public function testCleanupRemovesOnlyOrphanedSubscriptionsOfRegisteredTypes(): void
+    {
+        $this->single = false;
+        $management = $this->management();
+        $this->assertTrue($management->subscribeGuest($this->type, 'ref', $this->email('kept')));
+        $kept = $this->reference;
+        $this->reference++;
+        $this->assertTrue($management->subscribeGuest($this->type, 'ref', $this->email('gone')));
+        $this->orphan = $this->reference;
+        $type = $this->createStub(SubscriptionTypeInterface::class);
+        $type->method('orphanCondition')->willReturnCallback(fn ($column) => $column . ' = ' . $this->orphan);
+        $cleanup = new CleanUpSubscriptions($this->resource, new SubscriptionTypePool([$this->type => $type]));
+        $this->assertSame(1, $cleanup->execute());
+        $this->assertSame([(string)$kept], array_column($this->rows(), 'reference_id'));
+        $this->assertSame(0, (new CleanUpSubscriptions($this->resource, new SubscriptionTypePool([])))->execute(),
+            'an unregistered type is left alone');
     }
 
     public function testDeletingTheStoreOrCustomerRemovesTheirSubscriptions(): void

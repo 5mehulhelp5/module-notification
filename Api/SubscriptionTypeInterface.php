@@ -31,4 +31,12 @@ interface SubscriptionTypeInterface
      * @return Target|null null: not theirs or does not exist - refused, nothing changes
      */
     public function authorize(string $reference, int $customerId): ?Target;
+
+    /**
+     * SQL that is true when the referenced item no longer exists (e.g. Magento deleted the cart), so the daily
+     * cleanup removes its subscriptions - and with them the guest's address. Notification cannot hold a foreign key
+     * to every feature's table; this replaces it.
+     * @param string $referenceIdColumn trusted SQL identifier of the subscription's reference_id
+     */
+    public function orphanCondition(string $referenceIdColumn): string;
 }

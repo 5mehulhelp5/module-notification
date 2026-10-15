@@ -19,4 +19,10 @@ class SubscriptionTypePool
         $type = $this->types[$code] ?? null;
         return $type instanceof SubscriptionTypeInterface ? $type : null;
     }
+
+    /** @return array<string, SubscriptionTypeInterface> code => type */
+    public function getAll(): array
+    {
+        return array_filter($this->types, fn ($type) => $type instanceof SubscriptionTypeInterface);
+    }
 }

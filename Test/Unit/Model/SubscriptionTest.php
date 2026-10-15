@@ -7,6 +7,9 @@ use CommerceKings\Consent\Api\ConsentGuardInterface;
 use CommerceKings\Consent\Api\Data\WithdrawalContext;
 use CommerceKings\Notification\Api\ContactRepositoryInterface;
 use CommerceKings\Notification\Api\Data\Subscription;
+use CommerceKings\Notification\Api\SubscriptionTypeInterface;
+use CommerceKings\Notification\Cron\CleanUpSubscriptions;
+use CommerceKings\Notification\Model\SubscriptionTypePool;
 use CommerceKings\Notification\Model\SubscriptionContactReference;
 use CommerceKings\Notification\Model\SubscriptionGuard;
 use CommerceKings\Notification\Model\SubscriptionRepository;
@@ -52,6 +55,22 @@ class SubscriptionTest extends TestCase
         $handler->execute(new WithdrawalContext('test_purpose', [], 1, 'browser', 'banner'));
         $this->assertSame([['table' => 'ck_notification_subscription', 'where' => ['consent_id IN (?)' => ['a', 'b']]]],
             $this->deletes);
+    }
+
+    public function testCleanupRemovesSubscriptionsWhoseReferenceIsGoneForEveryRegisteredType(): void
+    {
+        $types = [];
+        foreach (['cart_reminder' => 'NO_CART', 'back_in_stock' => 'NO_PRODUCT'] as $code => $condition) {
+            $types[$code] = $this->createStub(SubscriptionTypeInterface::class);
+            $types[$code]->method('orphanCondition')->willReturnCallback(fn ($column) => $condition . '(' . $column . ')');
+        }
+        $this->queryRowCounts = [2, 1];
+        $this->assertSame(3, (new CleanUpSubscriptions($this->resource(), new SubscriptionTypePool($types + ['broken' => new \stdClass()])))
+            ->execute());
+        $this->assertSame([
+            ['DELETE s FROM ck_notification_subscription AS s WHERE s.type = ? AND (NO_CART(s.reference_id))', ['cart_reminder']],
+            ['DELETE s FROM ck_notification_subscription AS s WHERE s.type = ? AND (NO_PRODUCT(s.reference_id))', ['back_in_stock']],
+        ], $this->queries, 'one statement per type; unregistered types are left alone');
     }
 
     public function testSubscriptionsKeepTheirContacts(): void
