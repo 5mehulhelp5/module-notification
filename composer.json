@@ -1,0 +1,49 @@
+{
+    "name": "commercekings/module-notification",
+    "description": "Shared email delivery for CommerceKings notifications in Magento 2: one message queue consumer, optional recipient cooldown, store-emulated sending and one-click unsubscribe headers.",
+    "type": "magento2-module",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "CommerceKings"
+        }
+    ],
+    "require": {
+        "php": "~8.1.0||~8.2.0||~8.3.0||~8.4.0||~8.5.0",
+        "magento/framework": "^103.0",
+        "magento/module-store": "^101.1",
+        "magento/module-message-queue": "^100.4",
+        "magento/module-config": "^101.2",
+        "magento/module-backend": "^102.0",
+        "commercekings/module-core": "^0.1"
+    },
+    "suggest": {
+        "magento/module-mysql-mq": "Use Magento's native database queue transport when RabbitMQ is unavailable."
+    },
+    "autoload": {
+        "files": [
+            "registration.php"
+        ],
+        "psr-4": {
+            "CommerceKings\\Notification\\": ""
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
+    },
+    "archive": {
+        "exclude": [
+            "/Test/",
+            "/.github/",
+            "/.gitignore",
+            "/.gitattributes"
+        ]
+    },
+    "homepage": "https://github.com/commercekings/module-notification",
+    "support": {
+        "issues": "https://github.com/commercekings/module-notification/issues",
+        "source": "https://github.com/commercekings/module-notification"
+    }
+}

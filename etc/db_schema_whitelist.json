@@ -1,0 +1,15 @@
+{
+    "ck_notification_cooldown": {
+        "column": {
+            "recipient_hash": true,
+            "sent_at": true,
+            "claim_token": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        },
+        "index": {
+            "CK_NOTIFICATION_COOLDOWN_SENT_AT": true
+        }
+    }
+}

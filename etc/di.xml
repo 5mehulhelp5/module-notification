@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <preference for="CommerceKings\Notification\Api\MailerInterface" type="CommerceKings\Notification\Model\Mailer"/>
+    <preference for="CommerceKings\Notification\Api\CooldownInterface" type="CommerceKings\Notification\Model\Cooldown"/>
+    <preference for="CommerceKings\Notification\Api\QueueInterface" type="CommerceKings\Notification\Model\Queue"/>
+    <!-- feature modules register their notification types here (argument "types": code => NotificationTypeInterface) -->
+    <type name="CommerceKings\Notification\Model\TypePool">
+        <arguments>
+            <argument name="types" xsi:type="array"/>
+        </arguments>
+    </type>
+</config>

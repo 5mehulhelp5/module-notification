@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+    <!-- the email cooldown: keyed hashes only, never an address -->
+    <table name="ck_notification_cooldown" resource="default" engine="innodb" comment="CK notification: temporary recipient cooldown">
+        <column xsi:type="varchar" name="recipient_hash" nullable="false" length="64" comment="Keyed hash of normalized recipient"/>
+        <column xsi:type="timestamp" name="sent_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="Claim time"/>
+        <column xsi:type="varchar" name="claim_token" nullable="true" length="32" comment="Owner of delivery claim"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="recipient_hash"/>
+        </constraint>
+        <index referenceId="CK_NOTIFICATION_COOLDOWN_SENT_AT" indexType="btree">
+            <column name="sent_at"/>
+        </index>
+    </table>
+</schema>
