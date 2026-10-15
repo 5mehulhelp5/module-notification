@@ -4,10 +4,34 @@
     <preference for="CommerceKings\Notification\Api\CooldownInterface" type="CommerceKings\Notification\Model\Cooldown"/>
     <preference for="CommerceKings\Notification\Api\QueueInterface" type="CommerceKings\Notification\Model\Queue"/>
     <preference for="CommerceKings\Notification\Api\ContactRepositoryInterface" type="CommerceKings\Notification\Model\ContactRepository"/>
+    <preference for="CommerceKings\Notification\Api\SubscriptionManagementInterface" type="CommerceKings\Notification\Model\SubscriptionManagement"/>
+    <preference for="CommerceKings\Notification\Api\SubscriptionRepositoryInterface" type="CommerceKings\Notification\Model\SubscriptionRepository"/>
+    <preference for="CommerceKings\Notification\Api\SubscriptionGuardInterface" type="CommerceKings\Notification\Model\SubscriptionGuard"/>
     <!-- modules that point to contacts register a ContactReferenceInterface here, so unused contacts can be removed -->
     <type name="CommerceKings\Notification\Model\ContactReferencePool">
         <arguments>
-            <argument name="references" xsi:type="array"/>
+            <argument name="references" xsi:type="array">
+                <item name="subscriptions" xsi:type="object">CommerceKings\Notification\Model\SubscriptionContactReference</item>
+            </argument>
+        </arguments>
+    </type>
+    <!-- feature modules register who may subscribe here (argument "types": code => SubscriptionTypeInterface),
+         and CommerceKings\Notification\Model\WithdrawalHandler in Consent's WithdrawalPool under their purpose -->
+    <type name="CommerceKings\Notification\Model\SubscriptionTypePool">
+        <arguments>
+            <argument name="types" xsi:type="array"/>
+        </arguments>
+    </type>
+    <virtualType name="CommerceKingsNotificationEmailLength" type="Magento\Framework\Validator\StringLength">
+        <arguments>
+            <argument name="options" xsi:type="array">
+                <item name="max" xsi:type="number">255</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <type name="CommerceKings\Notification\Model\SubscriptionManagement">
+        <arguments>
+            <argument name="emailLengthValidator" xsi:type="object">CommerceKingsNotificationEmailLength</argument>
         </arguments>
     </type>
     <!-- feature modules register their notification types here (argument "types": code => NotificationTypeInterface) -->

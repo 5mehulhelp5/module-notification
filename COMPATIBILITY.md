@@ -6,7 +6,8 @@ Magento/PHP combination has passed runtime testing.
 
 Verification runs alongside `commercekings/module-abandoned-cart`, its first user, in the
 CommerceKings sandbox (Composer installation, DI compilation, database status, PHPStan level 5,
-Magento2 coding standard, unit and integration tests). Installation from distribution archives
+Magento2 coding standard, unit and SQL integration tests with a test subscription type, and REST status checks
+for both subscribe routes). Installation from distribution archives
 remains pending.
 
 The GitHub workflow checks package metadata, PHP syntax on 8.1–8.5 and Git archive contents.

@@ -27,5 +27,31 @@
         "index": {
             "CK_NOTIFICATION_CONTACT_CREATED_AT": true
         }
+    },
+    "ck_notification_subscription": {
+        "column": {
+            "subscription_id": true,
+            "type": true,
+            "reference_id": true,
+            "store_id": true,
+            "subject_key": true,
+            "contact_id": true,
+            "customer_id": true,
+            "consent_id": true,
+            "browser_hash": true,
+            "captured_at": true
+        },
+        "index": {
+            "CK_NOTIFICATION_SUBSCRIPTION_CONSENT_ID": true,
+            "CK_NOTIFICATION_SUBSCRIPTION_CONTACT_ID": true,
+            "CK_NOTIFICATION_SUBSCRIPTION_CUSTOMER_ID": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "CK_NOTIFICATION_SUBSCRIPTION_TYPE_REFERENCE_ID_SUBJECT_KEY": true,
+            "CK_NOTIFICATION_SUBSCRIPTION_STORE_ID_STORE_STORE_ID": true,
+            "CK_NTFC_SUBSCRIPTION_CONTACT_ID_CK_NTFC_CONTACT_CONTACT_ID": true,
+            "CK_NTFC_SUBSCRIPTION_CSTR_ID_CSTR_ENTT_ENTT_ID": true
+        }
     }
 }

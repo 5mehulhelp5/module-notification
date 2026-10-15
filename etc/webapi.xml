@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Webapi:etc/webapi.xsd">
+    <!-- guests: authorized by the notification type (e.g. a masked cart id), like Magento's guest-cart APIs -->
+    <route url="/V1/ck-notification/subscriptions" method="POST">
+        <service class="CommerceKings\Notification\Api\SubscriptionManagementInterface" method="subscribeGuest"/>
+        <resources>
+            <resource ref="anonymous"/>
+        </resources>
+    </route>
+    <!-- logged-in customers: session (storefront AJAX) or customer token; the id is never taken from the body -->
+    <route url="/V1/ck-notification/subscriptions/mine" method="POST">
+        <service class="CommerceKings\Notification\Api\SubscriptionManagementInterface" method="subscribeCustomer"/>
+        <resources>
+            <resource ref="self"/>
+        </resources>
+        <data>
+            <parameter name="customerId" force="true">%customer_id%</parameter>
+        </data>
+    </route>
+</routes>

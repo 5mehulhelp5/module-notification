@@ -4,8 +4,11 @@ declare(strict_types=1);
 namespace CommerceKings\Notification\Test\Unit\Model;
 
 use CommerceKings\Notification\Api\NotificationTypeInterface;
+use CommerceKings\Notification\Api\SubscriptionGuardInterface;
+use CommerceKings\Notification\Api\SubscriptionTypeInterface;
 use CommerceKings\Notification\Model\Consumer;
 use CommerceKings\Notification\Model\Queue;
+use CommerceKings\Notification\Model\SubscriptionTypePool;
 use CommerceKings\Notification\Model\TypePool;
 use Magento\Framework\MessageQueue\PublisherInterface;
 use PHPUnit\Framework\TestCase;
@@ -15,6 +18,9 @@ class ConsumerTest extends TestCase
 {
     private array $processed = [];
     private array $errors = [];
+    private array $skipped = [];
+    /** subscription ids still valid for "subscribed" */
+    private array $valid = [];
 
     private function consumer(): Consumer
     {
@@ -22,7 +28,11 @@ class ConsumerTest extends TestCase
         $type->method('process')->willReturnCallback(function ($reference) { $this->processed[] = $reference; });
         $logger = $this->createStub(LoggerInterface::class);
         $logger->method('error')->willReturnCallback(function ($message) { $this->errors[] = $message; });
-        return new Consumer(new TypePool(['cart_reminder' => $type, 'broken' => new \stdClass()]), $logger);
+        $logger->method('info')->willReturnCallback(function ($message) { $this->skipped[] = $message; });
+        $guard = $this->createStub(SubscriptionGuardInterface::class);
+        $guard->method('isValid')->willReturnCallback(fn ($id, $code) => $code === 'subscribed' && in_array($id, $this->valid, true));
+        return new Consumer(new TypePool(['cart_reminder' => $type, 'subscribed' => $type, 'broken' => new \stdClass()]), $logger,
+            new SubscriptionTypePool(['subscribed' => $this->createStub(SubscriptionTypeInterface::class)]), $guard);
     }
 
     public function testHandsTheReferenceToItsType(): void
@@ -39,6 +49,17 @@ class ConsumerTest extends TestCase
         }
         $this->assertSame([], $this->processed);
         $this->assertCount(4, $this->errors);
+    }
+
+    public function testSubscriptionTypesOnlyGetValidSubscriptions(): void
+    {
+        $this->valid = [7];
+        foreach (['subscribed|7', 'subscribed|8', 'subscribed|abc', 'subscribed|7x'] as $message) {
+            $this->consumer()->process($message);
+        }
+        $this->assertSame(['7'], $this->processed);
+        $this->assertCount(3, $this->skipped);
+        $this->assertSame([], $this->errors, 'a withdrawn subscription is expected, not an error');
     }
 
     public function testQueuePublishesTypeAndReferenceToTheSharedTopic(): void
