@@ -3,13 +3,10 @@ declare(strict_types=1);
 
 namespace CommerceKings\Notification\Model;
 
-use CommerceKings\Consent\Api\BrowserIdentityInterface;
-use CommerceKings\Consent\Api\ConsentGuardInterface;
-use CommerceKings\Consent\Api\ConsentInterface;
-use CommerceKings\Consent\Api\Data\Consent;
 use CommerceKings\Notification\Api\ContactRepositoryInterface;
 use CommerceKings\Notification\Api\Data\Target;
 use CommerceKings\Notification\Api\SubscriptionManagementInterface;
+use CommerceKings\Notification\Api\SubscriptionPermissionInterface;
 use CommerceKings\Notification\Api\SubscriptionTypeInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Exception\InputException;
@@ -20,8 +17,8 @@ use Magento\Store\Model\StoreManagerInterface;
 
 /**
  * Subscribe in this order, nothing written before the last step: email rules, the type's authorize(),
- * consent for its purpose and website, the guest contact, then one INSERT ... SELECT whose WHERE holds
- * the consent guard and the type's condition. Direct SQL - no models are saved.
+ * the permission (SubscriptionPermissionInterface), the guest contact, then one INSERT ... SELECT whose WHERE
+ * holds the permission's condition and the type's condition. Direct SQL - no models are saved.
  */
 class SubscriptionManagement implements SubscriptionManagementInterface
 {
@@ -30,9 +27,7 @@ class SubscriptionManagement implements SubscriptionManagementInterface
     public function __construct(
         private readonly ResourceConnection $resource,
         private readonly SubscriptionTypePool $types,
-        private readonly ConsentInterface $consent,
-        private readonly ConsentGuardInterface $guard,
-        private readonly BrowserIdentityInterface $browser,
+        private readonly SubscriptionPermissionInterface $permission,
         private readonly ContactRepositoryInterface $contacts,
         private readonly StoreManagerInterface $stores,
         private readonly EmailAddress $emailValidator,
@@ -49,16 +44,16 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         if ($target === null) {
             return false;
         }
-        $consent = $target->accepting && $email !== '' ? $this->consent->getCurrent($subscriptionType->getPurpose()) : null;
-        if ($consent === null) {
+        $permission = $target->accepting && $email !== '' ? $this->permission->check($subscriptionType, $target) : null;
+        if ($permission === null || $permission->removesExisting) {
             $this->unsubscribeGuest($type, $subscriptionType, $target);
             return false;
         }
-        if (!$this->matches($consent, $subscriptionType, $target)) {
+        if (!$permission->isGranted()) {
             return false;
         }
         $contactId = $this->contacts->save($this->websiteId($target), $email);
-        return $this->store($type, $subscriptionType, $target, $consent->consentId, $contactId, null);
+        return $this->store($type, $subscriptionType, $target, (string)$permission->reference, $contactId, null);
     }
 
     public function subscribeCustomer(int $customerId, string $type, string $reference): bool
@@ -71,11 +66,11 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         if ($target === null || !$target->accepting) {
             return false;
         }
-        $consent = $this->consent->getCurrent($subscriptionType->getPurpose());
-        if ($consent === null || !$this->matches($consent, $subscriptionType, $target)) {
+        $permission = $this->permission->check($subscriptionType, $target);
+        if (!$permission->isGranted()) {
             return false;
         }
-        return $this->store($type, $subscriptionType, $target, $consent->consentId, null, $customerId);
+        return $this->store($type, $subscriptionType, $target, (string)$permission->reference, null, $customerId);
     }
 
     /** Trimmed address or '' (unsubscribe); anything else is Magento's 400 without echoing the input. */
@@ -113,11 +108,6 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         return (int)$this->stores->getStore($target->storeId)->getWebsiteId();
     }
 
-    private function matches(Consent $consent, SubscriptionTypeInterface $type, Target $target): bool
-    {
-        return $consent->purpose === $type->getPurpose() && $consent->websiteId === $this->websiteId($target);
-    }
-
     /** One per reference for single types, otherwise one per contact or customer. */
     private function subjectKey(SubscriptionTypeInterface $type, ?int $contactId, ?int $customerId): string
     {
@@ -125,9 +115,9 @@ class SubscriptionManagement implements SubscriptionManagementInterface
     }
 
     /** @return string[] */
-    private function conditions(string $consentId, Target $target): array
+    private function conditions(string $reference, Target $target): array
     {
-        $conditions = [$this->guard->validCondition($this->resource->getConnection()->quote($consentId))];
+        $conditions = [$this->permission->validCondition($this->resource->getConnection()->quote($reference))];
         if ($target->condition !== '') {
             $conditions[] = '(' . $target->condition . ')';
         }
@@ -139,20 +129,19 @@ class SubscriptionManagement implements SubscriptionManagementInterface
     {
         $db = $this->resource->getConnection();
         $subjectKey = $this->subjectKey($type, $contactId, $customerId);
-        $browserHash = $this->browser->hash();
         $conditions = $this->conditions($consentId, $target);
         $statement = $db->query(sprintf(
-            'INSERT INTO %s (type, reference_id, store_id, subject_key, contact_id, customer_id, consent_id, browser_hash, captured_at)'
-            . ' SELECT ?, ?, ?, ?, ?, ?, ?, ?, NOW() FROM DUAL WHERE %s ON DUPLICATE KEY UPDATE'
+            'INSERT INTO %s (type, reference_id, store_id, subject_key, contact_id, customer_id, consent_id, captured_at)'
+            . ' SELECT ?, ?, ?, ?, ?, ?, ?, NOW() FROM DUAL WHERE %s ON DUPLICATE KEY UPDATE'
             // MySQL assigns in order: compare the old values before replacing them. A change restarts the delay.
-            . ' captured_at = IF(contact_id <=> ? AND customer_id <=> ? AND consent_id = ? AND browser_hash = ?, captured_at, NOW()),'
-            . ' store_id = ?, contact_id = ?, customer_id = ?, consent_id = ?, browser_hash = ?',
+            . ' captured_at = IF(contact_id <=> ? AND customer_id <=> ? AND consent_id = ?, captured_at, NOW()),'
+            . ' store_id = ?, contact_id = ?, customer_id = ?, consent_id = ?',
             $db->quoteIdentifier($this->resource->getTableName(self::TABLE)),
             implode(' AND ', $conditions)
         ), [
-            $code, $target->referenceId, $target->storeId, $subjectKey, $contactId, $customerId, $consentId, $browserHash,
-            $contactId, $customerId, $consentId, $browserHash,
-            $target->storeId, $contactId, $customerId, $consentId, $browserHash,
+            $code, $target->referenceId, $target->storeId, $subjectKey, $contactId, $customerId, $consentId,
+            $contactId, $customerId, $consentId,
+            $target->storeId, $contactId, $customerId, $consentId,
         ]);
         if ($statement->rowCount() > 0) {
             return true;
@@ -161,7 +150,6 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         $select = $db->select()->from($this->resource->getTableName(self::TABLE), 'subscription_id')
             ->where('type = ?', $code)->where('reference_id = ?', $target->referenceId)
             ->where('subject_key = ?', $subjectKey)->where('consent_id = ?', $consentId)
-            ->where('browser_hash = ?', $browserHash)
             ->where($contactId === null ? 'contact_id IS NULL' : $db->quoteInto('contact_id = ?', $contactId))
             ->where($customerId === null ? 'customer_id IS NULL' : $db->quoteInto('customer_id = ?', $customerId));
         foreach ($conditions as $condition) {

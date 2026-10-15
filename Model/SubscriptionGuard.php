@@ -3,16 +3,16 @@ declare(strict_types=1);
 
 namespace CommerceKings\Notification\Model;
 
-use CommerceKings\Consent\Api\ConsentGuardInterface;
 use CommerceKings\Notification\Api\SubscriptionGuardInterface;
+use CommerceKings\Notification\Api\SubscriptionPermissionInterface;
 use Magento\Framework\App\ResourceConnection;
 
-/** A subscription is valid while its row exists and CommerceKings_Consent still accepts its consent. */
+/** A subscription is valid while its row exists and its permission (SubscriptionPermissionInterface) is still valid. */
 class SubscriptionGuard implements SubscriptionGuardInterface
 {
     public function __construct(
         private readonly ResourceConnection $resource,
-        private readonly ConsentGuardInterface $consentGuard
+        private readonly SubscriptionPermissionInterface $permission
     ) {
     }
 
@@ -20,7 +20,7 @@ class SubscriptionGuard implements SubscriptionGuardInterface
     {
         return sprintf('EXISTS (SELECT 1 FROM %s AS ck_ns WHERE ck_ns.subscription_id = %s AND %s)',
             $this->resource->getConnection()->quoteIdentifier($this->resource->getTableName(SubscriptionManagement::TABLE)),
-            $subscriptionIdColumn, $this->consentGuard->validCondition('ck_ns.consent_id'));
+            $subscriptionIdColumn, $this->permission->validCondition('ck_ns.consent_id'));
     }
 
     public function isValid(int $subscriptionId, string $type): bool
@@ -29,6 +29,6 @@ class SubscriptionGuard implements SubscriptionGuardInterface
         return (bool)$db->fetchOne($db->select()
             ->from(['ck_ns' => $this->resource->getTableName(SubscriptionManagement::TABLE)], 'subscription_id')
             ->where('ck_ns.subscription_id = ?', $subscriptionId)->where('ck_ns.type = ?', $type)
-            ->where($this->consentGuard->validCondition('ck_ns.consent_id')));
+            ->where($this->permission->validCondition('ck_ns.consent_id')));
     }
 }

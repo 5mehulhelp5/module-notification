@@ -14,7 +14,9 @@ use CommerceKings\Notification\Api\SubscriptionTypeInterface;
 use CommerceKings\Notification\Cron\CleanUpSubscriptions;
 use CommerceKings\Notification\Model\ContactReferencePool;
 use CommerceKings\Notification\Model\ContactRepository;
+use CommerceKings\Notification\Model\Consent\ConsentPermission;
 use CommerceKings\Notification\Model\SubscriptionGuard;
+use CommerceKings\Notification\Model\SubscriptionRemoval;
 use CommerceKings\Notification\Model\SubscriptionManagement;
 use CommerceKings\Notification\Model\SubscriptionTypePool;
 use CommerceKings\Notification\Model\WithdrawalHandler;
@@ -114,12 +116,16 @@ class SubscriptionTest extends TestCase
         $consent->method('getCurrent')->willReturnCallback(fn () => new Consent($this->consentId, 'test_purpose',
             (int)$this->stores->getStore($this->storeId)->getWebsiteId(), 'banner', 'choice', '2026-01-01 00:00:00',
             '1', '1', '2026-01-01 00:00:00', '2027-01-01 00:00:00'));
-        $browser = $this->createStub(BrowserIdentityInterface::class);
-        $browser->method('hash')->willReturn(str_repeat('b', 64));
         $filters = $this->om->create(FilterManager::class);
-        return new SubscriptionManagement($this->resource, new SubscriptionTypePool([$this->type => $type]), $consent,
-            $this->guard(), $browser, $this->om->get(ContactRepositoryInterface::class), $this->stores,
+        return new SubscriptionManagement($this->resource, new SubscriptionTypePool([$this->type => $type]),
+            $this->permission($consent), $this->om->get(ContactRepositoryInterface::class), $this->stores,
             new EmailAddress(), new StringLength(['max' => 255]), $filters);
+    }
+
+    private function permission(?ConsentInterface $consent = null): ConsentPermission
+    {
+        return new ConsentPermission($consent ?? $this->createStub(ConsentInterface::class), $this->guard(), $this->stores,
+            $this->createStub(BrowserIdentityInterface::class), $this->createStub(\CommerceKings\Consent\Model\ConsentStore::class));
     }
 
     private function guard(): ConsentGuardInterface
@@ -217,7 +223,7 @@ class SubscriptionTest extends TestCase
         $management = $this->management();
         $this->assertTrue($management->subscribeGuest($this->type, 'ref', $this->email('guest')));
         $id = (int)$this->rows()[0]['subscription_id'];
-        $guard = new SubscriptionGuard($this->resource, $this->guard());
+        $guard = new SubscriptionGuard($this->resource, $this->permission());
         $this->assertTrue($guard->isValid($id, $this->type));
         $this->assertFalse($guard->isValid($id, 'other_type'));
 
@@ -227,7 +233,7 @@ class SubscriptionTest extends TestCase
         $unused = $contacts->save($website, $this->email('retyped'));
         $this->assertSame([$unused], $this->unusedContacts([$used, $unused]));
 
-        (new WithdrawalHandler($this->resource))->execute(new WithdrawalContext('test_purpose', ['consent-a'], $website,
+        (new WithdrawalHandler(new SubscriptionRemoval($this->resource)))->execute(new WithdrawalContext('test_purpose', ['consent-a'], $website,
             str_repeat('b', 64), 'banner'));
         $this->assertSame([], $this->rows());
         $this->assertFalse($guard->isValid($id, $this->type));

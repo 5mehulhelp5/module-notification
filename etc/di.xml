@@ -7,6 +7,9 @@
     <preference for="CommerceKings\Notification\Api\SubscriptionManagementInterface" type="CommerceKings\Notification\Model\SubscriptionManagement"/>
     <preference for="CommerceKings\Notification\Api\SubscriptionRepositoryInterface" type="CommerceKings\Notification\Model\SubscriptionRepository"/>
     <preference for="CommerceKings\Notification\Api\SubscriptionGuardInterface" type="CommerceKings\Notification\Model\SubscriptionGuard"/>
+    <preference for="CommerceKings\Notification\Api\SubscriptionRemovalInterface" type="CommerceKings\Notification\Model\SubscriptionRemoval"/>
+    <!-- who may subscribe: CommerceKings_Consent for now (moves to the consent bridge) -->
+    <preference for="CommerceKings\Notification\Api\SubscriptionPermissionInterface" type="CommerceKings\Notification\Model\Consent\ConsentPermission"/>
     <!-- modules that point to contacts register a ContactReferenceInterface here, so unused contacts can be removed -->
     <type name="CommerceKings\Notification\Model\ContactReferencePool">
         <arguments>

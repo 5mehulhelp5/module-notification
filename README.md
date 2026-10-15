@@ -60,7 +60,7 @@ type or invalid email is Magento's 400 without echoing the address.
 - **Guest:** an empty email, missing consent or a type that is not accepting removes the guest's subscription
   of a single type. Subscriptions of a one-per-person type are removed by the withdrawal link only.
 - **Customer:** without a consent in this browser nothing changes; a consent from another device stays.
-- A change of contact, customer, consent or browser sets `captured_at` (a type may use it to restart a delay);
+- A change of contact, customer or consent sets `captured_at` (a type may use it to restart a delay);
   an identical retry does not.
 
 ## Rate limiting
@@ -109,6 +109,19 @@ A bot challenge (e.g. Cloudflare Turnstile) can be added at the same layer; none
 sent and do not start the cooldown. `MailerInterface::send()` returns `SENT`, `COOLDOWN` or
 `RECIPIENT_CHANGED`; on anything but `SENT`, undo your own claim. Replace the cooldown with a
 `CooldownInterface` preference.
+
+### Permission
+
+Who may subscribe is `Api\SubscriptionPermissionInterface`: `check($type, $target)` returns a `Permission`
+(granted with a reference stored on the subscription, absent – a guest's single subscription is removed – or
+refused – nothing changes), and `validCondition($referenceColumn)` is the SQL that the subscribe INSERT and every
+send-time check (`SubscriptionGuardInterface`) contain, so a revocation at the same moment wins.
+`identifiesVisitor()` / `isCurrentVisitor($reference)` say whether the current visitor is the one who gave a
+permission (e.g. Consent compares the browser the consent was given in); a feature hands over something the
+subscriber owns only when it can tell. When a permission is revoked or the shopper unsubscribes,
+call `Api\SubscriptionRemovalInterface` (`removeByPermission($references)`, `remove($subscriptionId)`).
+Today both preferences point to CommerceKings_Consent (`Model\Consent\*`); they move to a separate consent bridge
+so Notification can run without the consent core.
 
 ### Subscription types
 

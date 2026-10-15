@@ -19,7 +19,6 @@ class Subscription
         public readonly ?int $contactId,
         public readonly ?int $customerId,
         public readonly string $consentId,
-        public readonly string $browserHash,
         public readonly string $capturedAt
     ) {
     }

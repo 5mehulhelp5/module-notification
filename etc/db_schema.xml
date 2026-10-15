@@ -45,7 +45,6 @@
         <column xsi:type="int" name="contact_id" unsigned="true" nullable="true" comment="Guest contact"/>
         <column xsi:type="int" name="customer_id" unsigned="true" nullable="true" comment="Customer"/>
         <column xsi:type="varchar" name="consent_id" nullable="false" length="32" comment="CommerceKings_Consent consent"/>
-        <column xsi:type="varchar" name="browser_hash" nullable="false" length="64" default="" comment="Browser that subscribed (sha256)"/>
         <column xsi:type="timestamp" name="captured_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="Created or last changed"/>
         <constraint xsi:type="primary" referenceId="PRIMARY">
             <column name="subscription_id"/>

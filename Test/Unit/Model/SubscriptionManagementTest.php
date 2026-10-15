@@ -7,9 +7,11 @@ use CommerceKings\Consent\Api\BrowserIdentityInterface;
 use CommerceKings\Consent\Api\ConsentGuardInterface;
 use CommerceKings\Consent\Api\ConsentInterface;
 use CommerceKings\Consent\Api\Data\Consent;
+use CommerceKings\Consent\Model\ConsentStore;
 use CommerceKings\Notification\Api\ContactRepositoryInterface;
 use CommerceKings\Notification\Api\Data\Target;
 use CommerceKings\Notification\Api\SubscriptionTypeInterface;
+use CommerceKings\Notification\Model\Consent\ConsentPermission;
 use CommerceKings\Notification\Model\SubscriptionManagement;
 use CommerceKings\Notification\Model\SubscriptionTypePool;
 use CommerceKings\Notification\Test\Unit\DbTestTrait;
@@ -62,8 +64,6 @@ class SubscriptionManagementTest extends TestCase
         });
         $guard = $this->createStub(ConsentGuardInterface::class);
         $guard->method('validCondition')->willReturnCallback(fn ($column) => 'VALID(' . $column . ')');
-        $browser = $this->createStub(BrowserIdentityInterface::class);
-        $browser->method('hash')->willReturn('browser');
         $contacts = $this->createStub(ContactRepositoryInterface::class);
         $contacts->method('save')->willReturnCallback(function ($website, $email) {
             $this->contacts[] = [$website, $email];
@@ -78,8 +78,16 @@ class SubscriptionManagementTest extends TestCase
         $stores->method('getStore')->willReturn($store);
         $filters = $this->createStub(FilterManager::class);
         $filters->method('get')->willReturn(new StringTrim());
-        return new SubscriptionManagement($this->resource(), new SubscriptionTypePool(['test_type' => $type]), $consent,
-            $guard, $browser, $contacts, $stores, new EmailAddress(), new StringLength(['max' => 255]), $filters);
+        return new SubscriptionManagement($this->resource(), new SubscriptionTypePool(['test_type' => $type]),
+            $this->permission($consent, $guard, $stores), $contacts, $stores,
+            new EmailAddress(), new StringLength(['max' => 255]), $filters);
+    }
+
+    private function permission(ConsentInterface $consent, ConsentGuardInterface $guard,
+        StoreManagerInterface $stores): ConsentPermission
+    {
+        return new ConsentPermission($consent, $guard, $stores, $this->createStub(BrowserIdentityInterface::class),
+            $this->createStub(ConsentStore::class));
     }
 
     private function assertNothingWritten(): void
@@ -145,8 +153,8 @@ class SubscriptionManagementTest extends TestCase
         [$sql, $bind] = $this->queries[0];
         $this->assertStringContainsString('INSERT INTO ck_notification_subscription', $sql);
         $this->assertStringContainsString("FROM DUAL WHERE VALID('new-consent') AND (STILL_YOURS) ON DUPLICATE KEY UPDATE", $sql);
-        $this->assertSame(['test_type', 42, 1, '', 5, null, 'new-consent', 'browser'], array_slice($bind, 0, 8));
-        $this->assertSame([5, null, 'new-consent', 'browser'], array_slice($bind, 8, 4), 'compared before replacing');
+        $this->assertSame(['test_type', 42, 1, '', 5, null, 'new-consent'], array_slice($bind, 0, 7));
+        $this->assertSame([5, null, 'new-consent'], array_slice($bind, 7, 3), 'compared before replacing');
     }
 
     public function testOnePerPersonTypesKeyByContactOrCustomer(): void

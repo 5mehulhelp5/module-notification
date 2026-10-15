@@ -16,6 +16,9 @@ First release. Features:
   authorization, consent for its purpose (requires `commercekings/module-consent`) and one guarded write;
   one withdrawal handler for every type; the consumer only hands over valid subscriptions; a daily cleanup
   removes subscriptions whose item is gone (`orphanCondition()`).
+- **Permission contract:** `SubscriptionPermissionInterface` (check, SQL condition, and whether the current visitor
+  gave a permission) and `SubscriptionRemovalInterface`; subscribe, the guard and withdrawal use them instead of
+  Consent directly. Subscriptions store no browser.
 - **Guest contacts** (`ck_notification_contact`, `ContactRepositoryInterface`) shared by notification
   features, keyed by an exact normalized address (`email_key`), with reference-based cleanup of unused contacts.
 

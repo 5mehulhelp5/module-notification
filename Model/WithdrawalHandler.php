@@ -5,7 +5,7 @@ namespace CommerceKings\Notification\Model;
 
 use CommerceKings\Consent\Api\Data\WithdrawalContext;
 use CommerceKings\Consent\Api\WithdrawalHandlerInterface;
-use Magento\Framework\App\ResourceConnection;
+use CommerceKings\Notification\Api\SubscriptionRemovalInterface;
 
 /**
  * Removes the subscriptions of withdrawn consents, for every type. Consent registers handlers per purpose,
@@ -14,15 +14,12 @@ use Magento\Framework\App\ResourceConnection;
  */
 class WithdrawalHandler implements WithdrawalHandlerInterface
 {
-    public function __construct(private readonly ResourceConnection $resource)
+    public function __construct(private readonly SubscriptionRemovalInterface $removal)
     {
     }
 
     public function execute(WithdrawalContext $context): void
     {
-        if ($context->consentIds) {
-            $this->resource->getConnection()->delete($this->resource->getTableName(SubscriptionManagement::TABLE),
-                ['consent_id IN (?)' => $context->consentIds]);
-        }
+        $this->removal->removeByPermission($context->consentIds);
     }
 }

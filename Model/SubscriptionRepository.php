@@ -56,6 +56,6 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface
         return new Subscription((int)$row['subscription_id'], (string)$row['type'], (int)$row['reference_id'],
             (int)$row['store_id'], $row['contact_id'] === null ? null : (int)$row['contact_id'],
             $row['customer_id'] === null ? null : (int)$row['customer_id'], (string)$row['consent_id'],
-            (string)$row['browser_hash'], (string)$row['captured_at']);
+            (string)$row['captured_at']);
     }
 }

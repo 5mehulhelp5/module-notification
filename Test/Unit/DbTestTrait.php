@@ -17,6 +17,8 @@ trait DbTestTrait
     private array $updates = [];
     private array $inserts = [];
     private array $deletes = [];
+    /** rows delete() reports, default 3 */
+    private ?int $deleteResult = null;
     /** @var array<int, array{0: string, 1: mixed}> where() calls of the last select */
     private array $selectWhere = [];
     /** queued return values of update() (rows affected), default 1 */
@@ -77,7 +79,7 @@ trait DbTestTrait
         });
         $db->method('delete')->willReturnCallback(function ($table, $where = '') {
             $this->deletes[] = ['table' => $table, 'where' => (array)$where];
-            return 3;
+            return $this->deleteResult ?? 3;
         });
         $db->method('fetchRow')->willReturnCallback(fn () => $this->fetchRowResult);
         $db->method('fetchOne')->willReturnCallback(fn () => $this->fetchOneResult);
