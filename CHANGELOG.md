@@ -13,7 +13,8 @@ First release. Features:
   (*Email cooldown (days)*, default 7, 0 = off); keyed hashes only, pruned daily.
 - **Subscriptions** (`ck_notification_subscription`): one subscribe endpoint for every type
   (`/V1/ck-notification/subscriptions`, `/mine` for customers) with shared email rules, the type's
-  authorization, consent for its purpose (requires `commercekings/module-consent`) and one guarded write;
+  authorization, the permission for its purpose (opt-out alone, consent with `commercekings/module-consent-notification`)
+  and one guarded write; no dependency on `commercekings/module-consent`;
   one withdrawal handler for every type; the consumer only hands over valid subscriptions; a daily cleanup
   removes subscriptions whose item is gone (`orphanCondition()`).
 - **Permission contract:** `SubscriptionPermissionInterface` (check, SQL condition, and whether the current visitor

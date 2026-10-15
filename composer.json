@@ -1,6 +1,6 @@
 {
     "name": "commercekings/module-notification",
-    "description": "Consent-based notification subscriptions and shared email delivery for CommerceKings modules in Magento 2: one subscribe endpoint, guest contacts, one message queue consumer, optional recipient cooldown, store-emulated sending and one-click unsubscribe headers.",
+    "description": "Notification subscriptions (opt-out on their own, consent-based with commercekings/module-consent-notification) and shared email delivery for CommerceKings modules in Magento 2: one subscribe endpoint, guest contacts, one message queue consumer, optional recipient cooldown, store-emulated sending and one-click unsubscribe headers.",
     "type": "magento2-module",
     "license": "MIT",
     "authors": [
@@ -16,11 +16,11 @@
         "magento/module-config": "^101.2",
         "magento/module-backend": "^102.0",
         "magento/module-customer": "^103.0",
-        "commercekings/module-core": "^0.1",
-        "commercekings/module-consent": "^0.1"
+        "commercekings/module-core": "^0.1"
     },
     "suggest": {
-        "magento/module-mysql-mq": "Use Magento's native database queue transport when RabbitMQ is unavailable."
+        "magento/module-mysql-mq": "Use Magento's native database queue transport when RabbitMQ is unavailable.",
+        "commercekings/module-consent-notification": "Require a consent (commercekings/module-consent) for every subscription"
     },
     "autoload": {
         "files": [

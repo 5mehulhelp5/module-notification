@@ -4,10 +4,10 @@
 
 Usually installed as a dependency of a notification feature (e.g. `commercekings/module-abandoned-cart`);
 directly with `composer require commercekings/module-notification:^0.1` after the first release is published.
-Then enable its modules:
+On its own every authorized subscription is allowed until it is removed (opt-out); add
+`commercekings/module-consent-notification` to require a `commercekings/module-consent` consent instead.
 
 ```sh
-bin/magento module:enable CommerceKings_Core CommerceKings_Consent CommerceKings_Notification
 bin/magento setup:upgrade
 bin/magento cache:clean
 ```
@@ -16,7 +16,7 @@ The single way to subscribe to and send CommerceKings notifications (e.g. `comme
 Each module answers one question:
 
 ```
- CONSENT        "May we?"          permission per purpose (commercekings/module-consent)
+ PERMISSION     "May we?"          optional: consent per purpose (module-consent via module-consent-notification)
  NOTIFICATION   "Who, and how?"    email rules, contacts, subscriptions, withdrawal, delivery
  FEATURE        "What, and when?"  authorize a reference, its trigger, its content, its send history
 ```
