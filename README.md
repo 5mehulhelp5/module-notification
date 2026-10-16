@@ -2,11 +2,11 @@
 
 # Notifications
 
+<sub>Expert Magento engineering. New store, maintenance, custom development, high-performance hosting or more sales? [Talk to us](https://commercekings.net).</sub>
+
 Works with Magento 2.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQL queue
 
 [![License](https://badgen.net/github/license/commercekings/module-notification)](LICENSE) [![Release](https://badgen.net/github/release/commercekings/module-notification)](https://github.com/commercekings/module-notification/releases) [![Checks](https://badgen.net/github/checks/commercekings/module-notification/main?label=checks)](https://github.com/commercekings/module-notification/actions)
-
-<sub>Expert Magento engineering. New store, maintenance, custom development, high-performance hosting or more sales? [Talk to us](https://commercekings.net).</sub>
 
 **Every email sent in the background – never during checkout, never in a cron loop – so your store stays fast.**
 
