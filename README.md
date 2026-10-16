@@ -1,8 +1,8 @@
 # Notifications
 
-**Every email sent in the background – never during checkout, so your store stays fast.**
+**Every email sent in the background – never during checkout, never in a cron loop – so your store stays fast.**
 
-No email work during checkout: shoppers only subscribe (a single fast write) and a queue consumer sends later · scales by adding consumers · opt-in or opt-out · guest and customer subscriptions · recipient cooldown stored as hashes, never addresses · unused contacts cleaned up automatically · RFC 8058 one-click unsubscribe · RabbitMQ or MySQL queue
+No email work during checkout: shoppers only subscribe (a single fast write) and a queue consumer sends later · no cron jobs sending mail · tune it to your store: recipient cooldown, one-click unsubscribe per website, as many consumers as your traffic needs · opt-in or opt-out · guest and customer subscriptions · recipient cooldown stored as hashes, never addresses · unused contacts cleaned up automatically · RFC 8058 one-click unsubscribe · RabbitMQ or MySQL queue
 
 The one way CommerceKings features subscribe shoppers and send them emails. A feature (e.g. abandoned cart) says
 *what and when*; Notification handles *who and how*: subscriptions, guest contacts, one queue consumer, the mailer
