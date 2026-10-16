@@ -11,20 +11,18 @@ Works with Magento 2.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQL 
 
 A feature (e.g. abandoned cart) says *what and when*; Notification handles *who and how*.
 
-## With or without consent
+## Installation
 
-- **Opt-out (Notification alone)** – every subscription is allowed until the shopper unsubscribes; features show
-  their notice where shoppers subscribe.
-- **Opt-in** – add `commercekings/privacy-bundle` (the consent bridge and a banner): a subscription needs a consent from
-  `commercekings/module-consent` for the feature's purpose, withdrawing it removes the subscription, and notices are
-  off by default.
+Usually a feature brings it. On its own:
 
 ```sh
 composer require commercekings/module-notification:^0.1
 bin/magento setup:upgrade
 ```
 
-Usually you don't require it yourself – a feature module brings it.
+Alone it runs **opt-out**: a subscription stays until it is removed, and features show their notice. Add
+`commercekings/privacy-bundle` for **opt-in**: a subscription then needs a consent for the feature's purpose,
+withdrawing it removes the subscription, and notices are off by default.
 
 ## Settings
 
