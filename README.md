@@ -8,7 +8,7 @@ and a recipient cooldown.
 
 - **Opt-out (Notification alone)** – every subscription is allowed until the shopper unsubscribes; features show
   their notice where shoppers subscribe.
-- **Opt-in** – add the bridge `commercekings/module-consent-notification`: a subscription needs a consent from
+- **Opt-in** – add `commercekings/consent-optin` (the consent bridge and a banner): a subscription needs a consent from
   `commercekings/module-consent` for the feature's purpose, withdrawing it removes the subscription, and notices are
   off by default.
 
