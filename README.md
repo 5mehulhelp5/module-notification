@@ -4,7 +4,7 @@
 
 Works with Magento 2.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQL queue
 
-<sub>Expert Magento engineering. New store, maintenance, custom development or more sales? [Talk to us](https://commercekings.net).</sub>
+<sub>Expert Magento engineering. New store, maintenance, custom development, high-performance hosting or more sales? [Talk to us](https://commercekings.net).</sub>
 
 **Every email sent in the background – never during checkout, never in a cron loop – so your store stays fast.**
 
