@@ -8,9 +8,11 @@ and a recipient cooldown.
 
 ## With or without consent
 
-On its own, Notification allows every subscription until the shopper unsubscribes (opt-out). To require a consent
-first, add the bridge `commercekings/module-consent-notification`: a subscription then needs a consent from
-`commercekings/module-consent` for the feature's purpose, and withdrawing that consent removes it.
+- **Opt-out (Notification alone)** – every subscription is allowed until the shopper unsubscribes; features show
+  their notice where shoppers subscribe.
+- **Opt-in** – add the bridge `commercekings/module-consent-notification`: a subscription needs a consent from
+  `commercekings/module-consent` for the feature's purpose, withdrawing it removes the subscription, and notices are
+  off by default.
 
 ```sh
 composer require commercekings/module-notification:^0.1
