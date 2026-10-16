@@ -1,12 +1,15 @@
 # Notifications
 
+Works with Magento 2.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQL queue
+
 **Every email sent in the background – never during checkout, never in a cron loop – so your store stays fast.**
 
-No email work during checkout: shoppers only subscribe (a single fast write) and a queue consumer sends later · no cron jobs sending mail · tune it to your store: recipient cooldown, one-click unsubscribe per website, as many consumers as your traffic needs · opt-in or opt-out · guest and customer subscriptions · recipient cooldown stored as hashes, never addresses · unused contacts cleaned up automatically · RFC 8058 one-click unsubscribe · RabbitMQ or MySQL queue
+- **Fast checkout.** Shoppers only subscribe – one quick write. A queue consumer sends later.
+- **Scales with you.** Add consumers when traffic grows; RabbitMQ or Magento's MySQL queue.
+- **Private by default.** The cooldown keeps hashes, never addresses; unused contacts are removed.
+- **One engine for every notification** – opt-in or opt-out, guests and customers, RFC 8058 one-click unsubscribe.
 
-The one way CommerceKings features subscribe shoppers and send them emails. A feature (e.g. abandoned cart) says
-*what and when*; Notification handles *who and how*: subscriptions, guest contacts, one queue consumer, the mailer
-and a recipient cooldown.
+A feature (e.g. abandoned cart) says *what and when*; Notification handles *who and how*.
 
 ## With or without consent
 
