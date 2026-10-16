@@ -38,15 +38,10 @@ Both: [operations](docs/operations.md).
 
 ## Extending
 
-Interfaces in CommerceKings\Notification\Api:
-
-- NotificationTypeInterface: a notification type, registered in a pool
-- QueueInterface: publish its messages
-- SubscriptionTypeInterface: something a shopper subscribes to
-- SubscriptionPermissionInterface: who may subscribe (the consent bridge replaces it)
-- SubscriberInterface: who the subscriber is and their unsubscribe link
-- OptOutNoticeInterface: a notice where shoppers subscribe (Automatic, Yes or No)
-
+Implement `Api\NotificationTypeInterface` (or `Api\SubscriptionTypeInterface` for something a shopper subscribes to)
+and register it in a pool; publish with `Api\QueueInterface`. Replace who may subscribe with
+`Api\SubscriptionPermissionInterface` and `Api\SubscriberInterface` – that is what the consent bridge does.
+A feature can show a notice where shoppers subscribe with `Api\OptOutNoticeInterface` (Automatic / Yes / No).
 Details: [for module authors](docs/module-authors.md).
 
 ## Limitations
