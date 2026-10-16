@@ -7,7 +7,7 @@ Works with Magento 2.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQL 
 - **Fast checkout.** Shoppers only subscribe – one quick write. A queue consumer sends later.
 - **Scales with you.** Add consumers when traffic grows; RabbitMQ or Magento's MySQL queue.
 - **Private by default.** The cooldown keeps hashes, never addresses; unused contacts are removed.
-- **One engine for every notification** – opt-in or opt-out, guests and customers, RFC 8058 one-click unsubscribe.
+- **One engine for every notification** – opt-in or opt-out, guests and customers, optional RFC 8058 one-click unsubscribe.
 
 A feature (e.g. abandoned cart) says *what and when*; Notification handles *who and how*.
 
