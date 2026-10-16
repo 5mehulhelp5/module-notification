@@ -1,8 +1,8 @@
 # Notifications
 
-**One reliable engine for every shopper email: subscriptions, queue, delivery.**
+**Every email sent in the background – never during checkout, so your store stays fast.**
 
-Opt-in or opt-out · guest contacts · recipient cooldown · RabbitMQ or MySQL queue · RFC 8058 one-click unsubscribe
+No email work during checkout: shoppers only subscribe (a single fast write) and a queue consumer sends later · scales by adding consumers · opt-in or opt-out · guest and customer subscriptions · recipient cooldown stored as hashes, never addresses · unused contacts cleaned up automatically · RFC 8058 one-click unsubscribe · RabbitMQ or MySQL queue
 
 The one way CommerceKings features subscribe shoppers and send them emails. A feature (e.g. abandoned cart) says
 *what and when*; Notification handles *who and how*: subscriptions, guest contacts, one queue consumer, the mailer
