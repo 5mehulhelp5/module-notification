@@ -1,8 +1,10 @@
+<a href="https://commercekings.net"><img align="right" src="https://img.shields.io/badge/Built%20by-CommerceKings-24292F" alt="Built by CommerceKings – expert Magento engineering"></a>
+
 # Notifications
 
 Works with Magento 2.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQL queue
 
-<sub>Built by [CommerceKings](https://commercekings.net) – expert Magento engineering. New store, maintenance, custom development or more sales? [Talk to us](https://commercekings.net).</sub>
+<sub>Expert Magento engineering. New store, maintenance, custom development or more sales? [Talk to us](https://commercekings.net).</sub>
 
 **Every email sent in the background – never during checkout, never in a cron loop – so your store stays fast.**
 
