@@ -52,8 +52,18 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         if (!$permission->isGranted()) {
             return false;
         }
-        $contactId = $this->contacts->save($this->websiteId($target), $email);
-        return $this->store($type, $subscriptionType, $target, (string)$permission->reference, $contactId, null);
+        $db = $this->resource->getConnection();
+        $db->beginTransaction();
+        try {
+            // The contact upsert holds its row lock until the subscription exists, including reused contacts.
+            $contactId = $this->contacts->save($this->websiteId($target), $email);
+            $stored = $this->store($type, $subscriptionType, $target, (string)$permission->reference, $contactId, null);
+            $db->commit();
+            return $stored;
+        } catch (\Throwable $error) {
+            $db->rollBack();
+            throw $error;
+        }
     }
 
     public function subscribeCustomer(int $customerId, string $type, string $reference): bool

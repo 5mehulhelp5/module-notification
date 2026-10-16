@@ -31,8 +31,9 @@ class ContactRepository implements ContactRepositoryInterface
         $table = $db->quoteIdentifier($this->resource->getTableName(self::TABLE));
         $db->query("INSERT INTO {$table} (website_id, email, email_key) VALUES (?, ?, ?)"
             . ' ON DUPLICATE KEY UPDATE contact_id = contact_id', [$websiteId, $email, $key]);
+        // Use a current read: guest capture must not pin an older snapshot before its guarded subscription INSERT.
         return (int)$db->fetchOne($db->select()->from($this->resource->getTableName(self::TABLE), 'contact_id')
-            ->where('website_id = ?', $websiteId)->where('email_key = ?', $key));
+            ->where('website_id = ?', $websiteId)->where('email_key = ?', $key)->forUpdate(true));
     }
 
     /**

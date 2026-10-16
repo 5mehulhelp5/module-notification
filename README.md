@@ -33,6 +33,8 @@ Each module answers one question:
   Customers use their account email. Cron `commercekings_notification_contact_cleanup` (daily 03:15) removes
   contacts nothing uses after a 24-hour grace period; modules that store contact ids themselves register an
   `Api\ContactReferenceInterface` (`Model\ContactReferencePool` "references").
+  Guest capture acquires the contact and creates its subscription in one short transaction, so cleanup
+  cannot remove an old contact while it is being reused. Failed storage rolls back both writes.
 - **One queue consumer** `commerceKingsNotificationSend` for every type. Messages are `<type>|<reference>`;
   for subscription types the reference is the subscription id, and only a subscription that still exists with
   a valid consent is handed over.

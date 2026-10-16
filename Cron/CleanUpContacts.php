@@ -9,7 +9,8 @@ use Magento\Framework\App\ResourceConnection;
 
 /**
  * Remove contacts no registered module uses any more (e.g. a guest retyped the email). A contact is kept
- * for a day first, so a capture in progress cannot lose it. Without registered references nothing is removed.
+ * for a day first. Guest capture holds the contact row lock until its subscription commits, so cleanup
+ * cannot remove an old contact while it is being reused. Without registered references nothing is removed.
  */
 class CleanUpContacts
 {

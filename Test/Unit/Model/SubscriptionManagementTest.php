@@ -93,9 +93,11 @@ class SubscriptionManagementTest extends TestCase
         }
         $this->assertSame([], $this->queries, 'no subscription can be written without a contact');
         $this->assertSame([], $this->deletes, 'a failed save must not unsubscribe the previous recipient');
+        $this->assertSame(['beginTransaction', 'rollBack'], $this->transactionEvents);
         $this->contactFailure = null;
         $this->assertTrue($management->subscribeGuest('test_type', 'masked', 'guest@example.test'));
         $this->assertCount(1, $this->queries);
+        $this->assertSame(['beginTransaction', 'rollBack', 'beginTransaction', 'commit'], $this->transactionEvents);
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('subscriberKinds')]
@@ -112,6 +114,7 @@ class SubscriptionManagementTest extends TestCase
         } catch (\RuntimeException $error) {
             $this->assertSame($this->queryFailure, $error);
         }
+        $this->assertSame($guest ? ['beginTransaction', 'rollBack'] : [], $this->transactionEvents);
         $this->assertCount($guest ? 1 : 0, $this->contacts);
         $this->assertCount(1, $this->queries);
         $this->assertStringContainsString('INSERT INTO ck_notification_subscription', $this->queries[0][0]);
@@ -139,6 +142,7 @@ class SubscriptionManagementTest extends TestCase
         $this->assertStringContainsString("FROM DUAL WHERE VALID('new-consent') AND (STILL_YOURS) ON DUPLICATE KEY UPDATE", $sql);
         $this->assertSame(['test_type', 42, 1, '', 5, null, 'new-consent'], array_slice($bind, 0, 7));
         $this->assertSame([5, null, 'new-consent'], array_slice($bind, 7, 3), 'compared before replacing');
+        $this->assertSame(['beginTransaction', 'commit'], $this->transactionEvents);
     }
 
     public function testOnePerPersonTypesKeyByContactOrCustomer(): void
@@ -162,6 +166,7 @@ class SubscriptionManagementTest extends TestCase
         $this->assertContains(['contact_id = \'5\'', null], $this->selectWhere);
         $this->fetchOneResult = false;
         $this->assertFalse($this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test'));
+        $this->assertSame(['beginTransaction', 'commit', 'beginTransaction', 'commit'], $this->transactionEvents);
     }
 
     /** @dataProvider invalidEmails */

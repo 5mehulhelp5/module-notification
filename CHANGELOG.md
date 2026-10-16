@@ -4,6 +4,9 @@
 
 First release. Features:
 
+- Commit guest contact acquisition and subscription creation together, retaining the contact row lock until the
+  subscription exists. Cover old-contact reuse during concurrent cleanup and rollback on storage failures.
+
 - One address normalization (`ContactRepository::normalize()`: trim, Unicode NFC, lower case) for contacts and the
   recipient cooldown, so one contact is one cooldown.
 - Add failure tests for contact/subscription persistence, recipient lookup, invalid website ids and empty queue references, including retry behavior and suppression-claim release.

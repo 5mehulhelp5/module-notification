@@ -4,22 +4,27 @@ declare(strict_types=1);
 namespace CommerceKings\Notification\Test\Integration;
 
 use CommerceKings\Notification\Api\ContactRepositoryInterface;
+use CommerceKings\Notification\Api\ContactReferenceInterface;
 use CommerceKings\Notification\Api\Data\Permission;
 use CommerceKings\Notification\Api\SubscriptionPermissionInterface;
 use CommerceKings\Notification\Api\Data\Target;
 use CommerceKings\Notification\Api\SubscriptionTypeInterface;
 use CommerceKings\Notification\Cron\CleanUpSubscriptions;
+use CommerceKings\Notification\Cron\CleanUpContacts;
 use CommerceKings\Notification\Model\ContactReferencePool;
 use CommerceKings\Notification\Model\ContactRepository;
 use CommerceKings\Notification\Model\SubscriptionGuard;
 use CommerceKings\Notification\Model\SubscriptionRemoval;
 use CommerceKings\Notification\Model\SubscriptionManagement;
 use CommerceKings\Notification\Model\SubscriptionTypePool;
+use CommerceKings\Notification\Model\SubscriptionContactReference;
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Api\Data\CustomerInterfaceFactory;
 use Magento\Framework\App\Bootstrap;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\App\State;
+use Magento\Framework\DB\Adapter\LockWaitException;
+use Magento\Framework\DB\Sql\Expression;
 use Magento\Framework\Filter\FilterManager;
 use Magento\Framework\ObjectManagerInterface;
 use Magento\Framework\Registry;
@@ -100,7 +105,7 @@ class SubscriptionTest extends TestCase
         return $name . '.' . $this->type . '@example.test';
     }
 
-    private function management(): SubscriptionManagement
+    private function management(?ContactRepositoryInterface $contacts = null): SubscriptionManagement
     {
         $type = $this->createStub(SubscriptionTypeInterface::class);
         $type->method('getPurpose')->willReturn('test_purpose');
@@ -109,8 +114,22 @@ class SubscriptionTest extends TestCase
         $type->method('orphanCondition')->willReturnCallback(fn ($column) => $column . ' = ' . $this->orphan);
         $filters = $this->om->create(FilterManager::class);
         return new SubscriptionManagement($this->resource, new SubscriptionTypePool([$this->type => $type]),
-            $this->permission(), $this->om->get(ContactRepositoryInterface::class), $this->stores,
+            $this->permission(), $contacts ?? $this->om->get(ContactRepositoryInterface::class), $this->stores,
             new EmailAddress(), new StringLength(['max' => 255]), $filters);
+    }
+
+    private function afterContactSave(\Closure $afterSave): ContactRepositoryInterface
+    {
+        return new class($this->om->get(ContactRepositoryInterface::class), $afterSave) implements ContactRepositoryInterface {
+            public function __construct(private ContactRepositoryInterface $actual, private \Closure $afterSave) {}
+            public function save(int $websiteId, string $email): int
+            {
+                $id = $this->actual->save($websiteId, $email);
+                ($this->afterSave)();
+                return $id;
+            }
+            public function getEmail(int $contactId): ?string { return $this->actual->getEmail($contactId); }
+        };
     }
 
     /** grants the current $consentId; the reference 'withdrawn' is revoked */
@@ -225,6 +244,118 @@ class SubscriptionTest extends TestCase
         $this->assertSame([], $this->rows());
         $this->assertFalse($guard->isValid($id, $this->type));
         $this->assertSame([$used, $unused], $this->unusedContacts([$used, $unused]));
+    }
+
+    public function testConcurrentCleanupCannotRemoveAnOldContactBeingReused(): void
+    {
+        $actual = $this->om->get(ContactRepositoryInterface::class);
+        $email = $this->email('reused');
+        $id = $actual->save((int)$this->stores->getStore()->getWebsiteId(), $email);
+        $db = $this->resource->getConnection();
+        $db->update($this->table(ContactRepository::TABLE),
+            ['created_at' => new Expression('NOW() - INTERVAL 2 DAY')], ['contact_id = ?' => $id]);
+        $peerResource = $this->om->create(ResourceConnection::class);
+        $peer = $peerResource->getConnection();
+        $this->assertNotSame($db->fetchOne('SELECT CONNECTION_ID()'), $peer->fetchOne('SELECT CONNECTION_ID()'));
+        $peer->query('SET SESSION innodb_lock_wait_timeout = 1');
+        $reference = new class($id, new SubscriptionContactReference($peerResource)) implements ContactReferenceInterface {
+            public function __construct(private int $id, private SubscriptionContactReference $actual) {}
+            public function usedCondition(string $column): string
+            {
+                // Restrict the real cleanup to this fixture; every other contact is treated as in use.
+                return sprintf('%s <> %d OR (%s)', $column, $this->id, $this->actual->usedCondition($column));
+            }
+        };
+        $cleanup = new CleanUpContacts($peerResource, new ContactReferencePool(['fixture' => $reference]));
+        $blocked = false;
+        $duringSave = function () use ($cleanup, &$blocked): void {
+            try {
+                $cleanup->execute();
+            } catch (LockWaitException) {
+                $blocked = true;
+            }
+        };
+        $contacts = $this->afterContactSave($duringSave);
+        try {
+            $this->assertTrue($this->management($contacts)->subscribeGuest($this->type, 'ref', $email));
+            $this->assertTrue($blocked, 'cleanup must wait until contact acquisition and subscription creation commit');
+            $this->assertSame(0, $cleanup->execute(), 'after commit the subscription protects the reused contact');
+            $this->assertSame($email, $actual->getEmail($id));
+            $this->assertSame((string)$id, $this->rows()[0]['contact_id']);
+            $this->assertSame(0, $db->getTransactionLevel());
+        } finally {
+            $peer->closeConnection();
+        }
+    }
+
+    public function testConcurrentTargetChangeStillRefusesTheGuestWriteInsideItsTransaction(): void
+    {
+        $actual = $this->om->get(ContactRepositoryInterface::class);
+        $markerEmail = $this->email('target-open');
+        $markerId = $actual->save((int)$this->stores->getStore()->getWebsiteId(), $markerEmail);
+        $db = $this->resource->getConnection();
+        $this->condition = sprintf('EXISTS (SELECT 1 FROM %s AS target_marker WHERE target_marker.contact_id = %d AND %s)',
+            $db->quoteIdentifier($this->table(ContactRepository::TABLE)), $markerId,
+            $db->quoteInto('target_marker.email = ?', $markerEmail));
+        $peer = $this->om->create(ResourceConnection::class)->getConnection();
+        $changeTarget = fn () => $peer->update($this->table(ContactRepository::TABLE),
+            ['email' => $this->email('target-closed')], ['contact_id = ?' => $markerId]);
+        $contacts = $this->afterContactSave($changeTarget);
+        try {
+            $this->assertFalse($this->management($contacts)->subscribeGuest($this->type, 'ref', $this->email('guest')));
+            $this->assertSame([], $this->rows(), 'the write must see the concurrently changed target');
+            $this->assertSame(0, $db->getTransactionLevel());
+        } finally {
+            $peer->closeConnection();
+        }
+    }
+
+    public function testWaitingCleanupKeepsTheSubscriptionAfterCaptureCommits(): void
+    {
+        $actual = $this->om->get(ContactRepositoryInterface::class);
+        $email = $this->email('waiting-cleanup');
+        $id = $actual->save((int)$this->stores->getStore()->getWebsiteId(), $email);
+        $db = $this->resource->getConnection();
+        $db->update($this->table(ContactRepository::TABLE),
+            ['created_at' => new Expression('NOW() - INTERVAL 2 DAY')], ['contact_id = ?' => $id]);
+        $process = null;
+        $pipes = [];
+        $contacts = $this->afterContactSave(function () use ($id, $db, &$process, &$pipes): void {
+            $process = proc_open([PHP_BINARY, '-d', 'opcache.enable_cli=0', __DIR__ . '/contact-cleanup-worker.php',
+                (string)$id], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+            $this->assertIsResource($process);
+            fclose($pipes[0]);
+            unset($pipes[0]);
+            stream_set_timeout($pipes[1], 15);
+            $connectionId = (int)trim((string)fgets($pipes[1]));
+            $this->assertGreaterThan(0, $connectionId);
+            $waiting = false;
+            $deadline = microtime(true) + 5;
+            do {
+                foreach ($db->fetchAll('SHOW FULL PROCESSLIST') as $row) {
+                    if ((int)$row['Id'] === $connectionId && str_starts_with((string)$row['Info'], 'DELETE n FROM ')) {
+                        $waiting = true;
+                        break;
+                    }
+                }
+                if (!$waiting) { usleep(10000); }
+            } while (!$waiting && microtime(true) < $deadline);
+            $this->assertTrue($waiting, 'the cleanup must already be waiting on the contact before capture commits');
+        });
+        try {
+            $this->assertTrue($this->management($contacts)->subscribeGuest($this->type, 'ref', $email));
+            $removed = trim((string)stream_get_contents($pipes[1]));
+            $errors = stream_get_contents($pipes[2]);
+            $this->assertSame('0', $removed, $errors);
+            $this->assertSame($email, $actual->getEmail($id));
+            $this->assertCount(1, $this->rows(), 'cleanup must not cascade-delete the newly committed subscription');
+        } finally {
+            foreach ($pipes as $pipe) { fclose($pipe); }
+            if (is_resource($process)) {
+                if (proc_get_status($process)['running']) { proc_terminate($process); }
+                proc_close($process);
+            }
+        }
     }
 
     /** Contacts the cleanup would remove (CleanUpContacts' condition, limited to these ids). */
