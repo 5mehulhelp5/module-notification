@@ -41,6 +41,7 @@ Both: [operations](docs/operations.md).
 Implement `Api\NotificationTypeInterface` (or `Api\SubscriptionTypeInterface` for something a shopper subscribes to)
 and register it in a pool; publish with `Api\QueueInterface`. Replace who may subscribe with
 `Api\SubscriptionPermissionInterface` and `Api\SubscriberInterface` – that is what the consent bridge does.
+A feature can show a notice where shoppers subscribe with `Api\OptOutNoticeInterface` (Automatic / Yes / No).
 Details: [for module authors](docs/module-authors.md).
 
 ## Limitations

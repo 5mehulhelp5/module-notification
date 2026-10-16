@@ -8,7 +8,7 @@ use CommerceKings\Notification\Api\SubscriberInterface;
 
 /**
  * Notification on its own: the subscriber cannot be recognized in the storefront and there is no unsubscribe link. A
- * permission module replaces it (e.g. the consent bridge; an opt-out module supplies its unsubscribe page).
+ * permission module replaces it (e.g. the consent bridge); a shop adds its own unsubscribe page with a preference.
  */
 class AnonymousSubscriber implements SubscriberInterface
 {

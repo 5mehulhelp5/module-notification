@@ -30,4 +30,10 @@ interface SubscriptionPermissionInterface
      * this purpose (SubscriptionTypeInterface::getPurpose()) and the store the email is sent from?
      */
     public function isValidFor(string $reference, string $purpose, int $storeId): bool;
+
+    /**
+     * True when every authorized subscription is allowed without a recorded permission (opt-out). Features use it
+     * for opt-out defaults, e.g. whether their notice shows by default (OptOutNoticeInterface).
+     */
+    public function isOptOut(): bool;
 }

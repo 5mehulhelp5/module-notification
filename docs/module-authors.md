@@ -78,3 +78,26 @@ For notifications a visitor signs up for, also:
    not allow a subquery on a table the UPDATE itself joins (error 1093).
 4. Keep your send history keyed by what "once" means for you (e.g. the cart), never by the subscription id:
    a withdrawal deletes the subscription, and subscribing again creates a new one.
+
+## Opt-out notice
+
+A feature can tell shoppers where they subscribe (e.g. under the checkout email field). Add a config group with two
+fields, read them through `Api\OptOutNoticeInterface::getText('<section>/<group>', $storeId)` and show the text when
+it is not null:
+
+```xml
+<group id="notice" translate="label" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+    <label>Checkout notice</label>
+    <field id="show" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1">
+        <label>Show notice</label>
+        <source_model>CommerceKings\Notification\Model\Config\Source\NoticeMode</source_model>
+    </field>
+    <field id="text" translate="label" type="textarea" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+        <label>Notice text</label>
+        <depends><field id="show" separator=",">auto,1</field></depends>
+    </field>
+</group>
+```
+
+Default `show` to `auto` and `text` to your wording in `etc/config.xml`. *Automatic* shows the notice while
+`SubscriptionPermissionInterface::isOptOut()` is true (Notification alone) and hides it with the consent bridge.

@@ -28,4 +28,9 @@ class OpenPermission implements SubscriptionPermissionInterface
     {
         return true;
     }
+
+    public function isOptOut(): bool
+    {
+        return true;
+    }
 }

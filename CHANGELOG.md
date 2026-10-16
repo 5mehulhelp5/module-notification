@@ -4,6 +4,9 @@
 
 First release. Features:
 
+- **Opt-out notice:** `SubscriptionPermissionInterface::isOptOut()` (true for `OpenPermission`) and
+  `OptOutNoticeInterface`, which resolves a feature's *Show notice* (Automatic / Yes / No) and *Notice text* settings.
+  Automatic shows the notice in opt-out mode and hides it with a permission module such as the consent bridge.
 - Commit guest contact acquisition and subscription creation together, retaining the contact row lock until the
   subscription exists. Cover old-contact reuse during concurrent cleanup and rollback on storage failures.
 
