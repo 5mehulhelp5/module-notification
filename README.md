@@ -2,6 +2,8 @@
 
 Works with Magento 2.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQL queue
 
+<sub>Built by [CommerceKings](https://commercekings.net) – expert Magento engineering. New store, maintenance, custom development or more sales? [Talk to us](https://commercekings.net).</sub>
+
 **Every email sent in the background – never during checkout, never in a cron loop – so your store stays fast.**
 
 - **Fast checkout.** Shoppers only subscribe – one quick write. A queue consumer sends later.
