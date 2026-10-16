@@ -36,15 +36,20 @@ class ContactRepository implements ContactRepositoryInterface
     }
 
     /**
-     * An address's exact identity: sha256 of the trimmed, Unicode-NFC, lower-cased address (letter case is ignored,
-     * as Magento and the recipient cooldown do; accents and every other character count). Hex, so any collation
-     * compares it exactly.
+     * The one normalization of an address in Notification (contacts and the recipient cooldown): trimmed, Unicode NFC
+     * (a composed and a decomposed "é" are the same address), lower case. Accents and every other character count.
      */
-    public static function key(string $email): string
+    public static function normalize(string $email): string
     {
         $email = trim($email);
         $normalized = \Normalizer::normalize($email, \Normalizer::FORM_C);
-        return hash('sha256', mb_strtolower(is_string($normalized) ? $normalized : $email, 'UTF-8'));
+        return mb_strtolower(is_string($normalized) ? $normalized : $email, 'UTF-8');
+    }
+
+    /** An address's exact identity: sha256 of normalize(). Hex, so any collation compares it exactly. */
+    public static function key(string $email): string
+    {
+        return hash('sha256', self::normalize($email));
     }
 
     public function getEmail(int $contactId): ?string

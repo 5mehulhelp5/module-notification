@@ -4,6 +4,8 @@
 
 First release. Features:
 
+- One address normalization (`ContactRepository::normalize()`: trim, Unicode NFC, lower case) for contacts and the
+  recipient cooldown, so one contact is one cooldown.
 - Add failure tests for contact/subscription persistence, recipient lookup, invalid website ids and empty queue references, including retry behavior and suppression-claim release.
 - **Shared sending** for CommerceKings notifications: one queue consumer `commerceKingsNotificationSend`
   (RabbitMQ or Magento's database queue) dispatching `<type>|<reference>` to registered notification types.

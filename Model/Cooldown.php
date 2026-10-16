@@ -21,10 +21,13 @@ class Cooldown implements CooldownInterface
     ) {
     }
 
-    /** Keyed, purpose-separated hash; no email or deployment key is written to this table. */
+    /**
+     * Keyed, purpose-separated hash of the normalized address (ContactRepository::normalize(), so one contact is one
+     * cooldown); no email or deployment key is written to this table.
+     */
     public function hash(string $email): string
     {
-        return $this->encryptor->hash('commercekings_notification_recipient|' . mb_strtolower(trim($email)));
+        return $this->encryptor->hash('commercekings_notification_recipient|' . ContactRepository::normalize($email));
     }
 
     public function isRecent(string $email): bool

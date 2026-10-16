@@ -33,6 +33,26 @@ class CooldownTest extends TestCase
         $this->assertSame(str_repeat('a', 64), $this->cooldown()->hash('  Guest@Example.Test  '));
     }
 
+    /** One contact is one cooldown: the cooldown hashes exactly what the contact key normalizes. */
+    public function testTheCooldownNormalizesLikeContacts(): void
+    {
+        $inputs = [];
+        $encryptor = $this->createStub(EncryptorInterface::class);
+        $encryptor->method('hash')->willReturnCallback(function ($input) use (&$inputs) {
+            $inputs[] = $input;
+            return md5($input);
+        });
+        $cooldown = new Cooldown($this->resource(), $encryptor, $this->createStub(Random::class), $this->createStub(Config::class));
+        $composed = "Jos\u{00E9}@Example.Test";      // é as one code point
+        $decomposed = " jose\u{0301}@example.test ";  // e + combining acute
+        $this->assertSame($cooldown->hash($composed), $cooldown->hash($decomposed));
+        $this->assertSame(\CommerceKings\Notification\Model\ContactRepository::key($composed),
+            \CommerceKings\Notification\Model\ContactRepository::key($decomposed), 'the same contact');
+        $this->assertSame('commercekings_notification_recipient|' . \CommerceKings\Notification\Model\ContactRepository::normalize($composed),
+            $inputs[0]);
+        $this->assertNotSame($cooldown->hash('jose@example.test'), $cooldown->hash($composed), 'accents still count');
+    }
+
     public function testClaimChecksOwnershipRatherThanAffectedRowCount(): void
     {
         $this->queryRowCounts = [1, 1]; // CLIENT_FOUND_ROWS may report an unchanged row as affected.
