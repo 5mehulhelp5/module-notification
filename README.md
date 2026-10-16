@@ -65,3 +65,10 @@ Details: [for module authors](docs/module-authors.md).
 
 [How it works](docs/how-it-works.md) · [For module authors](docs/module-authors.md) · [Operations](docs/operations.md) ·
 [Compatibility](COMPATIBILITY.md) · [Changes](CHANGELOG.md)
+
+## Disclaimer
+
+These modules help you ask for, record and respect your shoppers' choices – they don't make your store compliant on
+their own. You are responsible for your store's privacy: what you collect, the wording you show, your privacy policy
+and whether your setup meets the laws that apply to you (e.g. GDPR, ePrivacy, email marketing rules). Get legal advice
+if you are unsure.
