@@ -1,6 +1,4 @@
-# CommerceKings_Notification
-
-**Development status:** first-release feature scope frozen; polishing and verification remain before publication.
+# Notifications
 
 The one way CommerceKings features subscribe shoppers and send them emails. A feature (e.g. abandoned cart) says
 *what and when*; Notification handles *who and how*: subscriptions, guest contacts, one queue consumer, the mailer
@@ -40,10 +38,15 @@ Both: [operations](docs/operations.md).
 
 ## Extending
 
-Implement `Api\NotificationTypeInterface` (or `Api\SubscriptionTypeInterface` for something a shopper subscribes to)
-and register it in a pool; publish with `Api\QueueInterface`. Replace who may subscribe with
-`Api\SubscriptionPermissionInterface` and `Api\SubscriberInterface` – that is what the consent bridge does.
-A feature can show a notice where shoppers subscribe with `Api\OptOutNoticeInterface` (Automatic / Yes / No).
+Interfaces in CommerceKings\Notification\Api:
+
+- NotificationTypeInterface: a notification type, registered in a pool
+- QueueInterface: publish its messages
+- SubscriptionTypeInterface: something a shopper subscribes to
+- SubscriptionPermissionInterface: who may subscribe (the consent bridge replaces it)
+- SubscriberInterface: who the subscriber is and their unsubscribe link
+- OptOutNoticeInterface: a notice where shoppers subscribe (Automatic, Yes or No)
+
 Details: [for module authors](docs/module-authors.md).
 
 ## Limitations
