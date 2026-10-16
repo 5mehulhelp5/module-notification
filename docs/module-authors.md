@@ -79,6 +79,21 @@ For notifications a visitor signs up for, also:
 4. Keep your send history keyed by what "once" means for you (e.g. the cart), never by the subscription id:
    a withdrawal deletes the subscription, and subscribing again creates a new one.
 
+
+With the consent bridge, your type's purpose needs a Consent purpose declaration. Declare it in your `di.xml` on
+`CommerceKings\Consent\Model\PurposePool` (inert without Consent) and make it active only with the bridge, so a
+banner installed for other reasons does not show your switch in the opt-out setup:
+
+```xml
+<item name="my_purpose" xsi:type="array">
+    <item name="label" xsi:type="string">My notification</item>
+    <item name="terms_revision" xsi:type="string">1</item>
+    <item name="active_if" xsi:type="array">
+        <item name="consent_bridge" xsi:type="string">commercekings_consent_notification/general/enabled</item>
+    </item>
+</item>
+```
+
 ## Opt-out notice
 
 A feature can tell shoppers where they subscribe (e.g. under the checkout email field). Add a config group with two
