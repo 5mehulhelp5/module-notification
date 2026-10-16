@@ -38,17 +38,17 @@ Both: [operations](docs/operations.md).
 
 ## Extending
 
-`CommerceKings\Notification\Api\NotificationTypeInterface` – a notification type, registered in a pool
+`Api\NotificationTypeInterface` – a notification type, registered in a pool
 
-`CommerceKings\Notification\Api\QueueInterface` – publish its messages
+`Api\QueueInterface` – publish its messages
 
-`CommerceKings\Notification\Api\SubscriptionTypeInterface` – something a shopper subscribes to
+`Api\SubscriptionTypeInterface` – something a shopper subscribes to
 
-`CommerceKings\Notification\Api\SubscriptionPermissionInterface` – who may subscribe (the consent bridge replaces it)
+`Api\SubscriptionPermissionInterface` – who may subscribe (the consent bridge replaces it)
 
-`CommerceKings\Notification\Api\SubscriberInterface` – who the subscriber is and their unsubscribe link
+`Api\SubscriberInterface` – who the subscriber is and their unsubscribe link
 
-`CommerceKings\Notification\Api\OptOutNoticeInterface` – a notice where shoppers subscribe (Automatic, Yes or No)
+`Api\OptOutNoticeInterface` – a notice where shoppers subscribe (Automatic, Yes or No)
 
 Details: [for module authors](docs/module-authors.md).
 
