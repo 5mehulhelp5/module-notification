@@ -54,7 +54,10 @@ of Notification yet.
    `$delivery->recipient` and `$content->text` to your service and throws when it is not accepted.
 3. Its item in `Model\ProviderPool` (`etc/di.xml`, as above) and its settings (credentials with Magento's
    `Encrypted` backend model) in its own `system.xml` group.
-4. Notification types send with `Delivery::text($storeId, 'sms', $phone, fn () => new DeliveryContent([], text: '...'))`.
+4. Optionally a `Api\RecipientNormalizerInterface` for the channel in `Model\RecipientNormalizerPool`
+   (argument `normalizers`, item `sms`), e.g. to E.164 (`+381601234567`): the cooldown and your provider then see
+   one form of each number. Without one the number is only trimmed.
+5. Notification types send with `Delivery::text($storeId, 'sms', $phone, fn () => new DeliveryContent([], text: '...'))`.
 
 With one SMS provider installed it is used automatically; to choose between several, set
 `commercekings_notification/general/provider_sms` to the provider's code (your module may add the field).

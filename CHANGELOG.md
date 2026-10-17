@@ -9,7 +9,9 @@ First release. Features:
   provider and settings. Replaces `MailerInterface`, `Message` and `MessageContent` (now `Delivery` and
   `DeliveryContent`). `Delivery::text()` builds a plain-text delivery (e.g. SMS) without a template or sender.
   A provider says whether it adds one-click unsubscribe headers (`supportsOneClickUnsubscribe()`); the sender gives
-  the one-click URL only to those that do and logs a warning otherwise.
+  the one-click URL only to those that do and logs a warning otherwise. A per-channel `RecipientNormalizerInterface`
+  gives each recipient one canonical form for the cooldown and the provider. *Email cooldown (days)* is now
+  *Cooldown (days)*, kept per channel.
 - One-click unsubscribe with an http store URL sends the email without the headers and logs a warning, instead of
   failing the send.
 - Opt-out mode (`OpenPermission`) accepts only subscriptions made without a permission reference: after switching

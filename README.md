@@ -10,7 +10,7 @@ Works with Magento 2.4.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQ
   Optional shopper subscriptions are one quick write.
 - **Marketing and service messages.** Reminders shoppers opt into, or order and staff messages that need no subscription.
 - **Pluggable channels.** Email built in; SMS, WhatsApp or any other service plugs in as a provider module
-  ([SMS example](#example-an-sms-provider)).
+  (see *Example: an SMS provider* below).
 - **Inbox-ready at volume.** Optional RFC 8058 one-click unsubscribe, as Gmail and Yahoo require from bulk senders.
 - **Scales with you.** Add consumers when traffic grows; RabbitMQ or Magento's MySQL queue.
 - **Private by default.** The cooldown keeps hashes, never addresses; unused contacts are removed.
@@ -36,7 +36,8 @@ withdrawing it removes the subscription, and notices are off by default.
 
 | Field | Default |
 |---|---|
-| Email cooldown (days, global) | 7 – minimum gap between emails to one address; 0 turns it off |
+| Email provider (website) | Magento email – provider modules add their own |
+| Cooldown (days, global) | 7 – minimum gap between notifications to one recipient on a channel; 0 turns it off |
 | One-click unsubscribe (website) | No – RFC 8058 headers; the feature's unsubscribe link must accept the POST |
 
 ## Before going live
@@ -59,6 +60,8 @@ service messages and staff alerts.
 `Api\SenderInterface` – send a `Delivery` (email, or `Delivery::text()` for any other channel)
 
 `Api\ProviderInterface` – deliver on a channel; Magento email is built in, SMS or WhatsApp come as provider modules
+
+`Api\RecipientNormalizerInterface` – one canonical recipient form per channel (e.g. phone numbers in E.164)
 
 `Api\SubscriptionTypeInterface` – something a shopper subscribes to
 

@@ -16,8 +16,8 @@
                     <comment>Who delivers the emails. Magento email uses the store's mail settings; an installed provider module adds its own options and settings.</comment>
                 </field>
                 <field id="cooldown_days" translate="label comment" type="text" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Email cooldown (days)</label>
-                    <comment>Minimum gap between emails to the same address, across all notifications that use it and all stores. 0 turns it off. Default: 7 days.</comment>
+                    <label>Cooldown (days)</label>
+                    <comment>Minimum gap between notifications to the same recipient on the same channel (e.g. the same email address), across all notifications that use it and all stores. 0 turns it off. Default: 7 days.</comment>
                     <validate>required-entry validate-digits</validate>
                 </field>
                 <field id="one_click_unsubscribe" translate="label comment" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">

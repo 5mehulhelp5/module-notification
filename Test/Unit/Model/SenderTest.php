@@ -15,6 +15,8 @@ use CommerceKings\Notification\Model\Config\Source\Provider as ProviderSource;
 use CommerceKings\Notification\Model\OneClickHeaders;
 use CommerceKings\Notification\Model\Provider\MagentoEmail;
 use CommerceKings\Notification\Model\ProviderPool;
+use CommerceKings\Notification\Model\RecipientNormalizerPool;
+use CommerceKings\Notification\Api\RecipientNormalizerInterface;
 use CommerceKings\Notification\Model\Sender;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Mail\EmailMessage;
@@ -41,7 +43,7 @@ class SenderTest extends TestCase
     /** @param object|null $mailMessage the transport's message; null: Magento 2.4.8+ (Symfony) */
     /** @param ProviderInterface[] $extra more providers; $selected the stored provider code */
     private function sender(int $cooldownDays = 7, bool $stopFails = false, ?object $mailMessage = null,
-        array $extra = [], ?string $selected = null): Sender
+        array $extra = [], ?string $selected = null, array $normalizers = []): Sender
     {
         $this->native = (new \Symfony\Component\Mime\Email())->from('shop@example.test')->to('a@test.com')->text('x');
         $message = $mailMessage ?? $this->createStub(EmailMessage::class);
@@ -84,7 +86,7 @@ class SenderTest extends TestCase
         $logger = $this->createStub(\Psr\Log\LoggerInterface::class);
         $logger->method('warning')->willReturnCallback(function ($text) { $this->warnings[] = $text; });
         $this->pool = new ProviderPool($config, [new MagentoEmail($builder, new OneClickHeaders(), $logger), ...$extra]);
-        return new Sender($this->pool, $emulation, $cooldown, $config, $logger);
+        return new Sender($this->pool, $emulation, $cooldown, $config, $logger, new RecipientNormalizerPool($normalizers));
     }
 
     private function message(bool $useCooldown = true, ?\Closure $current = null, ?string $oneClick = null,
@@ -241,6 +243,22 @@ class SenderTest extends TestCase
         $this->assertSame(SenderInterface::SENT, $sender->send($this->message(oneClick: 'https://shop.test/optout')));
         $this->assertNotNull($this->native->getHeaders()->get('List-Unsubscribe'), 'Magento email supports it');
         $this->assertSame([], $this->warnings);
+    }
+
+    public function testChannelNormalizerShapesTheCooldownKeyAndTheRecipient(): void
+    {
+        $digits = new class implements RecipientNormalizerInterface {
+            public function normalize(string $recipient): string { return '+' . preg_replace('/\D/', '', $recipient); }
+        };
+        $sender = $this->sender(extra: [$this->textProvider()], normalizers: ['text' => $digits]);
+        $this->assertSame(SenderInterface::SENT, $sender->send(Delivery::text(3, 'text', '+381 (60) 123-4567',
+            fn () => new DeliveryContent([], text: 'Hi'))));
+        $this->assertSame('+381601234567', $this->mail['text'][0], 'the provider gets the canonical number');
+        $this->assertSame(['text:+381601234567'], $this->claims, 'one number, one cooldown');
+
+        $this->claims = [];
+        $this->assertSame(SenderInterface::SENT, $this->sender()->send($this->message(recipient: '  a@test.com ')));
+        $this->assertSame(['a@test.com'], $this->claims, 'without a normalizer the recipient is trimmed');
     }
 
     public function testProviderReportingSentKeepsTheClaim(): void

@@ -25,20 +25,26 @@ use Psr\Log\NullLogger;
 class Sender implements SenderInterface
 {
     private readonly LoggerInterface $logger;
+    private readonly RecipientNormalizerPool $normalizers;
 
     public function __construct(
         private readonly ProviderPoolInterface $providers,
         private readonly Emulation $emulation,
         private readonly CooldownInterface $cooldown,
         private readonly Config $config,
-        ?LoggerInterface $logger = null
+        ?LoggerInterface $logger = null,
+        ?RecipientNormalizerPool $normalizers = null
     ) {
         $this->logger = $logger ?? new NullLogger();
+        $this->normalizers = $normalizers ?? new RecipientNormalizerPool();
     }
 
     public function send(Delivery $delivery): string
     {
-        // Email keeps the plain address as its cooldown key; other channels are kept apart by a prefix.
+        // One canonical recipient for the cooldown and the provider. Email keeps the plain address as its cooldown key;
+        // other channels are kept apart by a prefix.
+        $recipient = $this->normalizers->normalize($delivery->channel, $delivery->recipient);
+        $delivery = $this->withRecipient($delivery, $recipient);
         $key = $delivery->channel === Channel::EMAIL
             ? $delivery->recipient : $delivery->channel . ':' . $delivery->recipient;
         $claim = null;
@@ -89,5 +95,12 @@ class Sender implements SenderInterface
         $this->logger->warning(sprintf('CommerceKings_Notification: one-click unsubscribe is on, but provider "%s"'
             . ' cannot add its headers; sent without them.', $provider->getCode()));
         return new DeliveryContent($content->vars, $content->recipientName, null, $content->text);
+    }
+
+    private function withRecipient(Delivery $delivery, string $recipient): Delivery
+    {
+        return $recipient === $delivery->recipient ? $delivery : new Delivery($delivery->storeId, $delivery->templateId,
+            $delivery->sender, $recipient, $delivery->content, $delivery->useCooldown, $delivery->isRecipientCurrent,
+            $delivery->channel);
     }
 }

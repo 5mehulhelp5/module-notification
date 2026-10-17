@@ -45,6 +45,14 @@
     <type name="CommerceKings\Notification\Model\Sender">
         <arguments>
             <argument name="logger" xsi:type="object">Psr\Log\LoggerInterface</argument>
+            <argument name="normalizers" xsi:type="object">CommerceKings\Notification\Model\RecipientNormalizerPool</argument>
+        </arguments>
+    </type>
+    <!-- recipient normalizers per channel (argument "normalizers": channel code => RecipientNormalizerInterface);
+         without one the recipient is trimmed. Email needs none: the cooldown normalizes addresses itself. -->
+    <type name="CommerceKings\Notification\Model\RecipientNormalizerPool">
+        <arguments>
+            <argument name="normalizers" xsi:type="array"/>
         </arguments>
     </type>
     <!-- delivery providers (argument "providers": code => ProviderInterface); the admin selects one per channel.
