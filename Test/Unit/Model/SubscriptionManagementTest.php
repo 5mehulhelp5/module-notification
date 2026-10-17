@@ -260,13 +260,20 @@ class SubscriptionManagementTest extends TestCase
         $this->assertNothingWritten();
     }
 
-    /** Notification alone: every authorized subscription is allowed, with no reference and no SQL requirement. */
+    /** Notification alone: every authorized subscription is allowed, with no reference. */
     public function testOpenPermissionSubscribesWithoutAReference(): void
     {
         $open = new \CommerceKings\Notification\Model\OpenPermission();
         $this->assertSame('', $open->check($this->createStub(SubscriptionTypeInterface::class), $this->target)->reference);
-        $this->assertSame('1 = 1', $open->validCondition('x'));
+        $this->assertSame("s.permission_ref = ''", $open->validCondition('s.permission_ref'));
         $this->assertTrue($open->isValidFor('', 'test_purpose', 1));
+    }
+
+    /** After switching from opt-in to opt-out, a consent-based subscription does not come back to life. */
+    public function testOpenPermissionDoesNotReviveSubscriptionsFromAPermissionModule(): void
+    {
+        $open = new \CommerceKings\Notification\Model\OpenPermission();
+        $this->assertFalse($open->isValidFor('a3f0c2d1e4b5a6c7d8e9f0a1b2c3d4e5', 'test_purpose', 1));
     }
 
     /** ...and its subscriber cannot be recognized and has no unsubscribe link. */

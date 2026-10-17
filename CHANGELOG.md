@@ -4,6 +4,8 @@
 
 First release. Features:
 
+- Opt-out mode (`OpenPermission`) accepts only subscriptions made without a permission reference: after switching
+  from opt-in, a subscription whose consent expired or was withdrawn does not come back to life.
 - Requires Magento 2.4.4 or later (`magento/framework ^103.0.4`): Magento 2.4.0–2.4.3 do not run on PHP 8.1.
 - **Opt-out notice:** `SubscriptionPermissionInterface::isOptOut()` (true for `OpenPermission`) and
   `OptOutNoticeInterface`, which resolves a feature's *Show notice* (Automatic / Yes / No) and *Notice text* settings.

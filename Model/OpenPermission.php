@@ -19,14 +19,19 @@ class OpenPermission implements SubscriptionPermissionInterface
         return Permission::granted();
     }
 
+    /**
+     * Only subscriptions made in opt-out mode (no reference). One that still carries a permission module's reference
+     * (e.g. a consent from before switching to opt-out) may have expired or been withdrawn: it does not come back to
+     * life; the shopper's next email entry subscribes again under opt-out.
+     */
     public function validCondition(string $referenceColumn): string
     {
-        return '1 = 1';
+        return $referenceColumn . " = ''";
     }
 
     public function isValidFor(string $reference, string $purpose, int $storeId): bool
     {
-        return true;
+        return $reference === '';
     }
 
     public function isOptOut(): bool
