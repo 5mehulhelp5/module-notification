@@ -9,8 +9,8 @@ use CommerceKings\Notification\Api\Channel;
 class Delivery
 {
     /**
-     * @param string $templateId the email template; other channels use DeliveryContent::$text
-     * @param string $sender Magento sender identity (e.g. "general"), resolved for the store
+     * @param string $templateId the email template; '' for text channels (see text())
+     * @param string $sender Magento sender identity (e.g. "general"), resolved for the store; '' for text channels
      * @param string $recipient the address on the channel: an email address for Channel::EMAIL
      * @param \Closure(): DeliveryContent $content built inside the store's environment (translations, URLs)
      * @param bool $useCooldown false for notifications the recipient asked for (e.g. back in stock)
@@ -26,5 +26,24 @@ class Delivery
         public readonly ?\Closure $isRecipientCurrent = null,
         public readonly string $channel = Channel::EMAIL
     ) {
+    }
+
+    /**
+     * A plain-text notification on a channel without templates: no email template or sender identity, the text is
+     * DeliveryContent::$text.
+     *
+     * @param string $channel the provider's channel code
+     * @param \Closure(): DeliveryContent $content
+     * @param (\Closure(): bool)|null $isRecipientCurrent
+     */
+    public static function text(
+        int $storeId,
+        string $channel,
+        string $recipient,
+        \Closure $content,
+        bool $useCooldown = true,
+        ?\Closure $isRecipientCurrent = null
+    ): self {
+        return new self($storeId, '', '', $recipient, $content, $useCooldown, $isRecipientCurrent, $channel);
     }
 }

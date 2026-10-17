@@ -199,37 +199,39 @@ class SenderTest extends TestCase
     }
 
     /** A provider for another channel that records what it was given. */
-    private function smsProvider(?\Throwable $error = null): ProviderInterface
+    private function textProvider(?\Throwable $error = null): ProviderInterface
     {
         $provider = $this->createStub(ProviderInterface::class);
-        $provider->method('getCode')->willReturn('test_sms');
-        $provider->method('getLabel')->willReturn('Test SMS');
-        $provider->method('getChannel')->willReturn(Channel::SMS);
+        $provider->method('getCode')->willReturn('test_text');
+        $provider->method('getLabel')->willReturn('Test text');
+        $provider->method('getChannel')->willReturn('text');
         $provider->method('supports')->willReturn(false);
         $provider->method('send')->willReturnCallback(function (Delivery $delivery, DeliveryContent $content) use ($error) {
             if ($error) {
                 throw $error;
             }
-            $this->mail['sms'] = [$delivery->recipient, $content->text];
+            $this->mail['text'] = [$delivery->recipient, $content->text];
         });
         return $provider;
     }
 
     public function testEachChannelUsesItsOwnProviderAndCooldownKey(): void
     {
-        $sender = $this->sender(extra: [$this->smsProvider()]);
-        $this->assertSame(SenderInterface::SENT, $sender->send($this->message(channel: Channel::SMS, recipient: '+381601234567')));
-        $this->assertSame(['+381601234567', 'Your cart is waiting'], $this->mail['sms']);
+        $sender = $this->sender(extra: [$this->textProvider()]);
+        $text = Delivery::text(3, 'text', '+381601234567', fn () => new DeliveryContent([], text: 'Your cart is waiting'));
+        $this->assertSame(['', ''], [$text->templateId, $text->sender], 'a text delivery needs no template or sender');
+        $this->assertSame(SenderInterface::SENT, $sender->send($text));
+        $this->assertSame(['+381601234567', 'Your cart is waiting'], $this->mail['text']);
         $this->assertSame(0, $this->sent, 'the email provider is not involved');
         $this->assertSame(SenderInterface::SENT, $sender->send($this->message()));
-        $this->assertSame(['sms:+381601234567', 'a@test.com'], $this->claims, 'email keeps the plain address as key');
+        $this->assertSame(['text:+381601234567', 'a@test.com'], $this->claims, 'email keeps the plain address as key');
     }
 
     public function testProviderReportingSentKeepsTheClaim(): void
     {
         $sent = new MessageSentException('accepted, then the API timed out');
         try {
-            $this->sender(extra: [$this->smsProvider($sent)])->send($this->message(channel: Channel::SMS, recipient: '+1'));
+            $this->sender(extra: [$this->textProvider($sent)])->send($this->message(channel: 'text', recipient: '+1'));
             $this->fail('Expected MessageSentException');
         } catch (MessageSentException $error) {
             $this->assertSame($sent, $error);
@@ -239,29 +241,29 @@ class SenderTest extends TestCase
 
     public function testSelectedProviderFallsBackToTheChannelDefaultAndNeverCrossesChannels(): void
     {
-        $this->sender(extra: [$this->smsProvider()], selected: 'test_sms');
-        $this->assertSame('magento_email', $this->pool->getSelected(3, Channel::EMAIL)->getCode(), 'an SMS provider is never used for email');
+        $this->sender(extra: [$this->textProvider()], selected: 'test_text');
+        $this->assertSame('magento_email', $this->pool->getSelected(3, Channel::EMAIL)->getCode(), 'a text provider is never used for email');
         $this->sender(selected: 'removed_module');
         $this->assertSame('magento_email', $this->pool->getSelected(3, Channel::EMAIL)->getCode());
         $this->expectException(LocalizedException::class);
-        $this->pool->getSelected(3, Channel::SMS);
+        $this->pool->getSelected(3, 'text');
     }
 
     public function testNoProviderForTheChannelReleasesTheClaim(): void
     {
         try {
-            $this->sender()->send($this->message(channel: Channel::SMS, recipient: '+1'));
+            $this->sender()->send($this->message(channel: 'text', recipient: '+1'));
             $this->fail('Expected a missing provider');
         } catch (LocalizedException) {
-            $this->assertSame([['sms:+1', 'token']], $this->released);
+            $this->assertSame([['text:+1', 'token']], $this->released);
             $this->assertSame([], $this->emulated);
         }
     }
 
     public function testAdminListsOnlyTheChannelsProviders(): void
     {
-        $this->sender(extra: [$this->smsProvider()]);
+        $this->sender(extra: [$this->textProvider()]);
         $this->assertSame([['value' => 'magento_email', 'label' => 'Magento email']], (new ProviderSource($this->pool))->toOptionArray());
-        $this->assertSame([['value' => 'test_sms', 'label' => 'Test SMS']], (new ProviderSource($this->pool, Channel::SMS))->toOptionArray());
+        $this->assertSame([['value' => 'test_text', 'label' => 'Test text']], (new ProviderSource($this->pool, 'text'))->toOptionArray());
     }
 }

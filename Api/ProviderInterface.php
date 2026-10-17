@@ -7,7 +7,8 @@ use CommerceKings\Notification\Api\Data\Delivery;
 use CommerceKings\Notification\Api\Data\DeliveryContent;
 
 /**
- * Hands one notification to a delivery service (Magento's mail transport, an email API, an SMS gateway).
+ * Hands one notification to a delivery service (Magento's mail transport, an email API, or any other
+ * channel's service).
  * Registered in ProviderPool through di.xml; the admin selects one per channel. SenderInterface calls it inside
  * the store's environment, after the recipient cooldown and re-check - a provider only delivers.
  *

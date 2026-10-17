@@ -7,7 +7,7 @@ First release. Features:
 - **Providers:** sending goes through `SenderInterface` to the provider selected per channel (`ProviderInterface`,
   `ProviderPool`; setting *Email provider*, per website, default *Magento email*). Provider modules add their own
   provider and settings. Replaces `MailerInterface`, `Message` and `MessageContent` (now `Delivery` and
-  `DeliveryContent`).
+  `DeliveryContent`). `Delivery::text()` builds a plain-text delivery (e.g. SMS) without a template or sender.
 - One-click unsubscribe with an http store URL sends the email without the headers and logs a warning, instead of
   failing the send.
 - Opt-out mode (`OpenPermission`) accepts only subscriptions made without a permission reference: after switching

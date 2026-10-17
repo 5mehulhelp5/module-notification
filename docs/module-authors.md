@@ -25,8 +25,8 @@ sent and do not start the cooldown. `SenderInterface::send()` returns `SENT`, `C
 
 ## Providers
 
-A provider delivers notifications on one channel (`Api\Channel`: email, SMS, …); the admin selects one per channel
-(**Email provider** for email, default *Magento email*). A provider module needs three things:
+A provider delivers notifications on one channel: `Api\Channel::EMAIL`, or a code your module chooses (e.g. `sms`);
+the admin selects the email provider (**Email provider**, default *Magento email*). A provider module needs three things:
 
 1. A class implementing `Api\ProviderInterface`: `getCode()`, `getLabel()`, `getChannel()`, `supports()` (e.g.
    `ONE_CLICK_UNSUBSCRIBE`) and `send(Delivery, DeliveryContent)`. Throw if the service did not accept the
@@ -46,6 +46,19 @@ A provider delivers notifications on one channel (`Api\Channel`: email, SMS, …
 The sender keeps the cooldown, recipient re-check and store environment for every provider. A non-email channel
 also needs its recipients (e.g. phone numbers), its own consent and content (`DeliveryContent::$text`) – not part
 of Notification yet.
+
+### Build an SMS provider
+
+1. A module that requires `commercekings/module-notification` and loads after `CommerceKings_Notification`.
+2. A class implementing `Api\ProviderInterface` with `getChannel()` returning your channel code, e.g. `'sms'`; `send()` posts
+   `$delivery->recipient` and `$content->text` to your service and throws when it is not accepted.
+3. Its item in `Model\ProviderPool` (`etc/di.xml`, as above) and its settings (credentials with Magento's
+   `Encrypted` backend model) in its own `system.xml` group.
+4. Notification types send with `Delivery::text($storeId, 'sms', $phone, fn () => new DeliveryContent([], text: '...'))`.
+
+With one SMS provider installed it is used automatically; to choose between several, set
+`commercekings_notification/general/provider_sms` to the provider's code (your module may add the field).
+Any other channel works the same way: pick a code (e.g. `whatsapp`) and use it in both places.
 
 ## Permission
 
