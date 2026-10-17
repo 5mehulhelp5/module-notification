@@ -4,11 +4,13 @@ Works with Magento 2.4.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQ
 
 [![License](https://badgen.net/github/license/commercekings/module-notification)](LICENSE) [![Release](https://badgen.net/github/release/commercekings/module-notification)](https://github.com/commercekings/module-notification/releases) [![Checks](https://github.com/commercekings/module-notification/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/commercekings/module-notification/actions/workflows/checks.yml)
 
-**Thousands of shopper notifications a minute or a handful a day – your store never slows down.**
+**Thousands of notifications a minute or a handful a day – your store never slows down.**
 
-- **Fast storefront.** Shoppers only subscribe – one quick write. A queue consumer sends later.
+- **Fast storefront.** Every notification is sent in the background by a queue consumer, never during a page view.
+  Optional shopper subscriptions are one quick write.
 - **Marketing and service messages.** Reminders shoppers opt into, or order and staff messages that need no subscription.
-- **Pluggable channels.** Email built in; SMS, WhatsApp or any other service plugs in as a provider module.
+- **Pluggable channels.** Email built in; SMS, WhatsApp or any other service plugs in as a provider module
+  ([SMS example](#example-an-sms-provider)).
 - **Inbox-ready at volume.** Optional RFC 8058 one-click unsubscribe, as Gmail and Yahoo require from bulk senders.
 - **Scales with you.** Add consumers when traffic grows; RabbitMQ or Magento's MySQL queue.
 - **Private by default.** The cooldown keeps hashes, never addresses; unused contacts are removed.
