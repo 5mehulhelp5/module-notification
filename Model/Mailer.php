@@ -11,6 +11,7 @@ use Magento\Framework\App\Area;
 use Magento\Framework\Mail\Template\TransportBuilder;
 use Magento\Store\Model\App\Emulation;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Sends one notification email: optional recipient cooldown claim, recipient re-check, content built in
@@ -19,14 +20,20 @@ use Psr\Log\LoggerInterface;
  */
 class Mailer implements MailerInterface
 {
+    private readonly OneClickHeaders $oneClickHeaders;
+    private readonly LoggerInterface $logger;
+
     public function __construct(
         private readonly TransportBuilder $transportBuilder,
         private readonly Emulation $emulation,
         private readonly CooldownInterface $cooldown,
         private readonly Config $config,
-        private readonly OneClickHeaders $oneClickHeaders,
-        private readonly LoggerInterface $logger
+        ?OneClickHeaders $oneClickHeaders = null,
+        ?LoggerInterface $logger = null
     ) {
+        // optional: code that builds the mailer itself with the first four arguments keeps working (DI passes both)
+        $this->oneClickHeaders = $oneClickHeaders ?? new OneClickHeaders();
+        $this->logger = $logger ?? new NullLogger();
     }
 
     public function send(Message $message): string
