@@ -7,10 +7,11 @@ Works with Magento 2.4.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQ
 **Thousands of shopper notifications a minute or a handful a day – your store never slows down.**
 
 - **Fast storefront.** Shoppers only subscribe – one quick write. A queue consumer sends later.
+- **Marketing and service messages.** Reminders shoppers opt into, or order and staff messages that need no subscription.
+- **Pluggable channels.** Email built in; SMS, WhatsApp or any other service plugs in as a provider module.
 - **Inbox-ready at volume.** Optional RFC 8058 one-click unsubscribe, as Gmail and Yahoo require from bulk senders.
 - **Scales with you.** Add consumers when traffic grows; RabbitMQ or Magento's MySQL queue.
 - **Private by default.** The cooldown keeps hashes, never addresses; unused contacts are removed.
-- **One engine for every notification** – opt-in or opt-out, guests and customers.
 
 A feature (e.g. abandoned cart) says *what and when*; Notification handles *who and how*.
 
@@ -46,9 +47,16 @@ Both: [operations](docs/operations.md).
 
 ## Extending
 
+Notification types work **with or without subscriptions**: with them for messages shoppers sign up for, without for
+service messages and staff alerts.
+
 `Api\NotificationTypeInterface` – a notification type, registered in a pool
 
 `Api\QueueInterface` – publish its messages
+
+`Api\SenderInterface` – send a `Delivery` (email, or `Delivery::text()` for any other channel)
+
+`Api\ProviderInterface` – deliver on a channel; Magento email is built in, SMS or WhatsApp come as provider modules
 
 `Api\SubscriptionTypeInterface` – something a shopper subscribes to
 
@@ -57,6 +65,29 @@ Both: [operations](docs/operations.md).
 `Api\SubscriberInterface` – who the subscriber is and their unsubscribe link
 
 `Api\OptOutNoticeInterface` – a notice where shoppers subscribe (Automatic, Yes or No)
+
+### Example: an SMS provider
+
+```php
+class SmsProvider implements ProviderInterface
+{
+    public function getCode(): string { return 'my_sms'; }
+    public function getLabel(): string { return 'My SMS gateway'; }
+    public function getChannel(): string { return 'sms'; }
+    public function supports(string $capability): bool { return false; }
+
+    public function send(Delivery $delivery, DeliveryContent $content): void
+    {
+        // post $delivery->recipient and $content->text to your gateway; throw if it is not accepted
+    }
+}
+```
+
+Register it in `Model\ProviderPool` (`etc/di.xml`), then send from a notification type:
+
+```php
+$sender->send(Delivery::text($storeId, 'sms', $phone, fn () => new DeliveryContent([], text: 'Your cart is waiting')));
+```
 
 Details: [for module authors](docs/module-authors.md).
 
