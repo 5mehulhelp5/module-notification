@@ -1,15 +1,16 @@
-# Notifications<a href="https://commercekings.net"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/commercekings/module-notification/main/.github/commercekings-dark.svg"><img align="right" width="152" src="https://raw.githubusercontent.com/commercekings/module-notification/main/.github/commercekings-light.svg" alt="Built by CommerceKings. Ready to sell more? Talk to us"></picture></a>
+# Notification Engine with Zero Storefront Impact<a href="https://commercekings.net"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/commercekings/module-notification/main/.github/commercekings-dark.svg"><img align="right" width="152" src="https://raw.githubusercontent.com/commercekings/module-notification/main/.github/commercekings-light.svg" alt="Built by CommerceKings. Ready to sell more? Talk to us"></picture></a>
 
 Works with Magento 2.4.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQL queue
 
 [![License](https://badgen.net/github/license/commercekings/module-notification)](LICENSE) [![Release](https://badgen.net/github/release/commercekings/module-notification)](https://github.com/commercekings/module-notification/releases) [![Checks](https://github.com/commercekings/module-notification/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/commercekings/module-notification/actions/workflows/checks.yml)
 
-**Every email sent in the background – never during checkout, never in a cron loop – so your store stays fast.**
+**Thousands of shopper notifications a minute or a handful a day – your store never slows down.**
 
-- **Fast checkout.** Shoppers only subscribe – one quick write. A queue consumer sends later.
+- **Fast storefront.** Shoppers only subscribe – one quick write. A queue consumer sends later.
+- **Inbox-ready at volume.** Optional RFC 8058 one-click unsubscribe, as Gmail and Yahoo require from bulk senders.
 - **Scales with you.** Add consumers when traffic grows; RabbitMQ or Magento's MySQL queue.
 - **Private by default.** The cooldown keeps hashes, never addresses; unused contacts are removed.
-- **One engine for every notification** – opt-in or opt-out, guests and customers, optional RFC 8058 one-click unsubscribe.
+- **One engine for every notification** – opt-in or opt-out, guests and customers.
 
 A feature (e.g. abandoned cart) says *what and when*; Notification handles *who and how*.
 
