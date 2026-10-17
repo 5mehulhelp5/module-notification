@@ -74,7 +74,7 @@ class SmsProvider implements ProviderInterface
     public function getCode(): string { return 'my_sms'; }
     public function getLabel(): string { return 'My SMS gateway'; }
     public function getChannel(): string { return 'sms'; }
-    public function supports(string $capability): bool { return false; }
+    public function supportsOneClickUnsubscribe(): bool { return false; }
 
     public function send(Delivery $delivery, DeliveryContent $content): void
     {

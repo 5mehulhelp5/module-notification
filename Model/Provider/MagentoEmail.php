@@ -37,9 +37,9 @@ class MagentoEmail implements ProviderInterface
         return Channel::EMAIL;
     }
 
-    public function supports(string $capability): bool
+    public function supportsOneClickUnsubscribe(): bool
     {
-        return $capability === self::ONE_CLICK_UNSUBSCRIBE;
+        return true;
     }
 
     public function send(Delivery $delivery, DeliveryContent $content): void

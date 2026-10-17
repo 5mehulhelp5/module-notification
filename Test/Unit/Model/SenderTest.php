@@ -84,7 +84,7 @@ class SenderTest extends TestCase
         $logger = $this->createStub(\Psr\Log\LoggerInterface::class);
         $logger->method('warning')->willReturnCallback(function ($text) { $this->warnings[] = $text; });
         $this->pool = new ProviderPool($config, [new MagentoEmail($builder, new OneClickHeaders(), $logger), ...$extra]);
-        return new Sender($this->pool, $emulation, $cooldown, $config);
+        return new Sender($this->pool, $emulation, $cooldown, $config, $logger);
     }
 
     private function message(bool $useCooldown = true, ?\Closure $current = null, ?string $oneClick = null,
@@ -205,12 +205,13 @@ class SenderTest extends TestCase
         $provider->method('getCode')->willReturn('test_text');
         $provider->method('getLabel')->willReturn('Test text');
         $provider->method('getChannel')->willReturn('text');
-        $provider->method('supports')->willReturn(false);
+        $provider->method('supportsOneClickUnsubscribe')->willReturn(false);
         $provider->method('send')->willReturnCallback(function (Delivery $delivery, DeliveryContent $content) use ($error) {
             if ($error) {
                 throw $error;
             }
             $this->mail['text'] = [$delivery->recipient, $content->text];
+            $this->mail['text_one_click'] = $content->oneClickUnsubscribeUrl;
         });
         return $provider;
     }
@@ -225,6 +226,21 @@ class SenderTest extends TestCase
         $this->assertSame(0, $this->sent, 'the email provider is not involved');
         $this->assertSame(SenderInterface::SENT, $sender->send($this->message()));
         $this->assertSame(['text:+381601234567', 'a@test.com'], $this->claims, 'email keeps the plain address as key');
+    }
+
+    public function testOneClickUrlOnlyReachesProvidersThatSupportIt(): void
+    {
+        $sender = $this->sender(extra: [$this->textProvider()]);
+        $text = Delivery::text(3, 'text', '+381601234567',
+            fn () => new DeliveryContent([], null, 'https://shop.test/optout', 'Your cart is waiting'));
+        $this->assertSame(SenderInterface::SENT, $sender->send($text));
+        $this->assertNull($this->mail['text_one_click'], 'a provider without the capability never gets the URL');
+        $this->assertStringContainsString('provider "test_text" cannot add its headers', implode(' ', $this->warnings));
+
+        $this->warnings = [];
+        $this->assertSame(SenderInterface::SENT, $sender->send($this->message(oneClick: 'https://shop.test/optout')));
+        $this->assertNotNull($this->native->getHeaders()->get('List-Unsubscribe'), 'Magento email supports it');
+        $this->assertSame([], $this->warnings);
     }
 
     public function testProviderReportingSentKeepsTheClaim(): void

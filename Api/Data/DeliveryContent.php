@@ -7,8 +7,8 @@ class DeliveryContent
 {
     /**
      * @param array<string, mixed> $vars template variables
-     * @param string|null $oneClickUnsubscribeUrl HTTPS URL accepting RFC 8058 POSTs; providers that support
-     *     ProviderInterface::ONE_CLICK_UNSUBSCRIBE add List-Unsubscribe headers
+     * @param string|null $oneClickUnsubscribeUrl HTTPS URL accepting RFC 8058 POSTs; only providers whose
+     *     supportsOneClickUnsubscribe() is true receive it (they add List-Unsubscribe headers)
      * @param string|null $text plain text for channels without templates
      */
     public function __construct(

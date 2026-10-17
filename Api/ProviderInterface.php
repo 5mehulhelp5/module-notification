@@ -16,9 +16,6 @@ use CommerceKings\Notification\Api\Data\DeliveryContent;
  */
 interface ProviderInterface
 {
-    /** RFC 8058 one-click unsubscribe headers (email). */
-    public const ONE_CLICK_UNSUBSCRIBE = 'one_click_unsubscribe';
-
     /** Unique, stored in the configuration, e.g. "magento_email". */
     public function getCode(): string;
 
@@ -28,7 +25,11 @@ interface ProviderInterface
     /** One of the Channel codes. */
     public function getChannel(): string;
 
-    public function supports(string $capability): bool;
+    /**
+     * Can it add RFC 8058 one-click unsubscribe headers? When false, the sender leaves out
+     * DeliveryContent::$oneClickUnsubscribeUrl (the notification's own unsubscribe link still works).
+     */
+    public function supportsOneClickUnsubscribe(): bool;
 
     /**
      * Throws if the service did not accept the notification. A failure after it accepted it must be thrown as

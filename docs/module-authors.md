@@ -28,8 +28,8 @@ sent and do not start the cooldown. `SenderInterface::send()` returns `SENT`, `C
 A provider delivers notifications on one channel: `Api\Channel::EMAIL`, or a code your module chooses (e.g. `sms`);
 the admin selects the email provider (**Email provider**, default *Magento email*). A provider module needs three things:
 
-1. A class implementing `Api\ProviderInterface`: `getCode()`, `getLabel()`, `getChannel()`, `supports()` (e.g.
-   `ONE_CLICK_UNSUBSCRIBE`) and `send(Delivery, DeliveryContent)`. Throw if the service did not accept the
+1. A class implementing `Api\ProviderInterface`: `getCode()`, `getLabel()`, `getChannel()`,
+   `supportsOneClickUnsubscribe()` and `send(Delivery, DeliveryContent)`. Throw if the service did not accept the
    notification; throw `Exception\MessageSentException` if it failed after accepting it.
 2. Its item in `Model\ProviderPool` (`etc/di.xml`):
    ```xml

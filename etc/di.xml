@@ -42,6 +42,11 @@
             <argument name="emailLengthValidator" xsi:type="object">CommerceKingsNotificationEmailLength</argument>
         </arguments>
     </type>
+    <type name="CommerceKings\Notification\Model\Sender">
+        <arguments>
+            <argument name="logger" xsi:type="object">Psr\Log\LoggerInterface</argument>
+        </arguments>
+    </type>
     <!-- delivery providers (argument "providers": code => ProviderInterface); the admin selects one per channel.
          A provider module adds its item here and its settings group in its own system.xml. -->
     <type name="CommerceKings\Notification\Model\ProviderPool">
