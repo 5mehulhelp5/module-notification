@@ -16,7 +16,9 @@ First release. Features:
 - Add failure tests for contact/subscription persistence, recipient lookup, invalid website ids and empty queue references, including retry behavior and suppression-claim release.
 - **Shared sending** for CommerceKings notifications: one queue consumer `commerceKingsNotificationSend`
   (RabbitMQ or Magento's database queue) dispatching `<type>|<reference>` to registered notification types.
-- **Mailer:** store-emulated content, recipient re-check, optional RFC 8058 one-click headers (setting *One-click unsubscribe*, per website, default No);
+- **Mailer:** store-emulated content, recipient re-check, optional RFC 8058 one-click headers (setting *One-click unsubscribe*, per website, default No),
+  also on Magento 2.4.4–2.4.7 through a polyfill for Magento's Laminas transport; a mail transport replaced by an
+  extension sends without them and logs a warning instead of failing;
   `MessageSentException` when a step fails after the mail server accepted the email.
 - **Recipient cooldown:** optional per message (`Message::$useCooldown`) and per shop
   (*Email cooldown (days)*, default 7, 0 = off); keyed hashes only, pruned daily.

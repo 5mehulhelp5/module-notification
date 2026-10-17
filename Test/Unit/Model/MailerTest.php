@@ -10,6 +10,7 @@ use CommerceKings\Notification\Api\MailerInterface;
 use CommerceKings\Notification\Exception\MessageSentException;
 use CommerceKings\Notification\Model\Config;
 use CommerceKings\Notification\Model\Mailer;
+use CommerceKings\Notification\Model\OneClickHeaders;
 use Magento\Framework\Mail\EmailMessage;
 use Magento\Framework\Mail\Template\TransportBuilder;
 use Magento\Framework\Mail\TransportInterface;
@@ -26,13 +27,17 @@ class MailerTest extends TestCase
     private array $claims = [];
     private array $released = [];
     private array $emulated = [];
+    private array $warnings = [];
     private \Symfony\Component\Mime\Email $native;
 
-    private function mailer(int $cooldownDays = 7, bool $stopFails = false): Mailer
+    /** @param object|null $mailMessage the transport's message; null: Magento 2.4.8+ (Symfony) */
+    private function mailer(int $cooldownDays = 7, bool $stopFails = false, ?object $mailMessage = null): Mailer
     {
         $this->native = (new \Symfony\Component\Mime\Email())->from('shop@example.test')->to('a@test.com')->text('x');
-        $message = $this->createStub(EmailMessage::class);
-        $message->method('getSymfonyMessage')->willReturn($this->native);
+        $message = $mailMessage ?? $this->createStub(EmailMessage::class);
+        if ($mailMessage === null) {
+            $message->method('getSymfonyMessage')->willReturn($this->native);
+        }
         $transport = $this->createStub(TransportInterface::class);
         $transport->method('getMessage')->willReturn($message);
         $transport->method('sendMessage')->willReturnCallback(function () {
@@ -65,7 +70,9 @@ class MailerTest extends TestCase
         $cooldown->method('release')->willReturnCallback(function ($email, $token) { $this->released[] = [$email, $token]; });
         $config = $this->createStub(Config::class);
         $config->method('getCooldownDays')->willReturn($cooldownDays);
-        return new Mailer($builder, $emulation, $cooldown, $config);
+        $logger = $this->createStub(\Psr\Log\LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(function ($text) { $this->warnings[] = $text; });
+        return new Mailer($builder, $emulation, $cooldown, $config, new OneClickHeaders(), $logger);
     }
 
     private function message(bool $useCooldown = true, ?\Closure $current = null, ?string $oneClick = null): Message
@@ -169,4 +176,14 @@ class MailerTest extends TestCase
         }
         $this->assertSame(1, $this->sent);
     }
+
+    public function testUnknownMailMessageSendsWithoutOneClickHeadersAndWarns(): void
+    {
+        $this->assertSame(MailerInterface::SENT, $this->mailer(mailMessage: new \stdClass())
+            ->send($this->message(oneClick: 'https://shop.test/optout')));
+        $this->assertSame(1, $this->sent, 'a missing header never blocks the email');
+        $this->assertCount(1, $this->warnings);
+        $this->assertStringContainsString('without them', $this->warnings[0]);
+    }
 }
+

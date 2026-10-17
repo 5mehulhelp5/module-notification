@@ -10,6 +10,7 @@ use CommerceKings\Notification\Exception\MessageSentException;
 use Magento\Framework\App\Area;
 use Magento\Framework\Mail\Template\TransportBuilder;
 use Magento\Store\Model\App\Emulation;
+use Psr\Log\LoggerInterface;
 
 /**
  * Sends one notification email: optional recipient cooldown claim, recipient re-check, content built in
@@ -22,7 +23,9 @@ class Mailer implements MailerInterface
         private readonly TransportBuilder $transportBuilder,
         private readonly Emulation $emulation,
         private readonly CooldownInterface $cooldown,
-        private readonly Config $config
+        private readonly Config $config,
+        private readonly OneClickHeaders $oneClickHeaders,
+        private readonly LoggerInterface $logger
     ) {
     }
 
@@ -55,19 +58,14 @@ class Mailer implements MailerInterface
                     ->addTo($message->email, $content->recipientName ?: null)
                     ->getTransport();
                 if ($content->oneClickUnsubscribeUrl !== null) {
-                    $mail = $transport->getMessage();
-                    if (!is_object($mail) || !method_exists($mail, 'getSymfonyMessage')) {
-                        throw new \UnexpectedValueException('The notification mail transport does not support one-click headers.');
-                    }
                     $url = $content->oneClickUnsubscribeUrl;
                     if (parse_url($url, PHP_URL_SCHEME) !== 'https') {
                         throw new \UnexpectedValueException('One-click unsubscribe requires an HTTPS opt-out URL.');
                     }
-                    $headers = $mail->getSymfonyMessage()->getHeaders();
-                    $headers->remove('List-Unsubscribe');
-                    $headers->remove('List-Unsubscribe-Post');
-                    $headers->addTextHeader('List-Unsubscribe', '<' . $url . '>');
-                    $headers->addTextHeader('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click');
+                    if (!$this->oneClickHeaders->add($transport, $url)) {
+                        $this->logger->warning('CommerceKings_Notification: the mail transport does not support'
+                            . ' one-click headers; sent without them (the email\'s unsubscribe link still works).');
+                    }
                 }
                 $transport->sendMessage();
                 $sent = true;

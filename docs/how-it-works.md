@@ -32,7 +32,9 @@ Each module answers one question:
   a valid consent is handed over.
 - **Mailer**: optional recipient cooldown, recipient re-check, content built in the message's store,
   optional RFC 8058 one-click unsubscribe headers (**One-click unsubscribe**, Yes/No per website, default No; the
-  type's unsubscribe link must accept the mail client's POST). A failure before the mail server accepted the email
+  type's unsubscribe link must accept the mail client's POST). Magento 2.4.8+ adds them through Symfony Mailer;
+  2.4.4–2.4.7 through a polyfill for Magento's Laminas transport (`Model\OneClickHeaders`). A mail transport
+  replaced by an extension (e.g. an SMTP module) sends without them and logs a warning. A failure before the mail server accepted the email
   releases the cooldown claim; a failure after it surfaces as `MessageSentException` so it is never sent twice.
 - **Recipient cooldown**: minimum gap between emails to the same address across all notifications that
   use it and all stores. Keyed hashes only (`ck_notification_cooldown`), never an address.
