@@ -168,13 +168,11 @@ class MailerTest extends TestCase
         $this->assertSame('<https://shop.test/ckconsent/optout?c=id&t=sig>', $headers->get('List-Unsubscribe')?->getBodyAsString());
         $this->assertSame('List-Unsubscribe=One-Click', $headers->get('List-Unsubscribe-Post')?->getBodyAsString());
 
-        try {
-            $this->mailer()->send($this->message(oneClick: 'http://shop.test/optout'));
-            $this->fail('Expected insecure URL refusal');
-        } catch (\UnexpectedValueException $error) {
-            $this->assertSame('One-click unsubscribe requires an HTTPS opt-out URL.', $error->getMessage());
-        }
-        $this->assertSame(1, $this->sent);
+        // an http store (e.g. staging): the email still goes out, without the headers
+        $this->assertSame(MailerInterface::SENT, $this->mailer()->send($this->message(oneClick: 'http://shop.test/optout')));
+        $this->assertNull($this->native->getHeaders()->get('List-Unsubscribe'));
+        $this->assertStringContainsString('needs an HTTPS store URL', implode(' ', $this->warnings));
+        $this->assertSame(2, $this->sent);
     }
 
     public function testUnknownMailMessageSendsWithoutOneClickHeadersAndWarns(): void

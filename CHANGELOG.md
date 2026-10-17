@@ -4,6 +4,8 @@
 
 First release. Features:
 
+- One-click unsubscribe with an http store URL sends the email without the headers and logs a warning, instead of
+  failing the send.
 - Opt-out mode (`OpenPermission`) accepts only subscriptions made without a permission reference: after switching
   from opt-in, a subscription whose consent expired or was withdrawn does not come back to life.
 - Requires Magento 2.4.4 or later (`magento/framework ^103.0.4`): Magento 2.4.0–2.4.3 do not run on PHP 8.1.

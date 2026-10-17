@@ -65,11 +65,12 @@ class Mailer implements MailerInterface
                     ->addTo($message->email, $content->recipientName ?: null)
                     ->getTransport();
                 if ($content->oneClickUnsubscribeUrl !== null) {
+                    // Never block the email over the optional headers: its unsubscribe link works either way.
                     $url = $content->oneClickUnsubscribeUrl;
                     if (parse_url($url, PHP_URL_SCHEME) !== 'https') {
-                        throw new \UnexpectedValueException('One-click unsubscribe requires an HTTPS opt-out URL.');
-                    }
-                    if (!$this->oneClickHeaders->add($transport, $url)) {
+                        $this->logger->warning('CommerceKings_Notification: one-click unsubscribe needs an HTTPS store'
+                            . ' URL (RFC 8058); sent without the headers.');
+                    } elseif (!$this->oneClickHeaders->add($transport, $url)) {
                         $this->logger->warning('CommerceKings_Notification: the mail transport does not support'
                             . ' one-click headers; sent without them (the email\'s unsubscribe link still works).');
                     }

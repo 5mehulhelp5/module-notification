@@ -63,7 +63,8 @@ type or invalid email is Magento's 400 without echoing the address.
 
 **Stores > Configuration > CommerceKings > Notifications**: *Email cooldown (days)*, default 7,
 **0 turns it off** (global); *One-click unsubscribe*, default No (per website) – RFC 8058 headers on every
-notification whose content passes an HTTPS unsubscribe URL; that URL must accept the mail client's POST.
+notification whose content passes an HTTPS unsubscribe URL (an http URL sends the email without them and logs a
+warning); that URL must accept the mail client's POST.
 
 ## Tests
 
