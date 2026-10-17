@@ -9,8 +9,7 @@ Works with Magento 2.4.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQ
 - **Fast storefront.** Every notification is sent in the background by a queue consumer, never during a page view.
   Optional shopper subscriptions are one quick write.
 - **Marketing and service messages.** Reminders shoppers opt into, or order and staff messages that need no subscription.
-- **Pluggable channels.** Email built in; SMS, WhatsApp or any other service plugs in as a provider module
-  (see *Example: an SMS provider* below).
+- **Pluggable channels.** Email built in; SMS, WhatsApp or any other service plugs in as a provider module.
 - **Inbox-ready at volume.** Optional RFC 8058 one-click unsubscribe, as Gmail and Yahoo require from bulk senders.
 - **Scales with you.** Add consumers when traffic grows; RabbitMQ or Magento's MySQL queue.
 - **Private by default.** The cooldown keeps hashes, never addresses; unused contacts are removed.
@@ -71,30 +70,7 @@ service messages and staff alerts.
 
 `Api\OptOutNoticeInterface` – a notice where shoppers subscribe (Automatic, Yes or No)
 
-### Example: an SMS provider
-
-```php
-class SmsProvider implements ProviderInterface
-{
-    public function getCode(): string { return 'my_sms'; }
-    public function getLabel(): string { return 'My SMS gateway'; }
-    public function getChannel(): string { return 'sms'; }
-    public function supportsOneClickUnsubscribe(): bool { return false; }
-
-    public function send(Delivery $delivery, DeliveryContent $content): void
-    {
-        // post $delivery->recipient and $content->text to your gateway; throw if it is not accepted
-    }
-}
-```
-
-Register it in `Model\ProviderPool` (`etc/di.xml`), then send from a notification type:
-
-```php
-$sender->send(Delivery::text($storeId, 'sms', $phone, fn () => new DeliveryContent([], text: 'Your cart is waiting')));
-```
-
-Details: [for module authors](docs/module-authors.md).
+Details, including how to build an SMS provider: [for module authors](docs/module-authors.md).
 
 ## Limitations
 
