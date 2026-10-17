@@ -22,6 +22,13 @@ class Config
         return max(0, (int)$this->scopeConfig->getValue(self::PREFIX . 'cooldown_days'));
     }
 
+    /** The provider selected for the store's website; null when none is stored. */
+    public function getProviderCode(int $storeId, string $channel): ?string
+    {
+        $code = $this->scopeConfig->getValue(self::PREFIX . 'provider_' . $channel, ScopeInterface::SCOPE_STORE, $storeId);
+        return is_string($code) && $code !== '' ? $code : null;
+    }
+
     /** RFC 8058 List-Unsubscribe headers on emails of this store; the type's unsubscribe link must accept them. */
     public function isOneClickUnsubscribeEnabled(int $storeId): bool
     {

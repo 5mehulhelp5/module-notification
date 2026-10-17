@@ -10,6 +10,11 @@
                 <label>Email delivery</label>
                 <fieldset_css>commercekings-config-section</fieldset_css>
                 <comment>Shared by all CommerceKings notifications.</comment>
+                <field id="provider_email" translate="label comment" type="select" sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Email provider</label>
+                    <source_model>CommerceKings\Notification\Model\Config\Source\Provider</source_model>
+                    <comment>Who delivers the emails. Magento email uses the store's mail settings; an installed provider module adds its own options and settings.</comment>
+                </field>
                 <field id="cooldown_days" translate="label comment" type="text" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Email cooldown (days)</label>
                     <comment>Minimum gap between emails to the same address, across all notifications that use it and all stores. 0 turns it off. Default: 7 days.</comment>

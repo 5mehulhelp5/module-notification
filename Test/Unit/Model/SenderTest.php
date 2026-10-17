@@ -3,14 +3,20 @@ declare(strict_types=1);
 
 namespace CommerceKings\Notification\Test\Unit\Model;
 
+use CommerceKings\Notification\Api\Channel;
 use CommerceKings\Notification\Api\CooldownInterface;
-use CommerceKings\Notification\Api\Data\Message;
-use CommerceKings\Notification\Api\Data\MessageContent;
-use CommerceKings\Notification\Api\MailerInterface;
+use CommerceKings\Notification\Api\Data\Delivery;
+use CommerceKings\Notification\Api\Data\DeliveryContent;
+use CommerceKings\Notification\Api\ProviderInterface;
+use CommerceKings\Notification\Api\SenderInterface;
 use CommerceKings\Notification\Exception\MessageSentException;
 use CommerceKings\Notification\Model\Config;
-use CommerceKings\Notification\Model\Mailer;
+use CommerceKings\Notification\Model\Config\Source\Provider as ProviderSource;
 use CommerceKings\Notification\Model\OneClickHeaders;
+use CommerceKings\Notification\Model\Provider\MagentoEmail;
+use CommerceKings\Notification\Model\ProviderPool;
+use CommerceKings\Notification\Model\Sender;
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Mail\EmailMessage;
 use Magento\Framework\Mail\Template\TransportBuilder;
 use Magento\Framework\Mail\TransportInterface;
@@ -18,7 +24,8 @@ use Magento\Store\Model\App\Emulation;
 use PHPUnit\Framework\TestCase;
 
 #[\PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations]
-class MailerTest extends TestCase
+/** The sender with the real ProviderPool and MagentoEmail provider; Magento's transport is stubbed. */
+class SenderTest extends TestCase
 {
     private array $mail = [];
     private int $sent = 0;
@@ -29,9 +36,12 @@ class MailerTest extends TestCase
     private array $emulated = [];
     private array $warnings = [];
     private \Symfony\Component\Mime\Email $native;
+    private ProviderPool $pool;
 
     /** @param object|null $mailMessage the transport's message; null: Magento 2.4.8+ (Symfony) */
-    private function mailer(int $cooldownDays = 7, bool $stopFails = false, ?object $mailMessage = null): Mailer
+    /** @param ProviderInterface[] $extra more providers; $selected the stored provider code */
+    private function sender(int $cooldownDays = 7, bool $stopFails = false, ?object $mailMessage = null,
+        array $extra = [], ?string $selected = null): Sender
     {
         $this->native = (new \Symfony\Component\Mime\Email())->from('shop@example.test')->to('a@test.com')->text('x');
         $message = $mailMessage ?? $this->createStub(EmailMessage::class);
@@ -70,20 +80,24 @@ class MailerTest extends TestCase
         $cooldown->method('release')->willReturnCallback(function ($email, $token) { $this->released[] = [$email, $token]; });
         $config = $this->createStub(Config::class);
         $config->method('getCooldownDays')->willReturn($cooldownDays);
+        $config->method('getProviderCode')->willReturn($selected);
         $logger = $this->createStub(\Psr\Log\LoggerInterface::class);
         $logger->method('warning')->willReturnCallback(function ($text) { $this->warnings[] = $text; });
-        return new Mailer($builder, $emulation, $cooldown, $config, new OneClickHeaders(), $logger);
+        $this->pool = new ProviderPool($config, [new MagentoEmail($builder, new OneClickHeaders(), $logger), ...$extra]);
+        return new Sender($this->pool, $emulation, $cooldown, $config);
     }
 
-    private function message(bool $useCooldown = true, ?\Closure $current = null, ?string $oneClick = null): Message
+    private function message(bool $useCooldown = true, ?\Closure $current = null, ?string $oneClick = null,
+        string $channel = Channel::EMAIL, string $recipient = 'a@test.com'): Delivery
     {
-        return new Message(3, 'tpl', 'general', 'a@test.com',
-            fn () => new MessageContent(['customer_name' => 'Jane'], 'Jane', $oneClick), $useCooldown, $current);
+        return new Delivery(3, 'tpl', 'general', $recipient,
+            fn () => new DeliveryContent(['customer_name' => 'Jane'], 'Jane', $oneClick, 'Your cart is waiting'),
+            $useCooldown, $current, $channel);
     }
 
     public function testSendsInTheMessagesStoreWithItsTemplateSenderAndRecipient(): void
     {
-        $this->assertSame(MailerInterface::SENT, $this->mailer()->send($this->message()));
+        $this->assertSame(SenderInterface::SENT, $this->sender()->send($this->message()));
         $this->assertSame(1, $this->sent);
         $this->assertSame(['tpl'], $this->mail['setTemplateIdentifier']);
         $this->assertSame([['area' => 'frontend', 'store' => 3]], $this->mail['setTemplateOptions']);
@@ -97,7 +111,7 @@ class MailerTest extends TestCase
     public function testInCooldownNothingIsSent(): void
     {
         $this->inCooldown = true;
-        $this->assertSame(MailerInterface::COOLDOWN, $this->mailer()->send($this->message()));
+        $this->assertSame(SenderInterface::COOLDOWN, $this->sender()->send($this->message()));
         $this->assertSame(0, $this->sent);
         $this->assertSame([], $this->emulated);
     }
@@ -105,15 +119,15 @@ class MailerTest extends TestCase
     public function testCooldownIsOptionalPerMessageAndPerShop(): void
     {
         $this->inCooldown = true;
-        $this->assertSame(MailerInterface::SENT, $this->mailer()->send($this->message(useCooldown: false)));
-        $this->assertSame(MailerInterface::SENT, $this->mailer(cooldownDays: 0)->send($this->message()));
+        $this->assertSame(SenderInterface::SENT, $this->sender()->send($this->message(useCooldown: false)));
+        $this->assertSame(SenderInterface::SENT, $this->sender(cooldownDays: 0)->send($this->message()));
         $this->assertSame(2, $this->sent);
         $this->assertSame([], $this->claims, 'requested emails and a shop without cooldown never claim');
     }
 
     public function testRecipientChangedAfterTheClaimReleasesItAndSendsNothing(): void
     {
-        $this->assertSame(MailerInterface::RECIPIENT_CHANGED, $this->mailer()->send($this->message(current: fn () => false)));
+        $this->assertSame(SenderInterface::RECIPIENT_CHANGED, $this->sender()->send($this->message(current: fn () => false)));
         $this->assertSame(0, $this->sent);
         $this->assertSame([['a@test.com', 'token']], $this->released);
     }
@@ -122,7 +136,7 @@ class MailerTest extends TestCase
     {
         $this->sendFails = true;
         try {
-            $this->mailer()->send($this->message());
+            $this->sender()->send($this->message());
             $this->fail('Expected SMTP failure');
         } catch (\RuntimeException $error) {
             $this->assertSame('SMTP down', $error->getMessage());
@@ -134,7 +148,7 @@ class MailerTest extends TestCase
     public function testRecipientCheckFailureReleasesTheClaimBeforeRenderingOrSending(): void
     {
         $error = new \RuntimeException('Recipient lookup unavailable');
-        $mailer = $this->mailer();
+        $mailer = $this->sender();
         try {
             $mailer->send($this->message(current: static function () use ($error): bool { throw $error; }));
             $this->fail('Recipient lookup failure must stop delivery.');
@@ -145,14 +159,14 @@ class MailerTest extends TestCase
         $this->assertSame(0, $this->sent);
         $this->assertSame([], $this->mail);
         $this->assertSame([], $this->emulated);
-        $this->assertSame(MailerInterface::SENT, $mailer->send($this->message()));
+        $this->assertSame(SenderInterface::SENT, $mailer->send($this->message()));
         $this->assertSame(1, $this->sent);
     }
 
     public function testFailureAfterHandoffKeepsTheClaimAndSaysSent(): void
     {
         try {
-            $this->mailer(stopFails: true)->send($this->message());
+            $this->sender(stopFails: true)->send($this->message());
             $this->fail('Expected cleanup failure');
         } catch (MessageSentException $error) {
             $this->assertSame('emulation cleanup failed', $error->getPrevious()?->getMessage());
@@ -163,13 +177,13 @@ class MailerTest extends TestCase
 
     public function testOneClickHeadersOnlyForHttpsUrls(): void
     {
-        $this->mailer()->send($this->message(oneClick: 'https://shop.test/ckconsent/optout?c=id&t=sig'));
+        $this->sender()->send($this->message(oneClick: 'https://shop.test/ckconsent/optout?c=id&t=sig'));
         $headers = $this->native->getHeaders();
         $this->assertSame('<https://shop.test/ckconsent/optout?c=id&t=sig>', $headers->get('List-Unsubscribe')?->getBodyAsString());
         $this->assertSame('List-Unsubscribe=One-Click', $headers->get('List-Unsubscribe-Post')?->getBodyAsString());
 
         // an http store (e.g. staging): the email still goes out, without the headers
-        $this->assertSame(MailerInterface::SENT, $this->mailer()->send($this->message(oneClick: 'http://shop.test/optout')));
+        $this->assertSame(SenderInterface::SENT, $this->sender()->send($this->message(oneClick: 'http://shop.test/optout')));
         $this->assertNull($this->native->getHeaders()->get('List-Unsubscribe'));
         $this->assertStringContainsString('needs an HTTPS store URL', implode(' ', $this->warnings));
         $this->assertSame(2, $this->sent);
@@ -177,11 +191,77 @@ class MailerTest extends TestCase
 
     public function testUnknownMailMessageSendsWithoutOneClickHeadersAndWarns(): void
     {
-        $this->assertSame(MailerInterface::SENT, $this->mailer(mailMessage: new \stdClass())
+        $this->assertSame(SenderInterface::SENT, $this->sender(mailMessage: new \stdClass())
             ->send($this->message(oneClick: 'https://shop.test/optout')));
         $this->assertSame(1, $this->sent, 'a missing header never blocks the email');
         $this->assertCount(1, $this->warnings);
         $this->assertStringContainsString('without them', $this->warnings[0]);
     }
-}
 
+    /** A provider for another channel that records what it was given. */
+    private function smsProvider(?\Throwable $error = null): ProviderInterface
+    {
+        $provider = $this->createStub(ProviderInterface::class);
+        $provider->method('getCode')->willReturn('test_sms');
+        $provider->method('getLabel')->willReturn('Test SMS');
+        $provider->method('getChannel')->willReturn(Channel::SMS);
+        $provider->method('supports')->willReturn(false);
+        $provider->method('send')->willReturnCallback(function (Delivery $delivery, DeliveryContent $content) use ($error) {
+            if ($error) {
+                throw $error;
+            }
+            $this->mail['sms'] = [$delivery->recipient, $content->text];
+        });
+        return $provider;
+    }
+
+    public function testEachChannelUsesItsOwnProviderAndCooldownKey(): void
+    {
+        $sender = $this->sender(extra: [$this->smsProvider()]);
+        $this->assertSame(SenderInterface::SENT, $sender->send($this->message(channel: Channel::SMS, recipient: '+381601234567')));
+        $this->assertSame(['+381601234567', 'Your cart is waiting'], $this->mail['sms']);
+        $this->assertSame(0, $this->sent, 'the email provider is not involved');
+        $this->assertSame(SenderInterface::SENT, $sender->send($this->message()));
+        $this->assertSame(['sms:+381601234567', 'a@test.com'], $this->claims, 'email keeps the plain address as key');
+    }
+
+    public function testProviderReportingSentKeepsTheClaim(): void
+    {
+        $sent = new MessageSentException('accepted, then the API timed out');
+        try {
+            $this->sender(extra: [$this->smsProvider($sent)])->send($this->message(channel: Channel::SMS, recipient: '+1'));
+            $this->fail('Expected MessageSentException');
+        } catch (MessageSentException $error) {
+            $this->assertSame($sent, $error);
+        }
+        $this->assertSame([], $this->released, 'accepted by the provider: never allow a second one');
+    }
+
+    public function testSelectedProviderFallsBackToTheChannelDefaultAndNeverCrossesChannels(): void
+    {
+        $this->sender(extra: [$this->smsProvider()], selected: 'test_sms');
+        $this->assertSame('magento_email', $this->pool->getSelected(3, Channel::EMAIL)->getCode(), 'an SMS provider is never used for email');
+        $this->sender(selected: 'removed_module');
+        $this->assertSame('magento_email', $this->pool->getSelected(3, Channel::EMAIL)->getCode());
+        $this->expectException(LocalizedException::class);
+        $this->pool->getSelected(3, Channel::SMS);
+    }
+
+    public function testNoProviderForTheChannelReleasesTheClaim(): void
+    {
+        try {
+            $this->sender()->send($this->message(channel: Channel::SMS, recipient: '+1'));
+            $this->fail('Expected a missing provider');
+        } catch (LocalizedException) {
+            $this->assertSame([['sms:+1', 'token']], $this->released);
+            $this->assertSame([], $this->emulated);
+        }
+    }
+
+    public function testAdminListsOnlyTheChannelsProviders(): void
+    {
+        $this->sender(extra: [$this->smsProvider()]);
+        $this->assertSame([['value' => 'magento_email', 'label' => 'Magento email']], (new ProviderSource($this->pool))->toOptionArray());
+        $this->assertSame([['value' => 'test_sms', 'label' => 'Test SMS']], (new ProviderSource($this->pool, Channel::SMS))->toOptionArray());
+    }
+}

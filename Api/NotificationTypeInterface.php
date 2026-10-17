@@ -6,7 +6,7 @@ namespace CommerceKings\Notification\Api;
 /**
  * One kind of notification (e.g. a cart reminder), registered by its module in di.xml
  * (Model\TypePool "types": code => implementation). The shared consumer hands it the reference it was
- * queued with; it re-checks its own rules on fresh data and sends through MailerInterface.
+ * queued with; it re-checks its own rules on fresh data and sends through SenderInterface.
  *
  * @api
  */

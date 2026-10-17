@@ -4,6 +4,7 @@
     <default>
         <commercekings_notification>
             <general>
+                <provider_email>magento_email</provider_email>
                 <cooldown_days>7</cooldown_days>
                 <one_click_unsubscribe>0</one_click_unsubscribe>
             </general>

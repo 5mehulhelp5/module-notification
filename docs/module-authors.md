@@ -5,7 +5,7 @@ Building a notification type on `commercekings/module-notification`. Start with 
 ## Notification types
 
 1. Implement `Api\NotificationTypeInterface::process(string $reference)`: re-check, claim atomically,
-   then `Api\MailerInterface::send(new Message(...))`.
+   then `Api\SenderInterface::send(new Delivery(...))`.
 2. Register it in your `etc/di.xml`:
    ```xml
    <type name="CommerceKings\Notification\Model\TypePool">
@@ -18,10 +18,34 @@ Building a notification type on `commercekings/module-notification`. Start with 
    ```
 3. Queue work with `Api\QueueInterface::publish('my_notification', $reference)`.
 
-`Message::$useCooldown = false` for emails the recipient asked for (e.g. back in stock): they are always
-sent and do not start the cooldown. `MailerInterface::send()` returns `SENT`, `COOLDOWN` or
+`Delivery::$useCooldown = false` for notifications the recipient asked for (e.g. back in stock): they are always
+sent and do not start the cooldown. `SenderInterface::send()` returns `SENT`, `COOLDOWN` or
 `RECIPIENT_CHANGED`; on anything but `SENT`, undo your own claim. Replace the cooldown with a
 `CooldownInterface` preference.
+
+## Providers
+
+A provider delivers notifications on one channel (`Api\Channel`: email, SMS, …); the admin selects one per channel
+(**Email provider** for email, default *Magento email*). A provider module needs three things:
+
+1. A class implementing `Api\ProviderInterface`: `getCode()`, `getLabel()`, `getChannel()`, `supports()` (e.g.
+   `ONE_CLICK_UNSUBSCRIBE`) and `send(Delivery, DeliveryContent)`. Throw if the service did not accept the
+   notification; throw `Exception\MessageSentException` if it failed after accepting it.
+2. Its item in `Model\ProviderPool` (`etc/di.xml`):
+   ```xml
+   <type name="CommerceKings\Notification\Model\ProviderPool">
+       <arguments>
+           <argument name="providers" xsi:type="array">
+               <item name="my_provider" xsi:type="object">Vendor\Module\Model\MyProvider</item>
+           </argument>
+       </arguments>
+   </type>
+   ```
+3. Its own settings group in `etc/adminhtml/system.xml`, in the `commercekings_notification` section.
+
+The sender keeps the cooldown, recipient re-check and store environment for every provider. A non-email channel
+also needs its recipients (e.g. phone numbers), its own consent and content (`DeliveryContent::$text`) – not part
+of Notification yet.
 
 ## Permission
 

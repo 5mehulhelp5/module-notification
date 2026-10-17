@@ -30,12 +30,16 @@ Each module answers one question:
 - **One queue consumer** `commerceKingsNotificationSend` for every type. Messages are `<type>|<reference>`;
   for subscription types the reference is the subscription id, and only a subscription that still exists with
   a valid consent is handed over.
-- **Mailer**: optional recipient cooldown, recipient re-check, content built in the message's store,
+- **Sender** (`Api\SenderInterface`): optional recipient cooldown, recipient re-check, content built in the delivery's
+  store, then the provider selected for the channel (**Email provider**, per website, default *Magento email*). A
+  failure before the provider accepted it releases the cooldown claim; a failure after it surfaces as
+  `MessageSentException` so it is never sent twice.
+- **Providers** (`Api\ProviderInterface`, registered in `Model\ProviderPool`): deliver a notification on one channel.
+  The built-in *Magento email* provider uses Magento's email templates and mail transport, with
   optional RFC 8058 one-click unsubscribe headers (**One-click unsubscribe**, Yes/No per website, default No; the
   type's unsubscribe link must accept the mail client's POST). Magento 2.4.8+ adds them through Symfony Mailer;
   2.4.4–2.4.7 through a polyfill for Magento's Laminas transport (`Model\OneClickHeaders`). A mail transport
-  replaced by an extension (e.g. an SMTP module) sends without them and logs a warning. A failure before the mail server accepted the email
-  releases the cooldown claim; a failure after it surfaces as `MessageSentException` so it is never sent twice.
+  replaced by an extension (e.g. an SMTP module) sends without them and logs a warning.
 - **Recipient cooldown**: minimum gap between emails to the same address across all notifications that
   use it and all stores. Keyed hashes only (`ck_notification_cooldown`), never an address.
 

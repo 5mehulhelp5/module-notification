@@ -4,6 +4,10 @@
 
 First release. Features:
 
+- **Providers:** sending goes through `SenderInterface` to the provider selected per channel (`ProviderInterface`,
+  `ProviderPool`; setting *Email provider*, per website, default *Magento email*). Provider modules add their own
+  provider and settings. Replaces `MailerInterface`, `Message` and `MessageContent` (now `Delivery` and
+  `DeliveryContent`).
 - One-click unsubscribe with an http store URL sends the email without the headers and logs a warning, instead of
   failing the send.
 - Opt-out mode (`OpenPermission`) accepts only subscriptions made without a permission reference: after switching
@@ -20,11 +24,11 @@ First release. Features:
 - Add failure tests for contact/subscription persistence, recipient lookup, invalid website ids and empty queue references, including retry behavior and suppression-claim release.
 - **Shared sending** for CommerceKings notifications: one queue consumer `commerceKingsNotificationSend`
   (RabbitMQ or Magento's database queue) dispatching `<type>|<reference>` to registered notification types.
-- **Mailer:** store-emulated content, recipient re-check, optional RFC 8058 one-click headers (setting *One-click unsubscribe*, per website, default No),
+- **Magento email provider:** store-emulated content, recipient re-check, optional RFC 8058 one-click headers (setting *One-click unsubscribe*, per website, default No),
   also on Magento 2.4.4–2.4.7 through a polyfill for Magento's Laminas transport; a mail transport replaced by an
   extension sends without them and logs a warning instead of failing;
   `MessageSentException` when a step fails after the mail server accepted the email.
-- **Recipient cooldown:** optional per message (`Message::$useCooldown`) and per shop
+- **Recipient cooldown:** optional per delivery (`Delivery::$useCooldown`) and per shop
   (*Email cooldown (days)*, default 7, 0 = off); keyed hashes only, pruned daily.
 - **Subscriptions** (`ck_notification_subscription`): one subscribe endpoint for every type
   (`/V1/ck-notification/subscriptions`, `/mine` for customers) with shared email rules, the type's
