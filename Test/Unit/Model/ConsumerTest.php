@@ -10,7 +10,11 @@ use CommerceKings\Notification\Model\Consumer;
 use CommerceKings\Notification\Model\Queue;
 use CommerceKings\Notification\Model\SubscriptionTypePool;
 use CommerceKings\Notification\Model\TypePool;
+use Magento\Framework\Exception\NotFoundException;
+use Magento\Framework\MessageQueue\ConnectionLostException;
+use Magento\Framework\MessageQueue\MessageLockException;
 use Magento\Framework\MessageQueue\PublisherInterface;
+use Magento\Framework\Phrase;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -60,6 +64,48 @@ class ConsumerTest extends TestCase
         $this->assertSame(['7'], $this->processed);
         $this->assertCount(3, $this->skipped);
         $this->assertSame([], $this->errors, 'a withdrawn subscription is expected, not an error');
+    }
+
+    private function failingConsumer(\Throwable $error): Consumer
+    {
+        $type = $this->createStub(NotificationTypeInterface::class);
+        $type->method('process')->willThrowException($error);
+        return new Consumer(new TypePool(['cart_reminder' => $type]), $this->createStub(LoggerInterface::class),
+            new SubscriptionTypePool([]), $this->createStub(SubscriptionGuardInterface::class));
+    }
+
+    public function testFailureReachesMagentoWithoutTheRecipientAddress(): void
+    {
+        $smtp = new \RuntimeException('550 5.1.1 <jane@example.com>: Recipient address rejected', 550);
+        try {
+            $this->failingConsumer($smtp)->process('cart_reminder|42');
+            $this->fail('Expected the failure to reach Magento so the message is rejected');
+        } catch (\RuntimeException $error) {
+            $this->assertNotSame($smtp, $error);
+            $this->assertStringNotContainsString('jane@example.com', $error->getMessage());
+            $this->assertStringStartsWith('CommerceKings_Notification: cart_reminder 42 failed (RuntimeException, code 550, at ',
+                $error->getMessage());
+            $this->assertStringContainsString(__FILE__ . ':', $error->getMessage());
+        }
+    }
+
+    public function testMagentoQueueExceptionsKeepTheirMeaning(): void
+    {
+        foreach ([new MessageLockException(new Phrase('locked')), new ConnectionLostException('gone'),
+            new NotFoundException(new Phrase('missing'))] as $queueError) {
+            try {
+                $this->failingConsumer($queueError)->process('cart_reminder|42');
+                $this->fail('Expected ' . get_class($queueError));
+            } catch (\Exception $error) {
+                $this->assertSame($queueError, $error);
+            }
+        }
+    }
+
+    public function testInvalidNotificationCodeIsNotLogged(): void
+    {
+        $this->consumer()->process("jane@example.com\nforged|42");
+        $this->assertSame(['CommerceKings_Notification: notification with an invalid code dropped'], $this->errors);
     }
 
     public function testQueuePublishesTypeAndReferenceToTheSharedTopic(): void
