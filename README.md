@@ -65,7 +65,9 @@ withdrawing it removes the subscription, and notices are off by default.
 
 - Run the consumer `commerceKingsNotificationSend` (RabbitMQ or Magento's database queue) with
   `--max-messages=1000`, and restart it after each deployment.
-- Rate-limit `POST /rest/<store>/V1/ck-notification/subscriptions` per IP in nginx or your proxy, e.g. 10 a minute.
+- Rate-limit `POST /rest/<store>/V1/ck-notification/subscriptions` per IP in your web server, proxy or CDN, e.g. 10 a
+  minute – the first line of defence. Optional second line: [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit) (Magento 2.4.7+, limits set in
+  the admin).
 
 Both: [operations](docs/operations.md).
 
@@ -98,7 +100,8 @@ Details, including how to build an SMS provider: [for module authors](docs/modul
 
 ## Limitations
 
-- No rate limit in code: protect the guest endpoint in front of Magento.
+- No rate limit in code: protect the guest endpoint in your web server, proxy or CDN; optionally also with
+  [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit).
 - A failed send is not retried by Notification; the feature decides (abandoned cart queues the cart again).
 - Do-not-contact blocks, the cooldown and the "stop these emails" links are keyed with Magento's encryption key.
   Changing the key (`encryption:key:change`) lifts every block, resets the cooldown and invalidates links already

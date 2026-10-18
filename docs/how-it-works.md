@@ -57,7 +57,8 @@ Each module answers one question:
 
 ## Subscribe
 
-Abuse protection for the anonymous guest endpoint belongs to your infrastructure – see *Rate limiting* below.
+Abuse protection for the anonymous guest endpoint belongs to your infrastructure first – a web server, proxy or CDN
+rule (see [operations](operations.md#rate-limiting)); [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit) is an optional second line.
 Without it, the recipient cooldown (one email per address per configured days) and the feature's own sending
 limits cap how often a stranger's address can be mailed, but not how fast a script can subscribe addresses.
 
