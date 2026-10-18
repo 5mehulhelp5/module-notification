@@ -19,6 +19,7 @@ or consent the next sign-up comes from.
 | Column | Content |
 |---|---|
 | `recipient_hash` | keyed hash of channel + normalized recipient, like the cooldown – never the address |
+| `reason` | `link`, `reply` (STOP reply or button) or `undeliverable` (`StopListInterface::REASON_*`); the strongest is kept |
 | `stopped_at` | when it was stopped |
 | `last_attempt_at` | the last sign-up attempt for this recipient (starts as `stopped_at`) |
 
@@ -30,7 +31,8 @@ Global across stores, like the cooldown.
 - The link carries the recipient encrypted with Magento's key (`r`) and an HMAC signature over it (`s`); no
   address appears in the URL.
 - It opens a confirmation page; only its **POST** stops, so email scanners that open links stop nothing.
-- On confirm: the row is written, every subscription for that recipient is deleted, and the page offers **Undo**
+- On confirm: the row is written, the recipient's stoppable subscriptions on that channel are deleted (service types
+  such as an order message keep theirs), and the page offers **Undo**
   (*"Changed your mind? Turn reminders back on."*).
 
 ## While stopped
@@ -114,6 +116,12 @@ cooldown period, stops within *Lifts after (days without attempts)* once nothing
 because it leaked): stops not yet moved to the newest key would no longer match and lift, and stop links signed
 with it would stop working. Removed stops cannot be restored.
 
+## Provider feedback
+
+- A service reporting an undeliverable address (e.g. an SMS status callback) stops it with
+  `REASON_UNDELIVERABLE`: suppressed, consents kept, lifts after the configured days. A STOP reply is `REASON_REPLY`.
+
 ## Later
 
-- Bounce and spam-complaint feedback from providers, stopping a recipient automatically.
+- Email bounce and spam-complaint feedback from mail providers (the same `REASON_UNDELIVERABLE` / `REASON_REPLY`
+  calls; no email provider module sends them yet).

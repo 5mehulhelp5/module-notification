@@ -73,8 +73,8 @@ Each module answers one question:
   (*General > Locale Options*); on the day clocks go forward a time in the skipped hour means the first time after it,
   on the day they go back a time in the repeated hour means its first occurrence. Rules based on the recipient's local
   time – e.g. US state laws such as Florida's FTSA (08:00–20:00 in the recipient's time zone) – need a zone provider
-  for the channel (`Api\QuietHoursZoneInterface`, di.xml `Model\QuietHours` "zones"; a planned SMS provider module
-  adds one): the window is then kept in the recipient's zones, quiet while it is on in any of them. Asked without a
+  for the channel (`Api\QuietHoursZoneInterface`, di.xml `Model\QuietHours` "zones"; an SMS provider module adds
+  one): the window is then kept in the recipient's zones, quiet while it is on in any of them. Asked without a
   recipient (a finder, before it knows the recipients), such a provider gives no zone – "not quiet" – and the sender
   holds each delivery on its own.
 - **Encryption key change**: stops and stop links are checked under every key in `env.php` (`Model\KeyedHash`); a

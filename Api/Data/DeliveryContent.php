@@ -3,6 +3,11 @@ declare(strict_types=1);
 
 namespace CommerceKings\Notification\Api\Data;
 
+/**
+ * The content of one notification, built inside the delivery's store (Delivery::$content).
+ *
+ * @api
+ */
 class DeliveryContent
 {
     /**

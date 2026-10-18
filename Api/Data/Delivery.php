@@ -5,7 +5,11 @@ namespace CommerceKings\Notification\Api\Data;
 
 use CommerceKings\Notification\Api\Channel;
 
-/** One notification for SenderInterface::send(). */
+/**
+ * One notification for SenderInterface::send().
+ *
+ * @api
+ */
 class Delivery
 {
     /**

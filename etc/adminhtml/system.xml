@@ -43,7 +43,7 @@
             <group id="quiet_hours" translate="label comment" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>Quiet hours</label>
                 <fieldset_css>commercekings-config-section</fieldset_css>
-                <comment>Marketing notifications are held during these hours and go out after them; messages about orders are never held. Times are in the store's time zone (General > Locale Options), not the recipient's: rules based on the recipient's local time (e.g. some US states) need a module for that.</comment>
+                <comment>Marketing notifications are held during these hours and go out after them; messages about orders are never held. Times are in the store's time zone (General > Locale Options), unless a provider module keeps them in the recipient's (e.g. for US state rules).</comment>
                 <field id="enabled" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Enabled</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>

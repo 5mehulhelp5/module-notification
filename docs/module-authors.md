@@ -98,9 +98,11 @@ Use `Channel::SMS` and `Channel::WHATSAPP`, never a code of your own for them: c
 and quiet hours are per channel, so every provider of a channel shares them. Notification normalizes both to strict
 E.164 (`Model\PhoneNormalizer`: `+`, a country code and 8–15 digits; spaces, dashes, dots and brackets are left
 out; anything else is refused with `''`). Your provider gets `$delivery->recipient` in that form; strip your service's
-own prefixes (e.g. `whatsapp:`) before you hand a number to Notification. A module with a phone library (national
-formats, a default region) may replace the item for a channel in `Model\RecipientNormalizerPool` (argument
-`normalizers`). A new channel brings its own normalizer – without one it takes no sign-ups.
+own prefixes (e.g. `whatsapp:`) before you hand a number to Notification. The core normalizer owns both channels: a
+provider module does not register one for `sms` or `whatsapp` – every provider of a channel must see the same form,
+and a replacement changes the keys of stored contacts and stops. Only a project replaces it, on purpose (e.g. with a
+phone library for national formats), in `Model\RecipientNormalizerPool` (argument `normalizers`). A new channel
+(e.g. `viber`) brings its own normalizer – without one it takes no sign-ups.
 
 ### Build an SMS or WhatsApp provider
 
@@ -112,6 +114,9 @@ formats, a default region) may replace the item for a channel in `Model\Recipien
 3. Notification types send with `Delivery::text($storeId, Channel::SMS, $phone, fn () => new DeliveryContent([],
    text: '...'), type: 'my_type')`.
 4. Hash or sign anything you store about a recipient with `Model\KeyedHash`, so it survives `encryption:key:change`.
+5. Keep your service's own channel failover off (e.g. Viber or WhatsApp falling back to SMS): the message would
+   arrive on a channel whose stop list, consent and quiet hours Notification never checked. A feature that wants a
+   fallback sends a second delivery on the other channel.
 
 ### Templates (e.g. WhatsApp)
 
@@ -128,6 +133,10 @@ counts a failed attempt.
 - **Verify the signature first** (e.g. Twilio's `X-Twilio-Signature`) against the store's configured public URL, not
   the request's (a proxy changes it), and answer 403 without doing anything else when it fails. The controller
   implements `CsrfAwareActionInterface`; the service posts without a store, so check against each configured account.
+- **Normalize the sender** before anything else: strip the service's prefixes (e.g. `whatsapp:`) and add a missing
+  `+` (some services send `381601234567`), so `$from` is E.164 like the stored contacts. `stop()` and `resume()`
+  throw `\InvalidArgumentException` for a number the channel cannot take: catch it, log it without the number and
+  answer 200, so the service does not retry a request that can never succeed.
 - **Do not register an inbound (reply) webhook in module-rate-limit:** a limited request is answered 429 and the
   service does not send it again – a STOP would be lost. The signature check is its protection. A delivery status
   callback may be limited.
@@ -348,7 +357,10 @@ offers at this number"). Notification ships it; your type only declares it:
    (a CSS selector of the phone input); `reference` defaults to the checkout's cart and `mine` to whether the checkout
    customer is signed in. Checking records the consent, unchecking withdraws it, a changed number moves it. Subscribe
    after the element triggers `ckAddressConsent:recorded`. The text is *Notifications > Consent for an address* per
-   store view and channel (empty: no checkbox). Other storefronts (Hyvä, headless) call
+   store view and channel (empty: no checkbox), read from
+   `commercekings_notification/address_consent/wording_<channel>`: `sms` and `whatsapp` have their fields; a module
+   adding a channel (e.g. `viber`) adds `wording_viber` to that group in its own `system.xml`, with a default in its
+   `config.xml`. Other storefronts (Hyvä, headless) call
    `CommerceKings_Notification/js/address-consent-core` (`record()`) or the REST routes directly.
 3. REST: `POST /V1/ck-notification/address-consents` (guest) and `/mine` (customer) with
    `{"type", "reference", "recipient", "wordingHash", "given"}`. Your type's `authorize()` decides who may record for
