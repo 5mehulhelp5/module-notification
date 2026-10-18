@@ -16,7 +16,9 @@ interface SubscriptionManagementInterface
      * Dispatched after a subscription row was written and Notification's own transaction committed – not for a refusal,
      * a stopped recipient or an identical retry that changed nothing. Data: subscription_id, type, channel, store_id,
      * contact_id (or null), customer_id (or null), created (true: a new row; false: an existing one changed, e.g. its
-     * address or permission). An observer error is logged and never fails the sign-up.
+     * address or permission), previous_contact_id (the changed row's contact before the write; null for a new row or
+     * when it had none) - contact_id !== previous_contact_id means a new address (e.g. send an opt-in confirmation
+     * then), equal means a renewal (e.g. a new consent). An observer error is logged and never fails the sign-up.
      */
     public const EVENT_SAVED = 'commercekings_notification_subscription_saved';
 

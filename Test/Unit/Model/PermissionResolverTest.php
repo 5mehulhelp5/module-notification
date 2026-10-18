@@ -105,4 +105,19 @@ class PermissionResolverTest extends TestCase
             new \CommerceKings\Notification\Api\Data\Subscription(1, 'sms_offer', 7, 1, 3, null, 'sms-checkbox', '2026-10-18 10:00:00')));
         $this->assertFalse((new TypeSubscriber($resolver, 'cart'))->isCurrentVisitor('consent-id'));
     }
+
+    /** TypePermission hands the recipient on: a feature's claim checks the type's own permission for that address. */
+    public function testTypePermissionPassesTheRecipientOn(): void
+    {
+        $seen = [];
+        $own = $this->createStub(SubscriptionPermissionInterface::class);
+        $own->method('check')->willReturnCallback(function ($type, $target, $recipient = null) use (&$seen) {
+            $seen[] = $recipient;
+            return Permission::granted('own');
+        });
+        $type = $this->type($own);
+        (new TypePermission($this->resolver(['sms_offer' => $type]), 'sms_offer'))
+            ->check($type, new Target(1, 1, true, '1 = 1'), '+381601234567');
+        $this->assertSame(['+381601234567'], $seen);
+    }
 }

@@ -42,6 +42,8 @@ class SubscriptionManagementTest extends TestCase
     private ?SubscriptionPermissionInterface $ownPermission = null;
     /** dispatched EVENT_SAVED data */
     private array $events = [];
+    /** the recipient each permission check() was given */
+    private array $checkedRecipients = [];
     private ?\Throwable $observerFailure = null;
     private array $errors = [];
 
@@ -63,8 +65,9 @@ class SubscriptionManagementTest extends TestCase
             return $this->target;
         });
         $permission = $this->createStub(SubscriptionPermissionInterface::class);
-        $permission->method('check')->willReturnCallback(function (SubscriptionTypeInterface $type) {
+        $permission->method('check')->willReturnCallback(function (SubscriptionTypeInterface $type, $target, $recipient = null) {
             $this->consentReads[] = $type->getPurpose();
+            $this->checkedRecipients[] = $recipient;
             return $this->current;
         });
         $permission->method('validCondition')->willReturnCallback(fn ($column) => 'VALID(' . $column . ')');
@@ -430,7 +433,8 @@ class SubscriptionManagementTest extends TestCase
         $this->fetchOneResult = '31';   // SELECT LAST_INSERT_ID()
         $this->assertTrue($this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test'));
         $this->assertSame([[SubscriptionManagementInterface::EVENT_SAVED, ['subscription_id' => 31, 'type' => 'test_type',
-            'channel' => 'email', 'store_id' => 1, 'contact_id' => 5, 'customer_id' => null, 'created' => true]]], $this->events);
+            'channel' => 'email', 'store_id' => 1, 'contact_id' => 5, 'customer_id' => null, 'created' => true,
+            'previous_contact_id' => null]]], $this->events);
         $this->assertStringContainsString('subscription_id = LAST_INSERT_ID(subscription_id)', $this->queries[0][0],
             'an update reports the existing row\'s id');
     }
@@ -440,6 +444,15 @@ class SubscriptionManagementTest extends TestCase
         $this->queryRowCounts = [2];   // MySQL: an existing row changed (e.g. a new address or permission)
         $this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test');
         $this->assertFalse($this->events[0][1]['created']);
+    }
+
+    /** previous_contact_id tells a new address (e.g. confirm the new number) from a renewal of the same one. */
+    public function testAChangedRowReportsItsPreviousContact(): void
+    {
+        $this->queryRowCounts = [2];
+        $this->fetchOneResult = '4';   // the row's contact before the write, then LAST_INSERT_ID()
+        $this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test');
+        $this->assertSame([4, 5], [$this->events[0][1]['previous_contact_id'], $this->events[0][1]['contact_id']]);
     }
 
     /** Nothing written, nothing announced: an identical retry, a refusal, a stopped recipient. */
@@ -516,5 +529,35 @@ class SubscriptionManagementTest extends TestCase
         $this->assertSame([], $this->contacts);
         $this->assertSame([], $this->queries);
         $this->assertSame([], $this->events);
+    }
+
+    /** The permission sees the address the subscription is stored with, in the sender's form. */
+    public function testThePermissionIsGivenTheAddressTheSubscriptionIsStoredWith(): void
+    {
+        $this->management()->subscribeGuest('test_type', 'masked', '  guest@example.test ');
+        $this->management()->subscribeCustomer(17, 'test_type', '42');
+        $this->channel = 'sms';
+        $this->management()->subscribeGuest('test_type', 'masked', ' +381 60 123 4567 ');
+        $this->management()->subscribeCustomer(17, 'test_type', '42', '+381 60 123 4567');
+        $this->assertSame(['guest@example.test', 'customer@test.com', '+381601234567', '+381601234567'],
+            $this->checkedRecipients, 'guest address, account email, then the normalized numbers');
+    }
+
+    /** A checkbox consent recorded for one number grants only that number, also for the same cart. */
+    public function testAnOwnConsentForOneNumberRefusesAnotherNumber(): void
+    {
+        $this->channel = 'sms';
+        $this->current = Permission::refused();   // the shop-wide permission must not decide
+        $this->ownPermission = $this->createStub(SubscriptionPermissionInterface::class);
+        $this->ownPermission->method('check')->willReturnCallback(fn ($type, $target, $recipient = null)
+            => $recipient === '+381601234567' ? Permission::granted('sms-consent-1') : Permission::refused());
+        $this->ownPermission->method('validCondition')->willReturnCallback(fn ($column) => 'OWN(' . $column . ')');
+        $this->assertTrue($this->management()->subscribeGuest('test_type', 'masked', '+381 60 123 4567 '));
+        $this->assertCount(1, $this->queries);
+        $this->assertFalse($this->management()->subscribeGuest('test_type', 'masked', '+381 60 999 9999'),
+            'another number for the same cart: a fresh check, refused');
+        $this->assertCount(1, $this->queries, 'nothing written for it');
+        $this->assertFalse($this->management()->subscribeCustomer(17, 'test_type', '42', '+381609999999'));
+        $this->assertCount(1, $this->queries);
     }
 }

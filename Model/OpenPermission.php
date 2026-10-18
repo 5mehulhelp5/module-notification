@@ -14,7 +14,7 @@ use CommerceKings\Notification\Api\SubscriptionTypeInterface;
  */
 class OpenPermission implements SubscriptionPermissionInterface
 {
-    public function check(SubscriptionTypeInterface $type, Target $target): Permission
+    public function check(SubscriptionTypeInterface $type, Target $target, ?string $recipient = null): Permission
     {
         return Permission::granted();
     }

@@ -20,9 +20,9 @@ class TypePermission implements SubscriptionPermissionInterface
     ) {
     }
 
-    public function check(SubscriptionTypeInterface $type, Target $target): Permission
+    public function check(SubscriptionTypeInterface $type, Target $target, ?string $recipient = null): Permission
     {
-        return $this->resolver->forType($type)->check($type, $target);
+        return $this->resolver->forType($type)->check($type, $target, $recipient);
     }
 
     public function validCondition(string $referenceColumn): string

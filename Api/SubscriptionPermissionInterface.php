@@ -15,8 +15,17 @@ use CommerceKings\Notification\Api\Data\Target;
  */
 interface SubscriptionPermissionInterface
 {
-    /** Called after the type authorized the target and before anything is written. */
-    public function check(SubscriptionTypeInterface $type, Target $target): Permission;
+    /**
+     * Called after the type authorized the target and before anything is written – on every sign-up, so a new address
+     * gets a fresh check.
+     *
+     * $recipient is the address the subscription will be stored with, in the form the sender uses (normalized by the
+     * channel's RecipientNormalizerInterface; email: trimmed): a guest's given address, a customer's account email on
+     * an email type, the recipient a customer gave on another channel; null when there is no address. A permission
+     * bound to an address uses it: a checkbox consent recorded for a number grants only that number. Look up your
+     * own evidence (recorded by your own endpoint) by the target and this recipient.
+     */
+    public function check(SubscriptionTypeInterface $type, Target $target, ?string $recipient = null): Permission;
 
     /**
      * SQL condition: the permission reference in $referenceColumn is still valid. It is part of the subscribe

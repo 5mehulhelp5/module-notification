@@ -293,6 +293,8 @@ class MultiChannelTest extends TestCase
         $this->assertSame([$id, false], [$this->saved[1]['subscription_id'], $this->saved[1]['created']],
             'a changed number: the same row, not created');
         $this->assertNotSame($this->saved[0]['contact_id'], $this->saved[1]['contact_id']);
+        $this->assertSame([null, $this->saved[0]['contact_id']],
+            [$this->saved[0]['previous_contact_id'], $this->saved[1]['previous_contact_id']], 'the number before the change');
         $this->resource->getConnection()->delete($this->resource->getTableName(ContactRepository::TABLE),
             ['contact_id = ?' => $this->saved[1]['contact_id']]);
     }

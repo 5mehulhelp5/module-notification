@@ -169,10 +169,18 @@ For notifications a visitor signs up for, also:
    ```
 4. Keep your send history keyed by what "once" means for you (e.g. the cart), never by the subscription id:
    a withdrawal deletes the subscription, and subscribing again creates a new one.
-5. To react to a sign-up – e.g. an SMS opt-in confirmation ("Reply YES to confirm") – observe
+5. **Own consent per address:** `SubscriptionPermissionInterface::check($type, $target, $recipient)` gets the
+   address the subscription will be stored with, in the sender's form (normalized; email trimmed) – the guest's
+   address, the customer's account email on email types, the number a customer gave on other channels. A type's own
+   permission (e.g. an SMS or WhatsApp checkbox, consent per number) records its evidence through its own endpoint
+   and looks it up by the target and this recipient: a consent recorded for one number grants only that number, and
+   a new number gets a fresh check. Put the number into the permission reference if the send-time check
+   (`validCondition()`, `isValidFor()`) must follow it too.
+6. To react to a sign-up – e.g. an SMS opt-in confirmation ("Reply YES to confirm") – observe
    `commercekings_notification_subscription_saved` (`SubscriptionManagementInterface::EVENT_SAVED`). It is dispatched
    after the row is committed, with `subscription_id`, `type`, `channel`, `store_id`, `contact_id`, `customer_id` and
-   `created` (true for a new row; false when an existing one changed, e.g. a new number or permission); not for a
+   `created` (true for a new row; false when an existing one changed, e.g. a new number or permission) and
+   `previous_contact_id` (the changed row's contact before; differs from `contact_id` for a new address); not for a
    refusal, a stopped recipient or an identical retry. Read the address with
    `SubscriptionRepositoryInterface::get()` and `getRecipient()`. Your observer's error is logged (its class only)
    and never fails the sign-up – send or queue from it, but do not rely on it to block one.

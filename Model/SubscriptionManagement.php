@@ -58,7 +58,8 @@ class SubscriptionManagement implements SubscriptionManagementInterface
             return false;
         }
         $permission = $target->accepting && $address !== ''
-            ? $this->permissions->forType($subscriptionType)->check($subscriptionType, $target) : null;
+            ? $this->permissions->forType($subscriptionType)->check($subscriptionType, $target,
+                $this->normalizers->normalize($channel, $address)) : null;
         if ($permission === null || $permission->removesExisting) {
             $this->unsubscribeGuest($type, $subscriptionType, $target);
             return false;
@@ -100,13 +101,16 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         if ($target === null || !$target->accepting) {
             return false;
         }
-        $permission = $this->permissions->forType($subscriptionType)->check($subscriptionType, $target);
+        // the address the subscription is stored with: the account email on email types, else the given recipient
+        $stored = $channel === Channel::EMAIL ? $this->accountEmail($customerId) : $address;
+        $permission = $this->permissions->forType($subscriptionType)->check($subscriptionType, $target,
+            $stored === '' ? null : $this->normalizers->normalize($channel, $stored));
         if (!$permission->isGranted()) {
             return false;
         }
         if ($channel === Channel::EMAIL) {
             // email: the account email, the same stop check as a guest's address
-            if ($this->isStoppedCustomer($customerId)) {
+            if ($stored !== '' && $this->stopList->touch(Channel::EMAIL, $stored)) {
                 return true;
             }
             $contactId = null;
@@ -152,7 +156,7 @@ class SubscriptionManagement implements SubscriptionManagementInterface
     /**
      * EVENT_SAVED for a written row, after the commit; an observer's error is logged, never the sign-up's.
      *
-     * @param array{stored: bool, id: ?int, created: bool} $result
+     * @param array{stored: bool, id: ?int, created: bool, previous_contact_id: ?int} $result
      */
     private function saved(array $result, string $code, SubscriptionTypeInterface $type, Target $target, ?int $contactId,
         ?int $customerId): void
@@ -169,6 +173,7 @@ class SubscriptionManagement implements SubscriptionManagementInterface
                 'contact_id' => $contactId,
                 'customer_id' => $customerId,
                 'created' => $result['created'],
+                'previous_contact_id' => $result['previous_contact_id'],
             ]);
         } catch (\Throwable $error) {
             $this->logger->error('CommerceKings_Notification: subscription saved event failed after commit.', [
@@ -177,15 +182,14 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         }
     }
 
-    /** A customer that no longer exists has no address to check: the guarded write refuses it as before. */
-    private function isStoppedCustomer(int $customerId): bool
+    /** The account email; '' for a customer that no longer exists (the guarded write refuses it). */
+    private function accountEmail(int $customerId): string
     {
         try {
-            $email = (string)$this->customers->getById($customerId)->getEmail();
+            return trim((string)$this->customers->getById($customerId)->getEmail());
         } catch (\Magento\Framework\Exception\NoSuchEntityException) {
-            return false;
+            return '';
         }
-        return $email !== '' && $this->stopList->touch(Channel::EMAIL, $email);
     }
 
     /**
@@ -265,8 +269,9 @@ class SubscriptionManagement implements SubscriptionManagementInterface
     }
 
     /**
-     * @return array{stored: bool, id: ?int, created: bool} stored also for an identical retry; id only when a row was
-     *         written (created: inserted, else changed)
+     * @return array{stored: bool, id: ?int, created: bool, previous_contact_id: ?int} stored also for an identical
+     *         retry; id only when a row was written (created: inserted, else changed; previous_contact_id: the changed
+     *         row's contact before the write)
      */
     private function store(string $code, SubscriptionTypeInterface $type, Target $target, string $reference,
         ?int $contactId, ?int $customerId): array
@@ -274,6 +279,10 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         $db = $this->resource->getConnection();
         $subjectKey = $this->subjectKey($type, $contactId, $customerId);
         $conditions = $this->conditions($type, $reference, $target);
+        // the row's contact before this write (for EVENT_SAVED): false when there is no row yet
+        $previous = $db->fetchOne($db->select()->from($this->resource->getTableName(self::TABLE), 'contact_id')
+            ->where('type = ?', $code)->where('reference_id = ?', $target->referenceId)
+            ->where('subject_key = ?', $subjectKey));
         $statement = $db->query(sprintf(
             'INSERT INTO %s (type, reference_id, store_id, subject_key, contact_id, customer_id, permission_ref, captured_at)'
             . ' SELECT ?, ?, ?, ?, ?, ?, ?, NOW() FROM DUAL WHERE %s ON DUPLICATE KEY UPDATE'
@@ -292,7 +301,8 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         // MySQL: 1 = inserted, 2 = an existing row changed, 0 = unchanged or refused
         $rows = $statement->rowCount();
         if ($rows > 0) {
-            return ['stored' => true, 'id' => (int)$db->fetchOne('SELECT LAST_INSERT_ID()'), 'created' => $rows === 1];
+            return ['stored' => true, 'id' => (int)$db->fetchOne('SELECT LAST_INSERT_ID()'), 'created' => $rows === 1,
+                'previous_contact_id' => $rows === 1 || $previous === false || $previous === null ? null : (int)$previous];
         }
         // Zero rows: refused, or an identical retry of an acknowledged-but-lost response.
         $select = $db->select()->from($this->resource->getTableName(self::TABLE), 'subscription_id')
@@ -303,7 +313,7 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         foreach ($conditions as $condition) {
             $select->where($condition);
         }
-        return ['stored' => (bool)$db->fetchOne($select), 'id' => null, 'created' => false];
+        return ['stored' => (bool)$db->fetchOne($select), 'id' => null, 'created' => false, 'previous_contact_id' => null];
     }
 
     /** A guest can only remove the one subscription of a single type; per-person ones need the withdrawal link. */
