@@ -22,8 +22,10 @@ $form = static function (string $action, string $label) use ($block, $escaper): 
     <?= /* @noEscape */ $form('block', (string)__('Stop these emails')) ?>
     <?php elseif ($state === Index::STATE_BLOCKED): ?>
     <p><?= $escaper->escapeHtml(__('Done. We will not send reminders or other marketing emails to this address.')) ?></p>
+    <?php if ($block->getData('can_undo')): ?>
     <p><?= $escaper->escapeHtml(__('Changed your mind?')) ?></p>
     <?= /* @noEscape */ $form('undo', (string)__('Turn reminders back on')) ?>
+    <?php endif; ?>
     <?php else: ?>
     <p><?= $escaper->escapeHtml(__('Done. You can sign up for reminders again; earlier sign-ups were removed when you stopped the emails.')) ?></p>
     <?php endif; ?>

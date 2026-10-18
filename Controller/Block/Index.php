@@ -20,7 +20,8 @@ use Magento\Framework\View\Result\PageFactory;
 /**
  * GET shows the do-not-contact confirmation for a signed link; only the form-key POST blocks or undoes, so mail
  * scanners that open links change nothing. An RFC 8058 one-click POST (body exactly List-Unsubscribe=One-Click) on the
- * signed URL blocks without browser state – it can never undo. Extends Action so Magento sets the store and currency
+ * signed URL blocks without browser state – it can never undo. A link signed before encryption:key:change still blocks
+ * (its key stays in env.php) but cannot undo. Extends Action so Magento sets the store and currency
  * context.
  */
 class Index extends Action implements HttpGetActionInterface, HttpPostActionInterface, CsrfAwareActionInterface
@@ -60,8 +61,13 @@ class Index extends Action implements HttpGetActionInterface, HttpPostActionInte
                 return $this->resultRedirectFactory->create()->setPath('');
             }
             if ($this->request->getParam('do') === 'undo') {
-                $this->blocks->unblock($link['channel'], $link['recipient']);
-                $state = self::STATE_UNBLOCKED;
+                // only a newest-key link may turn emails back on; an older one changes nothing
+                if ($link['current']) {
+                    $this->blocks->unblock($link['channel'], $link['recipient']);
+                    $state = self::STATE_UNBLOCKED;
+                } elseif ($this->blocks->isBlocked($link['channel'], $link['recipient'])) {
+                    $state = self::STATE_BLOCKED;
+                }
             } else {
                 $this->blocks->block($link['channel'], $link['recipient']);
                 $state = self::STATE_BLOCKED;
@@ -83,6 +89,8 @@ class Index extends Action implements HttpGetActionInterface, HttpPostActionInte
             $block->setData('state', $state);
             $block->setData('link_recipient', $link !== null ? $recipient : '');
             $block->setData('link_signature', $link !== null ? $signature : '');
+            // undo turns emails back on: only with a link signed by the newest key
+            $block->setData('can_undo', $link !== null && $link['current']);
         }
         return $page;
     }

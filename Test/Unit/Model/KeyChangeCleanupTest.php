@@ -76,57 +76,58 @@ class KeyChangeCleanupTest extends TestCase
         return array_map(fn ($i) => 'h' . $i, range(1, $count));
     }
 
-    public function testLiftedBlocksAreLoggedAndTheAdminIsNotifiedInBatches(): void
+    public function testByDefaultOnlyEarlierKeyCooldownsAreRemovedAndBlocksStay(): void
+    {
+        $notifier = $this->createMock(NotifierInterface::class);
+        $notifier->expects($this->never())->method('addMajor');
+        $removed = $this->cleanup(['ck_notification_recipient_block' => [['b1']],
+            'ck_notification_cooldown' => [$this->hashes(1000), $this->hashes(200)]], $notifier)->execute();
+        $this->assertSame(['blocks' => 0, 'cooldowns' => 1200, 'notified' => false], $removed,
+            'blocks of an earlier key still in env.php keep working, so they are never removed here');
+        $this->assertArrayNotHasKey('ck_notification_recipient_block', $this->wheres, 'the block table is not even read');
+        $this->assertSame([['key_id IN (?)', ['old-key-id']]], $this->wheres['ck_notification_cooldown']);
+        $this->assertSame([1000], $this->limits, 'read in batches of 1000');
+        $this->assertSame(['CommerceKings_Notification: encryption key changed; removed 0 do-not-contact block(s)'
+            . ' and 1200 cooldown row(s)'], $this->warnings);
+    }
+
+    public function testForceRemovesBlocksOfKeysNoLongerListedAndTellsTheAdmin(): void
     {
         $notifier = $this->createMock(NotifierInterface::class);
         $notifier->expects($this->once())->method('addMajor')
             ->with($this->stringContains('encryption key was changed'), $this->stringContains('37 do-not-contact block(s)'));
         $removed = $this->cleanup(['ck_notification_recipient_block' => [$this->hashes(37)],
-            'ck_notification_cooldown' => [$this->hashes(1000), $this->hashes(200)]], $notifier)->execute();
-        $this->assertSame(['blocks' => 37, 'cooldowns' => 1200, 'notified' => true], $removed);
-        $this->assertSame([1000, 1000], $this->limits, 'each table is read in batches of 1000');
-        $this->assertSame(['CommerceKings_Notification: encryption key changed; removed 37 do-not-contact block(s)'
-            . ' and 1200 cooldown row(s)'], $this->warnings);
+            'ck_notification_cooldown' => [$this->hashes(5)]], $notifier)->execute(true);
+        $this->assertSame(['blocks' => 37, 'cooldowns' => 5, 'notified' => true], $removed);
+        $this->assertSame([['key_id IS NOT NULL', null], ['key_id NOT IN (?)', ['current-key-id', 'old-key-id']]],
+            $this->wheres['ck_notification_recipient_block'], 'never the current or an earlier key still listed');
+        $this->assertSame([['key_id IS NOT NULL', null], ['key_id <> ?', 'current-key-id']],
+            $this->wheres['ck_notification_cooldown'], 'every cooldown row but the current key\'s');
     }
 
-    public function testByDefaultOnlyEarlierKeysInEnvPhpAreRemoved(): void
+    public function testTheDeleteChecksTheFingerprintAgain(): void
     {
-        $this->cleanup(['ck_notification_recipient_block' => [['h1']], 'ck_notification_cooldown' => []],
-            $this->createStub(NotifierInterface::class))->execute();
-        foreach (['ck_notification_recipient_block', 'ck_notification_cooldown'] as $table) {
-            $this->assertSame([['key_id IN (?)', ['old-key-id']]], $this->wheres[$table], $table);
-        }
-        $this->assertSame([['ck_notification_recipient_block', ['recipient_hash IN (?)' => ['h1'],
-            'key_id IN (?)' => ['old-key-id']]]], $this->deletes, 'the delete checks the key again');
+        $this->cleanup(['ck_notification_recipient_block' => [['h1', 'h2']], 'ck_notification_cooldown' => []],
+            $this->createStub(NotifierInterface::class))->execute(true);
+        $this->assertSame([['ck_notification_recipient_block', ['recipient_hash IN (?)' => ['h1', 'h2'],
+            'key_id IS NOT NULL', 'key_id NOT IN (?)' => ['current-key-id', 'old-key-id']]]], $this->deletes,
+            'a row rewritten with a listed key since the lookup stays');
     }
 
-    public function testWithoutEarlierKeysNothingIsRemovedByDefault(): void
+    public function testWithoutEarlierKeysTheDefaultRemovesNothing(): void
     {
-        $notifier = $this->createMock(NotifierInterface::class);
-        $notifier->expects($this->never())->method('addMajor');
         $removed = $this->cleanup(['ck_notification_recipient_block' => [['h1']], 'ck_notification_cooldown' => [['h2']]],
-            $notifier, null, [])->execute();
+            $this->createStub(NotifierInterface::class), null, [])->execute();
         $this->assertSame(['blocks' => 0, 'cooldowns' => 0, 'notified' => false], $removed,
             'a server with a wrong env.php knows none of the shop\'s keys');
         $this->assertSame([], $this->deletes);
-    }
-
-    public function testUnknownKeysAreRemovedOnlyOnRequestAndNeverUnmarkedRows(): void
-    {
-        $this->cleanup(['ck_notification_recipient_block' => [['h1']], 'ck_notification_cooldown' => []],
-            $this->createStub(NotifierInterface::class), null, [])->execute(true);
-        $condition = [['key_id IS NOT NULL', null], ['key_id <> ?', 'current-key-id']];
-        $this->assertSame($condition, $this->wheres['ck_notification_recipient_block']);
-        $this->assertSame($condition, $this->wheres['ck_notification_cooldown']);
-        $this->assertSame([['ck_notification_recipient_block', ['recipient_hash IN (?)' => ['h1'], 'key_id IS NOT NULL',
-            'key_id <> ?' => 'current-key-id']]], $this->deletes);
     }
 
     public function testABatchThatRemovesNothingEndsTheLoop(): void
     {
         $same = array_fill(0, 50, ['h1']);   // the lookup keeps returning a row the delete no longer matches
         $removed = $this->cleanup(['ck_notification_recipient_block' => $same, 'ck_notification_cooldown' => []],
-            $this->createStub(NotifierInterface::class), 0)->execute();
+            $this->createStub(NotifierInterface::class), 0)->execute(true);
         $this->assertSame(0, $removed['blocks']);
         $this->assertCount(1, $this->deletes);
     }
@@ -151,7 +152,7 @@ class KeyChangeCleanupTest extends TestCase
         $notifier = $this->createMock(NotifierInterface::class);
         $notifier->expects($this->never())->method('addMajor');
         $removed = $this->cleanup(['ck_notification_recipient_block' => [['h1']], 'ck_notification_cooldown' => []],
-            $notifier, null, ['old-key-id'], false)->execute();
+            $notifier, null, ['old-key-id'], false)->execute(true);
         $this->assertSame(['blocks' => 1, 'cooldowns' => 0, 'notified' => false], $removed);
         $this->assertCount(1, $this->warnings, 'the log still records it');
     }
@@ -179,7 +180,7 @@ class KeyChangeCleanupTest extends TestCase
         $notifier = $this->createStub(NotifierInterface::class);
         $notifier->method('addMajor')->willThrowException(new \RuntimeException('inbox down'));
         $removed = $this->cleanup(['ck_notification_recipient_block' => [$this->hashes(2)], 'ck_notification_cooldown' => []],
-            $notifier)->execute();
+            $notifier)->execute(true);
         $this->assertSame(['blocks' => 2, 'cooldowns' => 0, 'notified' => false], $removed);
         $this->assertCount(1, $this->warnings, 'the log line is the record');
         $this->assertStringContainsString('could not be posted', $this->errors[0]);

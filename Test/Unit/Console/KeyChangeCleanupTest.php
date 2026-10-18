@@ -34,7 +34,7 @@ class KeyChangeCleanupTest extends TestCase
             ->willReturn(['blocks' => 3, 'cooldowns' => 8, 'notified' => true]);
         $tester = new CommandTester(new KeyChangeCleanup($cleanup));
         $this->assertSame(Command::SUCCESS, $tester->execute([]));
-        $this->assertStringContainsString('Removed 3 do-not-contact block(s) and 8 cooldown row(s) of earlier keys.', $tester->getDisplay());
+        $this->assertStringContainsString('Removed 3 do-not-contact block(s) and 8 cooldown row(s) of earlier keys (cooldowns only; blocks keep working).', $tester->getDisplay());
         $this->assertStringContainsString('An admin notification tells the shop owner.', $tester->getDisplay());
     }
 
@@ -45,7 +45,7 @@ class KeyChangeCleanupTest extends TestCase
             ->willReturn(['blocks' => 0, 'cooldowns' => 2, 'notified' => false]);
         $tester = new CommandTester(new KeyChangeCleanup($cleanup));
         $tester->execute(['--force' => true]);
-        $this->assertStringContainsString('of earlier and unknown keys.', $tester->getDisplay());
+        $this->assertStringContainsString('of keys no longer in env.php (and earlier-key cooldowns).', $tester->getDisplay());
         $this->assertStringNotContainsString('admin notification', $tester->getDisplay(), 'no blocks: nothing to tell');
     }
 

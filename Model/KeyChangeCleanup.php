@@ -9,13 +9,14 @@ use Magento\Framework\Notification\NotifierInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Removes do-not-contact blocks and cooldown rows made with an earlier encryption key (they can no longer match)
- * and tells the shop owner once, in the admin notifications, when blocks were lifted that way. Run on purpose, after
- * `encryption:key:change`, by `notification:key-change:cleanup` – never automatically.
+ * After `encryption:key:change`, run on purpose by `notification:key-change:cleanup` – never automatically.
  *
- * By default only rows of an older key still listed in env.php are removed: a server with a wrong env.php knows
- * none of the shop's keys, so it removes nothing. Rows of a key that is no longer listed ("unknown") are removed
- * only on request. Rows without a fingerprint are never removed: they age out through the normal cleanups.
+ * Do-not-contact blocks of an older key still listed in env.php keep working: they are found under that key and moved
+ * to the newest one (RecipientBlock), so they are never removed here. Only blocks of a key that is no longer listed
+ * ("unknown") can no longer match; they are removed on request, and the shop owner is told once, in the admin
+ * notifications. Cooldown rows of older keys are removed by default (the cooldown only uses the newest key).
+ * Rows without a fingerprint are never removed: they age out through the normal cleanups. A server with a wrong
+ * env.php sees every row as unknown, so by default it removes no block.
  */
 class KeyChangeCleanup
 {
@@ -53,16 +54,19 @@ class KeyChangeCleanup
     }
 
     /**
-     * @param bool $unknown also remove rows of keys no longer listed in env.php
+     * @param bool $unknown also remove rows of keys no longer listed in env.php (blocks and cooldowns)
      * @return array{blocks: int, cooldowns: int, notified: bool} rows removed; whether the admin notice was posted
      */
     public function execute(bool $unknown = false): array
     {
-        $keys = $unknown ? null : $this->fingerprint->earlier();
         $current = $this->fingerprint->current();
+        $known = [$current, ...$this->fingerprint->earlier()];
         $removed = [
-            'blocks' => $this->purge($this->resource->getTableName(RecipientBlock::TABLE), $current, $keys),
-            'cooldowns' => $this->purge($this->resource->getTableName(Cooldown::TABLE), $current, $keys),
+            'blocks' => $unknown ? $this->purge($this->resource->getTableName(RecipientBlock::TABLE),
+                ['key_id IS NOT NULL', 'key_id NOT IN (?)' => $known]) : 0,
+            'cooldowns' => $this->purge($this->resource->getTableName(Cooldown::TABLE), $unknown
+                ? ['key_id IS NOT NULL', 'key_id <> ?' => $current]
+                : ['key_id IN (?)' => array_slice($known, 1)]),
             'notified' => false,
         ];
         if ($removed['blocks'] + $removed['cooldowns'] > 0) {
@@ -73,9 +77,9 @@ class KeyChangeCleanup
             try {
                 $this->notifier->addMajor(
                     (string)__('CommerceKings Notifications: the encryption key was changed'),
-                    (string)__('%1 do-not-contact block(s) were lifted and the email cooldown was reset. Recipients'
-                        . ' who had stopped your emails may get them again until they press "Stop" once more. Links in'
-                        . ' emails sent before the change no longer work.', $removed['blocks'])
+                    (string)__('%1 do-not-contact block(s) of encryption keys no longer in env.php were lifted.'
+                        . ' Recipients who had stopped your emails may get them again until they press "Stop" once'
+                        . ' more. Links in emails signed with those keys no longer work.', $removed['blocks'])
                 );
                 $removed['notified'] = true;
             } catch (\Throwable $error) {
@@ -88,17 +92,16 @@ class KeyChangeCleanup
     }
 
     /**
-     * Deletes in primary-key batches. The delete checks the fingerprint again, so a row rewritten with the current
-     * key since the lookup stays; a batch that removes nothing ends the loop.
+     * Deletes in primary-key batches. The delete checks the fingerprint again, so a row rewritten with another key
+     * since the lookup stays; a batch that removes nothing ends the loop.
      *
-     * @param string[]|null $keys the fingerprints to remove; null = every fingerprint but the current one
+     * @param array<int|string, mixed> $condition where conditions on key_id
      */
-    private function purge(string $table, string $current, ?array $keys): int
+    private function purge(string $table, array $condition): int
     {
-        if ($keys === []) {
-            return 0;
+        if (in_array([], $condition, true)) {
+            return 0;   // e.g. no older key listed
         }
-        $condition = $keys === null ? ['key_id IS NOT NULL', 'key_id <> ?' => $current] : ['key_id IN (?)' => $keys];
         $db = $this->resource->getConnection();
         $old = $db->select()->from($table, 'recipient_hash')->limit(self::BATCH);
         foreach ($condition as $where => $value) {

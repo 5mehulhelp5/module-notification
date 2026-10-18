@@ -4,11 +4,12 @@
 
 - In opt-out mode the "Stop these emails" link is always offered (it is the only way to stop the emails there),
   and the stop link accepts the mail provider's RFC 8058 one-click POST (blocks, never undoes).
-- **Encryption key change:** blocks and cooldown rows store a fingerprint of the key that made them;
-  `bin/magento notification:key-change:cleanup` (`--dry-run` counts rows per key) removes rows of earlier keys
-  still listed in `env.php` (`--force` also those of keys no longer listed) and, when blocks were lifted, posts an
-  admin notification (needs Magento_AdminNotification, which is suggested, not required). It runs only by hand,
-  never on a schedule.
+- **Encryption key change:** blocks and stop links keep working after `encryption:key:change` while the old key stays
+  in `env.php`: blocks are looked up under every listed key and moved to the newest one when found; older-key links
+  can block (also one-click) but never undo. Rows store a fingerprint of their key;
+  `bin/magento notification:key-change:cleanup` (`--dry-run` counts rows per key) removes earlier-key cooldown rows,
+  and with `--force` the rows of keys no longer listed, posting an admin notification when blocks were lifted (needs
+  Magento_AdminNotification, which is suggested, not required). It runs only by hand, never on a schedule.
 - **Do not contact:** a signed "stop these emails" link in marketing notifications (`RecipientBlockInterface`,
   `/cknotification/block` with a confirmation and Undo) stops all marketing notifications to that address. Blocked
   recipients are not subscribed again (answered as stored, so the list cannot be probed); the sender drops marketing

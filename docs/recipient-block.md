@@ -82,33 +82,37 @@ Global across stores, like the cooldown.
 
 ## Encryption key change
 
-The hashes and links are keyed with Magento's encryption key, and only hashes are stored, so a key change cannot
-be re-hashed: every block lifts and links already sent expire. Each row stores a fingerprint of its key (`key_id`).
+The hashes and links are keyed with Magento's encryption key. Only hashes are stored, so a block can never be
+re-hashed from its address – but Magento keeps the old keys in `env.php` after `encryption:key:change`, so:
+
+- **Blocks keep working.** A recipient is looked up under every listed key; a block found under an older key is
+  moved to the newest one (and its fingerprint, `key_id`, updated), so it also survives the later removal of the
+  old key.
+- **Stop links in emails already sent keep working**, by page and by RFC 8058 one-click – but only to **block**.
+  Undo needs a link signed with the newest key, so a leaked old key can never turn emails back on.
+- **The cooldown restarts**: it only uses the newest key.
+- Older keys are used only after a self-check: computing the newest key's hash must give Magento's own (with a
+  replaced encryptor that hashes differently, only the newest key counts).
+
 Subscriptions, contacts and consent records are not affected, and consent withdrawal links in emails already sent
 keep working while the old key stays in `env.php`.
 
-After `bin/magento encryption:key:change`:
-
-1. Restart the queue consumers and PHP-FPM (or reset opcache), so no running process keeps using the old key.
-2. On a server with the shop's `env.php`, count, then clean up:
+After `bin/magento encryption:key:change`, restart the queue consumers and PHP-FPM (or reset opcache), so no
+running process keeps using the old key. Then, on a server with the shop's `env.php`:
 
 ```sh
 bin/magento notification:key-change:cleanup --dry-run   # rows per key; removes nothing
-bin/magento notification:key-change:cleanup             # removes the rows of earlier keys
+bin/magento notification:key-change:cleanup             # removes cooldown rows of earlier keys
 ```
 
-The dry run shows, per table, the rows of the **current** key, of an **earlier** key still listed in `env.php`
-(Magento keeps old keys there after a change), of an **unknown** key and **unmarked** rows. The cleanup removes only
-the earlier-key rows, so a server with the wrong `env.php`, which knows none of the shop's keys, removes nothing.
-Unknown-key rows are removed only with `--force` – use it only if you deleted old keys from `env.php` yourself.
-Many unknown and no earlier rows usually mean the wrong `env.php`. Unmarked rows are never removed; they age out
-through the normal cleanups.
-
-The cleanup logs the counts and, when blocks were lifted, posts one admin notification with their number, so the
-shop owner knows that recipients who had stopped emails may get them again (the command says when no notice
-could be posted). Run it only once you are sure the new key stays: removed blocks cannot be restored. It can be
-run again, e.g. if a process kept the old key a little longer. It never runs automatically, and skipping it is
-harmless – the old rows only take space until the normal cleanups remove them.
+The dry run shows, per table, the rows of the **current** key, of an **earlier** key still listed in `env.php`, of
+an **unknown** key (no longer listed) and **unmarked** rows. By default the cleanup removes only earlier-key cooldown
+rows – blocks of a listed key are never removed. If you removed an old key from `env.php` (e.g. because it leaked),
+its blocks not yet moved can no longer match: `--force` removes those unknown-key rows, logs the counts and posts
+one admin notification with their number, so the shop owner knows that recipients who had stopped emails may get
+them again. A server with the wrong `env.php` sees every row as unknown, so never run `--force` there (the dry run
+shows it: many unknown and no current rows). Unmarked rows are never removed; they age out through the normal
+cleanups. Removed blocks cannot be restored. The command never runs automatically.
 
 - Blocking and cooldown claims store the current fingerprint; `setup:upgrade` only adds the column and never
   changes rows.

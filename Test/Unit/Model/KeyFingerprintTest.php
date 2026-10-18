@@ -44,8 +44,8 @@ class KeyFingerprintTest extends TestCase
         $encoded = 'base64' . base64_encode(random_bytes(32));     // the 2.4.7+ key format
         $new = str_repeat('c', 32);
         $earlier = $this->make("$old\n$encoded\n$new")->earlier();
-        $this->assertSame([$this->fingerprint($old), $this->fingerprint($encoded)], $earlier,
-            'each older key gives the fingerprint its rows were stored with');
+        $this->assertSame([$this->fingerprint($encoded), $this->fingerprint($old)], $earlier,
+            'each older key gives the fingerprint its rows were stored with, newest first');
         $this->assertSame([], $this->make($new)->earlier(), 'one key: nothing earlier');
     }
 

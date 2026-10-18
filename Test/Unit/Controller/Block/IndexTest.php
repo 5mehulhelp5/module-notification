@@ -42,7 +42,8 @@ class IndexTest extends TestCase
         $blocks = $this->createStub(RecipientBlockInterface::class);
         $blocks->method('fromLink')->willReturnCallback(function ($r, $s) {
             $this->calls[] = ['fromLink', $r, $s];
-            return $r === 'enc' && $s === 'sig' ? ['channel' => 'email', 'recipient' => 'a@example.test'] : null;
+            return $r === 'enc' && in_array($s, ['sig', 'oldsig'], true)
+                ? ['channel' => 'email', 'recipient' => 'a@example.test', 'current' => $s === 'sig'] : null;
         });
         $blocks->method('isBlocked')->willReturnCallback(fn () => $this->alreadyBlocked);
         $blocks->method('block')->willReturnCallback(function ($c, $r) { $this->calls[] = ['block', $c, $r]; });
@@ -133,6 +134,28 @@ class IndexTest extends TestCase
         $this->controller('POST', ['r' => 'enc', 's' => 'sig', 'form_key' => 'ok', 'do' => 'undo'])->execute();
         $this->assertSame([['unblock', 'email', 'a@example.test']], $this->changes());
         $this->assertSame(Index::STATE_UNBLOCKED, $this->blockData['state']);
+    }
+
+    /** A link from an email sent before encryption:key:change: it still stops the emails, but cannot turn them on. */
+    public function testALinkSignedWithAnOlderKeyBlocksButCannotUndo(): void
+    {
+        $this->controller('POST', ['r' => 'enc', 's' => 'oldsig', 'form_key' => 'ok'])->execute();
+        $this->assertSame([['block', 'email', 'a@example.test']], $this->changes());
+        $this->assertFalse($this->blockData['can_undo'], 'no Undo button for an old-key link');
+        $this->calls = [];
+        $this->alreadyBlocked = true;
+        $this->controller('POST', ['r' => 'enc', 's' => 'oldsig', 'form_key' => 'ok', 'do' => 'undo'])->execute();
+        $this->assertSame([], $this->changes(), 'a forged undo with a leaked old key turns nothing back on');
+        $this->assertSame(Index::STATE_BLOCKED, $this->blockData['state']);
+        $this->post = ['List-Unsubscribe' => 'One-Click'];
+        $this->controller('POST', ['r' => 'enc', 's' => 'oldsig'])->execute();
+        $this->assertSame(200, $this->status, 'one-click from the old email still works');
+    }
+
+    public function testANewestKeyLinkOffersUndo(): void
+    {
+        $this->controller('POST', ['r' => 'enc', 's' => 'sig', 'form_key' => 'ok'])->execute();
+        $this->assertTrue($this->blockData['can_undo']);
     }
 
     public function testForgedOrMalformedLinksChangeNothingAndCarryNoLink(): void

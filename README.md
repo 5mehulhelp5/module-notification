@@ -113,16 +113,14 @@ Details, including how to build an SMS provider: [for module authors](docs/modul
 - No rate limit in code: protect the guest endpoint in your web server, proxy or CDN; optionally also with
   [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit).
 - A failed send is not retried by Notification; the feature decides (abandoned cart queues the cart again).
-- Do not contact blocks, the cooldown and the "stop these emails" links are keyed with Magento's encryption key.
-  Changing the key (`encryption:key:change`) lifts every block, resets the cooldown and invalidates links already
-  sent; only the hash is stored, so nothing can be re-hashed. After a key change, restart the consumers and
-  PHP-FPM, then run `bin/magento notification:key-change:cleanup --dry-run` and again without `--dry-run`: it
-  removes the rows of earlier keys still listed in `env.php` and, when blocks were lifted, posts an admin
-  notification with their number (with Magento_AdminNotification; otherwise only the log records it). Removed
-  blocks cannot be restored; nothing is removed automatically
+- Do not contact blocks, the "stop these emails" links and the cooldown are keyed with Magento's encryption key.
+  After `encryption:key:change` blocks and stop links keep working while the old key stays in `env.php` (Magento
+  keeps it): a block found under an older key moves to the newest one, and an old stop link can still stop the
+  emails (one-click too) but not turn them back on. The cooldown restarts. Removing an old key from `env.php` lifts
+  the blocks not yet moved and ends links signed with it; `bin/magento notification:key-change:cleanup --force`
+  then removes those rows and tells the shop owner in the admin
   ([details](docs/recipient-block.md#encryption-key-change)). Subscriptions, contacts and consent records are not
-  affected, and consent withdrawal links keep working while the old key stays in `env.php`; cart restore links
-  expire (see those modules).
+  affected, and consent withdrawal links keep working the same way; cart restore links expire (see those modules).
 
 ## More
 

@@ -29,9 +29,11 @@ interface RecipientBlockInterface
     public function getBlockUrl(string $channel, string $recipient, int $storeId): string;
 
     /**
-     * The channel and recipient a signed link was made for, or null for an altered or foreign link.
+     * The channel and recipient a signed link was made for, or null for an altered or foreign link. A link signed
+     * before encryption:key:change still verifies while its key stays in env.php; `current` is false then – such a
+     * link may block, but never undo.
      *
-     * @return array{channel: string, recipient: string}|null
+     * @return array{channel: string, recipient: string, current: bool}|null
      */
     public function fromLink(string $recipient, string $signature): ?array;
 }

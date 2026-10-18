@@ -93,7 +93,7 @@ class RecipientBlockTest extends TestCase
         parse_str((string)parse_url($url, PHP_URL_QUERY), $query);
         $this->assertStringContainsString('/cknotification/block', $url);
         $this->assertStringNotContainsString(rawurlencode($this->email('a')), $url, 'the address is encrypted');
-        $this->assertSame(['channel' => Channel::EMAIL, 'recipient' => $this->email('a')],
+        $this->assertSame(['channel' => Channel::EMAIL, 'recipient' => $this->email('a'), 'current' => true],
             $this->blocks->fromLink($query['r'], $query['s']));
         $this->assertNull($this->blocks->fromLink($query['r'], str_repeat('0', 64)), 'forged signature');
         $this->assertNull($this->blocks->fromLink($query['r'] . 'x', $query['s']), 'altered recipient');
@@ -218,7 +218,7 @@ class RecipientBlockTest extends TestCase
             ->where('recipient_hash = ?', $hash));
     }
 
-    public function testKeyChangeRemovesEarlierKeysThenUnknownOnlyOnRequestAndNeverCurrentOrUnmarked(): void
+    public function testKeyChangeCleanupKeepsBlocksOfListedKeysAndRemovesUnknownOnesOnlyOnRequest(): void
     {
         $fixture = $this->keyChangeFixture();
         [$earlier, $unknown, $unmarked, $cooldown] = $fixture;
@@ -235,8 +235,9 @@ class RecipientBlockTest extends TestCase
             $this->assertTrue($this->blockExists($earlier[0]), 'counting removes nothing');
 
             $removed = $this->cleanup()->execute();
-            $this->assertGreaterThanOrEqual(2, $removed['blocks']);
-            $this->assertFalse($this->blockExists($earlier[0]) || $this->blockExists($earlier[1]), 'earlier-key blocks removed');
+            $this->assertSame(0, $removed['blocks'], 'by default no block is removed');
+            $this->assertTrue($this->blockExists($earlier[0]) && $this->blockExists($earlier[1]),
+                'blocks of an earlier key still in env.php keep working, so they stay');
             $this->assertSame(0, (int)$db->fetchOne($db->select()->from($this->resource->getTableName(Cooldown::TABLE), 'COUNT(*)')
                 ->where('recipient_hash = ?', $cooldown)), 'earlier-key cooldown removed');
             $this->assertTrue($this->blockExists($unknown), 'an unknown key stays without --force');
@@ -245,6 +246,7 @@ class RecipientBlockTest extends TestCase
 
             $this->cleanup()->execute(true);
             $this->assertFalse($this->blockExists($unknown), '--force removes the unknown key');
+            $this->assertTrue($this->blockExists($earlier[0]), '...but never a block of a key still listed');
             $this->assertTrue($this->blockExists($unmarked), 'a row without a fingerprint is never removed');
             $this->assertTrue($this->blocks->isBlocked(Channel::EMAIL, $this->email('a')));
         } finally {
@@ -265,14 +267,54 @@ class RecipientBlockTest extends TestCase
         $notices = fn () => $db->fetchAll($db->select()->from($inbox)->where('notification_id > ?', $lastNotice)
             ->where('title LIKE ?', '%encryption key was changed%'));
         try {
-            $this->assertTrue($this->cleanup()->execute()['notified']);
+            $this->assertFalse($this->cleanup()->execute()['notified'], 'the default lifts no block, so no notice');
+            $this->assertTrue($this->cleanup()->execute(true)['notified']);
             $this->assertCount(1, $notices(), 'one admin notification');
-            $this->assertStringContainsString('do-not-contact block(s) were lifted', $notices()[0]['description']);
-            $this->assertFalse($this->cleanup()->execute()['notified'], 'nothing earlier left');
+            $this->assertStringContainsString('do-not-contact block(s) of encryption keys no longer in env.php were lifted',
+                $notices()[0]['description']);
+            $this->assertFalse($this->cleanup()->execute(true)['notified'], 'nothing unknown left');
             $this->assertCount(1, $notices(), 'no second notification');
         } finally {
             $this->removeKeyChangeFixture($fixture);
             $db->delete($inbox, ['notification_id > ?' => $lastNotice, 'title LIKE ?' => '%encryption key was changed%']);
+        }
+    }
+
+    /** After encryption:key:change: a block stored and a stop link signed under an older key, both still listed. */
+    public function testABlockAndLinkOfAnOlderKeyKeepWorkingAndTheBlockMovesToTheNewestKey(): void
+    {
+        $real = (string)$this->om->get(\Magento\Framework\App\DeploymentConfig::class)->get('crypt/key');
+        $oldKey = 'ck-test-old-key-' . $this->run . '0123456789ab';
+        $config = $this->createStub(\Magento\Framework\App\DeploymentConfig::class);
+        $config->method('get')->willReturn($oldKey . "\n" . $real);
+        $encryptor = $this->om->get(\Magento\Framework\Encryption\EncryptorInterface::class);
+        $blocks = $this->om->create(RecipientBlock::class,
+            ['keyedHash' => new \CommerceKings\Notification\Model\KeyedHash($encryptor, $config)]);
+        $db = $this->resource->getConnection();
+        $table = $this->resource->getTableName(RecipientBlock::TABLE);
+        $address = $this->email('b');
+        $oldHash = hash_hmac('sha256', 'commercekings_notification_block|email|' . $address, $oldKey);
+        $db->insert($table, ['recipient_hash' => $oldHash, 'key_id' => 'old-key-fp',
+            'last_attempt_at' => new \Zend_Db_Expr('NOW() - INTERVAL 10 DAY')]);
+        try {
+            $this->assertTrue($blocks->isBlocked(Channel::EMAIL, $address), 'the old block still blocks');
+            $this->assertFalse((bool)$db->fetchOne($db->select()->from($table, 'recipient_hash')
+                ->where('recipient_hash = ?', $oldHash)), 'the old row is gone...');
+            $this->assertTrue($this->blocks->isBlocked(Channel::EMAIL, $address),
+                '...moved to the newest key, so it works even without the old key');
+            $this->assertSame($this->om->get(KeyFingerprint::class)->current(), $db->fetchOne($db->select()
+                ->from($table, 'key_id')->where('recipient_hash = ?', $this->hashOf($address))));
+
+            $url = $this->blocks->getBlockUrl(Channel::EMAIL, $address, 1);
+            parse_str((string)parse_url($url, PHP_URL_QUERY), $query);
+            $oldSignature = hash_hmac('sha256', 'commercekings_notification_block_link|' . $query['r'], $oldKey);
+            $this->assertSame(['channel' => Channel::EMAIL, 'recipient' => $address, 'current' => false],
+                $blocks->fromLink($query['r'], $oldSignature), 'a stop link from an email sent before the change');
+            $this->assertSame(['channel' => Channel::EMAIL, 'recipient' => $address, 'current' => true],
+                $blocks->fromLink($query['r'], $query['s']));
+            $this->assertNull($this->blocks->fromLink($query['r'], $oldSignature), 'with the old key removed: invalid');
+        } finally {
+            $db->delete($table, ['recipient_hash IN (?)' => [$oldHash, $this->hashOf($address)]]);
         }
     }
 
@@ -299,6 +341,6 @@ class RecipientBlockTest extends TestCase
 
     private function hashOf(string $email): string
     {
-        return (fn () => $this->hash(Channel::EMAIL, $email))->call($this->blocks);
+        return (fn () => $this->hashes(Channel::EMAIL, $email)[0])->call($this->blocks);
     }
 }

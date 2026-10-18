@@ -8,8 +8,8 @@ use Magento\Framework\Encryption\EncryptorInterface;
 
 /**
  * A short, one-way marker of Magento's current encryption key, stored with every keyed row (do-not-contact blocks,
- * cooldown). After encryption:key:change the rows made with the old key can no longer match; the marker lets the
- * cleanup find and remove them. One-way: it does not expose the key.
+ * cooldown). After encryption:key:change it tells rows of an older key still in env.php from rows of a key no longer
+ * listed, which the cleanup can remove. One-way: it does not expose the key.
  */
 class KeyFingerprint
 {
@@ -27,26 +27,14 @@ class KeyFingerprint
     }
 
     /**
-     * Fingerprints of the older keys still listed in env.php (Magento keeps them after encryption:key:change).
-     * Computed like Encryptor::hash(); empty when that cannot be confirmed against the newest key, so the cleanup
-     * then treats every other fingerprint as unknown.
+     * Fingerprints of the older keys still listed in env.php (Magento keeps them after encryption:key:change), newest
+     * first. Empty when they cannot be confirmed against the newest key (see KeyedHash).
      *
      * @return string[]
      */
     public function earlier(): array
     {
-        $keys = preg_split('/\s+/s', trim((string)$this->deploymentConfig->get('crypt/key')));
-        $fingerprints = array_map(fn (string $key) => substr(hash_hmac('sha256', self::SUBJECT, $this->decode($key)), 0, 16),
-            array_filter($keys, 'strlen'));
-        if (array_pop($fingerprints) !== $this->current()) {
-            return [];
-        }
-        return array_values(array_unique(array_diff($fingerprints, [$this->current()])));
-    }
-
-    /** Like Encryptor::decodeKey(): keys made by Magento 2.4.7+ are stored as "base64" + the encoded key. */
-    private function decode(string $key): string
-    {
-        return str_starts_with($key, 'base64') ? (string)base64_decode(substr($key, 6)) : $key;
+        $all = (new KeyedHash($this->encryptor, $this->deploymentConfig))->all(self::SUBJECT);
+        return array_values(array_unique(array_map(fn (string $hash) => substr($hash, 0, 16), array_slice($all, 1))));
     }
 }

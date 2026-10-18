@@ -26,11 +26,13 @@ class RecipientBlockLinkTest extends TestCase
         $encryptor = $this->createStub(EncryptorInterface::class);
         $encryptor->method('encrypt')->willReturn('0:3:cipher');
         $encryptor->method('hash')->willReturn(str_repeat('s', 64));
+        $hashes = $this->createStub(\CommerceKings\Notification\Model\KeyedHash::class);
+        $hashes->method('current')->willReturn(str_repeat('s', 64));
         $url = $this->createStub(UrlInterface::class);
         $url->method('getUrl')->willReturnCallback(fn ($route, $params) => 'https://shop.test/' . $route . '?'
             . http_build_query($params['_query']));
         return (new RecipientBlock($this->createStub(ResourceConnection::class), $encryptor, $url, $config,
-            new RecipientNormalizerPool(), $this->createStub(KeyFingerprint::class), $permission))
+            new RecipientNormalizerPool(), $this->createStub(KeyFingerprint::class), $permission, $hashes))
             ->getBlockUrl(Channel::EMAIL, 'a@example.test', 1);
     }
 
