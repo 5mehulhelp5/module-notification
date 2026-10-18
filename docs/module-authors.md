@@ -64,12 +64,13 @@ The sender keeps the cooldown, recipient re-check, stop list, quiet hours and st
 
 ### The provider selector
 
-With one provider installed for a channel it is used automatically. With several and none selected, the first
-installed (module load order) is used and a warning is logged once per process – select one under *Delivery*, since
-a deployment can change that order. To choose between several, the stored code is
+With one provider installed for a channel it is used automatically. Install one provider module per channel: recipient
+time zones (`QuietHours` "zones") and opt-in confirmations are per module. With several and none selected, the first
+installed (module load order) is used and a warning is logged once per process – select one under *Delivery*, since a
+deployment can change that order. To choose between several, the stored code is
 `commercekings_notification/general/provider_<channel>` (read per store view, e.g. set per website). The first module
-for a channel adds the field to the *Delivery* group, with `Model\Config\Source\Provider` for its channel (`@api`:
-a virtual type with its `channel` argument is a stable extension point):
+for a channel adds the field to the *Delivery* group, with `Model\Config\Source\Provider` for its channel (`@api`: a
+virtual type with its `channel` argument is a stable extension point):
 
 ```xml
 <!-- etc/di.xml -->
@@ -123,9 +124,11 @@ new channel (e.g. `telegram`) brings its own normalizer – without one it takes
 5. Keep your service's own channel failover off (e.g. Viber or WhatsApp falling back to SMS): the message would
    arrive on a channel whose stop list, consent and quiet hours Notification never checked. A feature that wants a
    fallback sends a second delivery on the other channel.
-6. A timeout or lost connection after the request was sent: throw `Exception\MessageSentException`, not a plain
+6. A timeout or lost connection after the request may have left: throw `Exception\MessageSentException`, not a plain
    error – the service may have accepted it, and a retry could deliver it twice (a missed reminder is better than a
-   duplicate).
+   duplicate). Treat a failure as "not sent" only when you can prove the request never left (host not found,
+   connection refused, TLS handshake, a timeout before any transfer): cURL reports a timeout (28) while connecting and
+   while waiting for the answer alike.
 7. Keep texts short: an SMS segment holds 160 GSM-7 characters, or 70 when any character needs Unicode (an accent
    outside GSM-7, an emoji); longer texts are sent and billed as several segments of 153 / 67. Name your brand and
    end with "Reply STOP to stop"; a long link costs segments, so prefer a short one.
@@ -156,15 +159,16 @@ counts a failed attempt.
 - **Do not register an inbound (reply) webhook in module-rate-limit:** a limited request is answered 429 and the
   service does not send it again – a STOP would be lost. The signature check is its protection. A delivery status
   callback may be limited.
-- **STOP** and similar words (UNSUBSCRIBE, CANCEL, END, QUIT; a WhatsApp "Stop promotions" button):
+- **STOP:** a reply that is exactly an opt-out keyword – STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT, OPTOUT,
+  REVOKE – ignoring case, spaces and punctuation (no first-word matching), or a WhatsApp "Stop promotions" button:
   `Api\StopListInterface::stop($channel, $from, StopListInterface::REASON_REPLY)`. Stoppable deliveries to the number
   are dropped from then on, in every website, its stoppable subscriptions and checkbox consents removed, and the stop
   holds until START (no lift timer; the stop link's Undo cannot lift it). Service messages still go out. Texts say
   "Reply STOP to stop" – a stop link (`getStopUrl()`) works too but is long (~200 characters).
 - **HELP** (INFO): leave it to the service's own auto-reply (set it up with your brand and how to stop); there is
   nothing for Notification to do.
-- **START** (UNSTOP): `resume($channel, $from)`. It lifts the stop only – the removed subscriptions do not come back;
-  the recipient signs up again (with consent).
+- **START** (UNSTOP, YES – the whole reply, as for STOP): `resume($channel, $from)`. It lifts the stop only – the
+  removed subscriptions do not come back; the recipient signs up again (with consent).
 - **Undeliverable numbers** (invalid, a landline, not reachable): when the service refuses at once, `send()` throws, so
   the feature counts a failed attempt and gives up after its retries. When it reports later (a status callback, e.g.
   Twilio 30003/30005/30006, 21211), call `stop($channel, $to, StopListInterface::REASON_UNDELIVERABLE)`: the number is
@@ -383,8 +387,9 @@ offers at this number"). Notification ships it; your type only declares it:
    element triggers `ckAddressConsent:recorded`. The text is *Notifications > Consent for an address* per store view and
    channel (empty: no checkbox), read from `commercekings_notification/address_consent/wording_<channel>`: `sms`,
    `whatsapp` and `viber` have their fields; for a module's own channel (e.g. `telegram`) the provider module adds
-   `wording_<channel>` to that group in its own `system.xml`, with a default in its `config.xml`. Other storefronts
-   (Hyvä, headless) call `CommerceKings_Notification/js/address-consent-core` (`record()`) or the REST routes directly.
+   `wording_<channel>` to that group in its own `system.xml`, with a default in its `config.xml`. Only the Luma checkout
+   is supported; a custom checkout can build on `CommerceKings_Notification/js/address-consent-core` (`record()`) or
+   the REST routes.
 3. REST: `POST /V1/ck-notification/address-consents` (guest) and `/mine` (customer) with
    `{"type", "reference", "recipient", "wordingHash", "given"}`. Your type's `authorize()` decides who may record for
    the reference. `wordingHash` is sha256 of the text the visitor saw: the server stores the store view's configured

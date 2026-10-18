@@ -66,9 +66,9 @@ type's own job (e.g. abandoned cart releases its claim so the next finder run qu
 
 ## Rate limiting
 
-**Recommended for every live shop.** The guest subscribe endpoint is anonymous: without a rate limit a script can
-make the shop send one reminder to any address it likes, up to the feature's hourly cap (e.g. abandoned cart's
-*Maximum reminders per hour*) – and those reminders take the place of real shoppers' in that hour.
+**Recommended for every live shop.** The guest subscribe endpoint is anonymous: without a rate limit a script can make
+the shop send one reminder to any address it likes – or a paid text to any number – up to the feature's hourly cap (e.g.
+abandoned cart's *Maximum reminders per hour*) – and those reminders take the place of real shoppers' in that hour.
 
 Rate-limit `POST /rest/<store>/V1/ck-notification/subscriptions` (and `…/address-consents`, the checkbox consent) per
 client IP in front of Magento – it then never

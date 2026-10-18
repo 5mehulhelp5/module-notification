@@ -1,6 +1,6 @@
 /**
  * Address consent, framework-free: record() posts a checkbox consent (or its withdrawal) for one address to
- * Notification's REST route. Any storefront (Luma, Hyvä, headless) builds its checkbox on it.
+ * Notification's REST route. Framework-free: a custom storefront can build its checkbox on it (only Luma's is shipped).
  */
 define([], function () {
     'use strict';

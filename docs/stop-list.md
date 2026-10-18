@@ -2,8 +2,8 @@
 
 Status: built. Start with the [README](../README.md).
 
-**Goal:** a recipient stops all **marketing** notifications to their address with one click. The stop ends by itself
-once nobody has tried the address for a while. Service messages (orders, payments) are never stopped.
+**Goal:** a recipient stops all **marketing** notifications to their address on that channel with one click. The stop
+ends by itself once nobody has tried the address for a while. Service messages (orders, payments) are never stopped.
 
 Shown to people as **Do not contact**; in code `StopListInterface` and `ck_notification_stop`.
 

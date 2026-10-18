@@ -9,12 +9,13 @@ Works with Magento 2.4.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQ
 - **Fast storefront.** Every notification is sent in the background by a queue consumer, never during a page view.
   Optional shopper subscriptions are one quick write.
 - **Marketing and service messages.** Reminders shoppers opt into, or order and staff messages that need no subscription.
-- **Email, SMS, WhatsApp.** Email built in; a provider module adds a messaging service. Phone numbers, consent for a
-  number (a checkbox, stored as evidence), STOP replies and quiet hours are part of Notification.
+- **Email, SMS, WhatsApp, Viber.** Email built in; a provider module adds a messaging service. Phone numbers, consent
+  for a number (a checkbox, stored as evidence), STOP replies and quiet hours are part of Notification.
 - **Inbox-ready at volume.** Optional RFC 8058 one-click unsubscribe, as Gmail and Yahoo require from bulk senders.
-- **Do not contact.** One click in a marketing email (or a STOP reply) stops all marketing to that recipient, whoever
-  signs them up again; order messages still arrive.
-- **Quiet hours.** Marketing is held at night and sent after – in the store's time zone, or the recipient's.
+- **Do not contact.** One click in a marketing email (or a STOP reply) stops all marketing to that address on that
+  channel (a STOP to the SMS number doesn't stop email), whoever signs them up again; order messages still arrive.
+- **Quiet hours.** Marketing is held at night (on by default for texts, 20:00–08:00) and sent after – in the store's
+  time zone, or the recipient's.
 - **Scales with you.** Add consumers when traffic grows; RabbitMQ or Magento's MySQL queue.
 - **Private by default.** Cooldown, stops and consents keep keyed hashes, never addresses; unused contacts are removed.
 
@@ -32,13 +33,14 @@ Provider modules: [Twilio](https://github.com/commercekings/module-notification-
 - A **permission** decides who may subscribe: everyone (opt-out), only with consent (opt-in, with the privacy bundle),
   or – per type – an **address consent**: a checkbox for one number. The **subscriber** provides the unsubscribe link.
 - The **queue** carries `<type>|<reference>`. One consumer sends every type, so nothing is sent during a page view.
-- The **delivery state** keeps each feature's send history per subscriber (sent, queued, retries), so a new sign-up
-  does not send twice.
+- The **delivery state** keeps each feature's send history per type and reference, e.g. per cart and reminder type
+  (sent, queued, retries), so a new sign-up does not send twice.
 - The **sender** checks a **delivery** against Do not contact, quiet hours and the cooldown, builds its content in
   the store's language, then hands it to a provider.
 - A **channel** is where a delivery goes: email, SMS, WhatsApp, Viber, or a code a provider module brings. A
   **normalizer** gives each channel one recipient form; SMS, WhatsApp and Viber numbers are E.164.
 - A **provider** delivers on one channel, chosen in the admin when there are several. Magento email is built in.
+  Install one provider module per channel: recipient time zones and opt-in confirmations are per module.
 
 ## Installation
 
@@ -51,7 +53,8 @@ bin/magento setup:upgrade
 
 Alone it runs **opt-out**: a subscription stays until it is removed, and features show their notice. Add
 `commercekings/privacy-bundle` for **opt-in**: a subscription then needs a consent for the feature's purpose,
-withdrawing it removes the subscription, and notices are off by default.
+withdrawing it removes the subscription, and notices are off by default. Text messages are always opt-in: a type with an
+address consent needs the number's checkbox in either setup.
 
 ## Settings
 
@@ -69,8 +72,8 @@ withdrawing it removes the subscription, and notices are off by default.
 - Run the consumer `commerceKingsNotificationSend` with `--max-messages=1000` and restart it after each deployment.
 - **Recommended:** rate-limit the anonymous routes `POST /rest/<store>/V1/ck-notification/subscriptions` and
   `…/address-consents` per IP (e.g. 10 a minute) in your web server, proxy or CDN, and optionally with
-  [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit). Without one, a script can
-  make the shop message any address, up to the feature's hourly cap.
+  [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit). Without one, a script can make
+  the shop message any address – a paid text to any number – up to the feature's hourly cap.
 
 Details: [operations](docs/operations.md).
 

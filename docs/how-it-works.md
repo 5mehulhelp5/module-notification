@@ -9,15 +9,16 @@ Each module answers one question:
 
 ```
  PERMISSION     "May we?"          optional: consent per purpose (module-consent via module-consent-notification)
- NOTIFICATION   "Who, and how?"    email rules, contacts, subscriptions, withdrawal, delivery
+ NOTIFICATION   "Who, and how?"    address rules, contacts, subscriptions, withdrawal, delivery
  FEATURE        "What, and when?"  authorize a reference, its trigger, its content, its send history
 ```
 
 - **Subscriptions** (`ck_notification_subscription`): who wants which notification type for which reference,
   under which permission (a consent, with the bridge). No row = not subscribed; a withdrawal deletes it.
-- **Subscribe endpoint** for every type. Order, nothing written before the last step: email rules → the type's
-  `authorize()` → the permission for the type's purpose and website → contact → one INSERT that repeats the
-  permission check and the type's condition, so a withdrawal or a changed reference at the same moment wins.
+- **Subscribe endpoint** for every type. Order, nothing written before the last step: address rules (email, or the
+  channel's normalizer) → the type's `authorize()` → the permission for the type's purpose and website → contact → one
+  INSERT that repeats the permission check and the type's condition, so a withdrawal or a changed reference at the same
+  moment wins.
 - **Saved event**: every written subscription row dispatches `commercekings_notification_subscription_saved` after
   the commit (with `created` and `previous_contact_id`), e.g. for an opt-in confirmation; an observer error is
   logged, never the sign-up's.
@@ -61,13 +62,13 @@ Each module answers one question:
   notifications that use it and all stores. One number of days for all channels (global); the keys are per channel. Keyed hashes only (`ck_notification_cooldown`), never an address.
 - **Do not contact** (`Api\StopListInterface`): a signed "stop these emails" link in marketing notifications opens
   `/cknotification/stop`; only its form-key POST stops, so mail scanners change nothing. Stopping removes the
-  recipient's subscriptions; a stop applies in every website and store. Sign-ups for a stopped recipient are answered as
-  stored but not written and restart the lift timer; the sender drops stoppable deliveries (`STOPPED`) and passes the
-  others (`Delivery::$stoppable = false`); a stoppable send without its own unsubscribe link gets the stop link as its
-  one-click URL. Each stop has a reason: a stop link's or an undeliverable number's lifts after *N* days without
-  attempts (cron), a STOP reply's only by `resume()` (START), and the link's Undo lifts only a link stop; an
-  undeliverable number keeps its checkbox consents. Keyed hashes only (`ck_notification_stop`); the link carries the
-  recipient encrypted. Design: [stop list](stop-list.md).
+  recipient's stoppable subscriptions on that channel; a stop applies on that channel in every website and store.
+  Sign-ups for a stopped recipient are answered as stored but not written and restart the lift timer; the sender drops
+  stoppable deliveries (`STOPPED`) and passes the others (`Delivery::$stoppable = false`); a stoppable send without its
+  own unsubscribe link gets the stop link as its one-click URL. Each stop has a reason: a stop link's or an
+  undeliverable number's lifts after *N* days without attempts (cron), a STOP reply's only by `resume()` (START), and
+  the link's Undo lifts only a link stop; an undeliverable number keeps its checkbox consents. Keyed hashes only
+  (`ck_notification_stop`); the link carries the recipient encrypted. Design: [stop list](stop-list.md).
 - **Quiet hours** (`Api\QuietHoursInterface`): a daily window (by default 20:00–08:00, may cross midnight) in which
   stoppable deliveries on the selected channels are held (`QUIET_HOURS`, before any cooldown claim) and sent by the
   feature after it (`nextAllowedAt()`, UTC). Service messages are never held. The default uses the store's time zone
@@ -85,10 +86,12 @@ Each module answers one question:
 
 ## Subscribe
 
-Abuse protection for the anonymous guest endpoint belongs to your infrastructure first – a web server, proxy or CDN
-rule (see [operations](operations.md#rate-limiting)); [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit) is an optional second line.
-Without it, the recipient cooldown (one email per address per configured days) and the feature's own sending
-limits cap how often a stranger's address can be mailed, but not how fast a script can subscribe addresses.
+Abuse protection for the anonymous guest endpoint belongs to your infrastructure first – a web server, proxy or CDN rule
+(see [operations](operations.md#rate-limiting));
+[commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit) is an optional second line.
+Without it, the recipient cooldown (one message per address and channel per configured days) and the feature's own
+sending limits cap how often a stranger's address can be messaged – a text to any number costs money – but not how fast
+a script can subscribe addresses.
 
 | Endpoint | Who | Body |
 | --- | --- | --- |

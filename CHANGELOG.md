@@ -41,10 +41,10 @@ First release. Requires Magento 2.4.4 or later (`magento/framework ^103.0.4`).
   undeliverable stops lift after *Lifts after (days without attempts)*, default 90; a STOP reply only by `resume()`
   (START); an undeliverable number keeps its consents. Stops and links survive
   `encryption:key:change` while the old key stays in `env.php` (`Model\KeyedHash`).
-- **Quiet hours:** `QuietHoursInterface` and *Quiet hours* (per store view: from – to, may cross midnight; channels;
-  on by default: 20:00–08:00 for every channel except email). Stoppable deliveries are held (`SenderInterface::QUIET_HOURS`) and sent after `nextAllowedAt()`.
-  The window is kept in the store's time zone, or in the recipient's through a zone provider per channel
-  (`QuietHoursZoneInterface`, `Model\QuietHours` "zones").
+- **Quiet hours:** `QuietHoursInterface` and *Quiet hours* (per store view: from – to, may cross midnight; channels; on
+  by default: 20:00–08:00 for every channel except email). Stoppable deliveries are held
+  (`SenderInterface::QUIET_HOURS`) and sent after `nextAllowedAt()`. The window is kept in the store's time zone, or in
+  the recipient's through a zone provider per channel (`QuietHoursZoneInterface`, `Model\QuietHours` "zones").
 - **Recipient cooldown:** an optional minimum gap per recipient and channel (*Cooldown (days)*, default 7);
   keyed hashes only. `CooldownInterface::isRecentFor($channel, $recipient)` checks the key the sender claims, so a
   finder can leave out a recipient in cooldown on any channel before it queues anything.
