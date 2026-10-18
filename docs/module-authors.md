@@ -62,7 +62,9 @@ The sender keeps the cooldown, recipient re-check, stop list, quiet hours and st
 
 ### The provider selector
 
-With one provider installed for a channel it is used automatically. To choose between several, the stored code is
+With one provider installed for a channel it is used automatically. With several and none selected, the first
+installed (module load order) is used and a warning is logged once per process – select one under *Delivery*, since
+a deployment can change that order. To choose between several, the stored code is
 `commercekings_notification/general/provider_<channel>` (read per store view, e.g. set per website). The first module
 for a channel adds the field to the *Delivery* group, with `Model\Config\Source\Provider` for its channel (`@api`:
 a virtual type with its `channel` argument is a stable extension point):
@@ -139,9 +141,10 @@ counts a failed attempt.
   the request's (a proxy changes it), and answer 403 without doing anything else when it fails. The controller
   implements `CsrfAwareActionInterface`; the service posts without a store, so check against each configured account.
 - **Normalize the sender** before anything else: strip the service's prefixes (e.g. `whatsapp:`) and add a missing
-  `+` (some services send `381601234567`), so `$from` is E.164 like the stored contacts. `stop()` and `resume()`
-  throw `\InvalidArgumentException` for a number the channel cannot take: catch it, log it without the number and
-  answer 200, so the service does not retry a request that can never succeed.
+  `+` (some services, e.g. Infobip, send `381601234567`), so `$from` is E.164 like the stored contacts. Every
+  `StopListInterface` method (`stop()`, `resume()`, `touch()`, `isStopped()`, `getReason()`, `getStopUrl()`) throws
+  `\InvalidArgumentException` for an address the channel cannot take: catch it, log it without the number and answer
+  200, so the service does not retry a request that can never succeed.
 - **Do not register an inbound (reply) webhook in module-rate-limit:** a limited request is answered 429 and the
   service does not send it again – a STOP would be lost. The signature check is its protection. A delivery status
   callback may be limited.

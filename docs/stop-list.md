@@ -59,8 +59,10 @@ Each stop keeps the strongest reason it was given (reply, then link, then undeli
 
 ## Interfaces and settings
 
-- `Api\StopListInterface`: `isStopped()`, `stop()`, `resume()`, `touch()` (restart the timer),
-  `getStopUrl()`. Replaceable with a di.xml preference.
+- `Api\StopListInterface`: `isStopped()`, `getReason()`, `stop()`, `resume()`, `touch()` (restart the timer),
+  `getStopUrl()`. Replaceable with a di.xml preference. Each throws `\InvalidArgumentException` for an address the
+  channel cannot take (it normalizes to `''`, e.g. a phone number without `+`), so a malformed address is never
+  stored or looked up under a key of its own; normalize or prefix it first (a webhook, see module-authors).
 - **Stores > Configuration > CommerceKings > Notifications > Do not contact**: *"Stop these emails" link* (store
   view, default Yes; always on in opt-out mode, where it is the only way to stop the emails), *Lifts after (days
   without attempts)* (global, default 90).
