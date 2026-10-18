@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- In opt-out mode the "Stop these emails" link is always offered (it is the only way to stop the emails there),
+  and the stop link accepts the mail provider's RFC 8058 one-click POST (blocks, never undoes).
 - **Encryption key change:** blocks and cooldown rows store a fingerprint of the key that made them;
   `bin/magento notification:key-change:cleanup` (`--dry-run` counts rows per key) removes rows of earlier keys
   still listed in `env.php` (`--force` also those of keys no longer listed) and, when blocks were lifted, posts an

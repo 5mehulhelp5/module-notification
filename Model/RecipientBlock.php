@@ -5,6 +5,7 @@ namespace CommerceKings\Notification\Model;
 
 use CommerceKings\Notification\Api\Channel;
 use CommerceKings\Notification\Api\RecipientBlockInterface;
+use CommerceKings\Notification\Api\SubscriptionPermissionInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\UrlInterface;
@@ -23,7 +24,8 @@ class RecipientBlock implements RecipientBlockInterface
         private readonly UrlInterface $url,
         private readonly Config $config,
         private readonly RecipientNormalizerPool $normalizers,
-        private readonly KeyFingerprint $fingerprint
+        private readonly KeyFingerprint $fingerprint,
+        private readonly SubscriptionPermissionInterface $permission
     ) {
     }
 
@@ -71,7 +73,8 @@ class RecipientBlock implements RecipientBlockInterface
 
     public function getBlockUrl(string $channel, string $recipient, int $storeId): string
     {
-        if (!$this->config->isBlockLinkEnabled($storeId)) {
+        // in opt-out mode the link is the only way to stop the emails: it is always offered there
+        if (!$this->config->isBlockLinkEnabled($storeId) && !$this->permission->isOptOut()) {
             return '';
         }
         $cipher = base64_encode($this->encryptor->encrypt($channel . '|' . $recipient));

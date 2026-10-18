@@ -62,6 +62,10 @@ type's own job (e.g. abandoned cart releases its claim so the next finder run qu
 
 ## Rate limiting
 
+**Recommended for every live shop.** The guest subscribe endpoint is anonymous: without a rate limit a script can
+make the shop send one reminder to any address it likes, up to the feature's hourly cap (e.g. abandoned cart's
+*Maximum reminders per hour*) – and those reminders take the place of real shoppers' in that hour.
+
 Rate-limit `POST /rest/<store>/V1/ck-notification/subscriptions` per client IP in front of Magento – it then never
 starts for a flood. The storefront scripts treat HTTP 429 as temporary and retry with back-off, so shoppers are not
 affected. A checkout sends a few requests per minute at most; suggested: 10 per minute per IP with a small burst.
@@ -78,6 +82,10 @@ location ~ ^/rest/[^/]+/V1/ck-notification/subscriptions {
     limit_req_status 429;
     try_files $uri $uri/ /index.php$is_args$args;
 }
+# Magento's asynchronous and bulk REST routes are not used by the storefront
+location ~ ^/rest/[^/]+/async(/bulk)?/V1/ck-notification/ {
+    return 404;
+}
 ```
 
 Behind Cloudflare or another proxy, restore the client IP first (`set_real_ip_from` with the proxy's ranges and
@@ -86,6 +94,6 @@ A request rate cannot see what a request contains: a slow script can still try m
 recipient cooldown on and set the feature's hourly sending limit (e.g. abandoned cart's *Maximum reminders per hour*).
 A bot challenge (e.g. Cloudflare Turnstile) can be added at the same layer; none is shipped.
 
-**Optional, inside Magento:** [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit) (Magento 2.4.7+) limits this endpoint per guest IP
+**Inside Magento (Magento 2.4.7+):** [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit) limits this endpoint per guest IP
 and per customer from the admin and answers 429 before it runs. Keep the rule above as the first line of defense –
 it stops a flood before PHP starts; the module is the second line.

@@ -26,12 +26,19 @@ class IndexTest extends TestCase
     private ?Redirect $redirect = null;
     private bool $validKey = true;
     private bool $alreadyBlocked = false;
+    private ?int $status = null;
+    private array $post = [];
+    private string $contentType = 'application/x-www-form-urlencoded';
 
     private function controller(string $method, array $params): Index
     {
         $request = $this->createStub(Http::class);
         $request->method('getMethod')->willReturn($method);
         $request->method('getParam')->willReturnCallback(fn ($name) => $params[$name] ?? null);
+        $request->method('getQuery')->willReturnCallback(fn ($name) => $params[$name] ?? null);
+        $request->method('getPost')->willReturnCallback(fn ($name) => $this->post[$name] ?? null);
+        $request->method('getPostValue')->willReturnCallback(fn () => $this->post);
+        $request->method('getHeader')->willReturnCallback(fn () => $this->contentType);
         $blocks = $this->createStub(RecipientBlockInterface::class);
         $blocks->method('fromLink')->willReturnCallback(function ($r, $s) {
             $this->calls[] = ['fromLink', $r, $s];
@@ -62,7 +69,16 @@ class IndexTest extends TestCase
         $pages->method('create')->willReturn($page);
         $validator = $this->createStub(Validator::class);
         $validator->method('validate')->willReturnCallback(fn () => $this->validKey);
-        return new Index($context, $request, $blocks, $pages, $validator);
+        $raw = $this->createStub(\Magento\Framework\Controller\Result\Raw::class);
+        $raw->method('setHttpResponseCode')->willReturnCallback(function ($code) use ($raw) {
+            $this->status = $code;
+            return $raw;
+        });
+        $raw->method('setHeader')->willReturnSelf();
+        $raw->method('setContents')->willReturnSelf();
+        $rawFactory = $this->createStub(\Magento\Framework\Controller\Result\RawFactory::class);
+        $rawFactory->method('create')->willReturn($raw);
+        return new Index($context, $request, $blocks, $pages, $validator, $rawFactory);
     }
 
     private function changes(): array
@@ -128,6 +144,54 @@ class IndexTest extends TestCase
         $this->controller('POST', ['r' => ['enc'], 's' => 'sig', 'form_key' => 'ok'])->execute();
         $this->assertSame([], $this->calls, 'array values are never checked or acted on');
         $this->assertSame([], $this->changes());
+    }
+
+    public function testOneClickUnsubscribeBlocksWithoutAFormKey(): void
+    {
+        $this->post = ['List-Unsubscribe' => 'One-Click'];
+        $this->controller('POST', ['r' => 'enc', 's' => 'sig'])->execute();
+        $this->assertSame(200, $this->status);
+        $this->assertSame([['block', 'email', 'a@example.test']], $this->changes());
+        $this->assertSame([], $this->blockData, 'no page is rendered');
+    }
+
+    public function testOneClickNeverUndoes(): void
+    {
+        $this->post = ['List-Unsubscribe' => 'One-Click'];
+        $this->controller('POST', ['r' => 'enc', 's' => 'sig', 'do' => 'undo'])->execute();
+        $this->assertSame([['block', 'email', 'a@example.test']], $this->changes(), 'a one-click POST only blocks');
+    }
+
+    /** @dataProvider badOneClicks */
+    #[\PHPUnit\Framework\Attributes\DataProvider('badOneClicks')]
+    public function testMalformedOrForgedOneClicksChangeNothing(array $post, string $type, string $signature): void
+    {
+        $this->post = $post;
+        $this->contentType = $type;
+        $this->controller('POST', ['r' => 'enc', 's' => $signature])->execute();
+        $this->assertSame(400, $this->status);
+        $this->assertSame([], $this->changes());
+    }
+
+    public static function badOneClicks(): array
+    {
+        $body = ['List-Unsubscribe' => 'One-Click'];
+        return [
+            'forged link' => [$body, 'application/x-www-form-urlencoded', 'forged'],
+            'other value' => [['List-Unsubscribe' => 'yes'], 'application/x-www-form-urlencoded', 'sig'],
+            'extra field' => [$body + ['do' => 'undo'], 'application/x-www-form-urlencoded', 'sig'],
+            'array value' => [['List-Unsubscribe' => ['One-Click']], 'application/x-www-form-urlencoded', 'sig'],
+            'json' => [$body, 'application/json', 'sig'],
+        ];
+    }
+
+    public function testCsrfLetsOnlyTheOneClickShapeThroughWithoutAFormKey(): void
+    {
+        $this->post = ['List-Unsubscribe' => 'One-Click'];
+        $request = $this->createStub(Http::class);
+        $request->method('getMethod')->willReturn('POST');
+        $request->method('getPost')->willReturnCallback(fn ($name) => $this->post[$name] ?? null);
+        $this->assertTrue($this->controller('GET', [])->validateForCsrf($request), 'the signed URL authorizes it');
     }
 
     public function testCsrfRejectsANonStringFormKey(): void

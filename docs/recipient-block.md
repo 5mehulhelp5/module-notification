@@ -51,7 +51,12 @@ Global across stores, like the cooldown.
 - `Api\RecipientBlockInterface`: `isBlocked()`, `block()`, `unblock()`, `touch()` (restart the timer),
   `getBlockUrl()`. Replaceable with a di.xml preference.
 - **Stores > Configuration > CommerceKings > Notifications > Do not contact**: *"Stop these emails" link* (store
-  view, default Yes), *Lifts after (days without attempts)* (global, default 90).
+  view, default Yes; always on in opt-out mode, where it is the only way to stop the emails), *Lifts after (days
+  without attempts)* (global, default 90).
+- **One-click unsubscribe (RFC 8058):** the stop link also accepts the mail provider's POST (body exactly
+  `List-Unsubscribe=One-Click`, no form key): it blocks and answers 200, a malformed or forged one 400. It never
+  undoes. A feature uses it as the one-click URL when it has no unsubscribe link of its own (abandoned cart in
+  opt-out mode).
 
 ## Where it lives
 
@@ -79,7 +84,8 @@ Global across stores, like the cooldown.
 
 The hashes and links are keyed with Magento's encryption key, and only hashes are stored, so a key change cannot
 be re-hashed: every block lifts and links already sent expire. Each row stores a fingerprint of its key (`key_id`).
-Subscriptions, contacts and consent records are not affected.
+Subscriptions, contacts and consent records are not affected, and consent withdrawal links in emails already sent
+keep working while the old key stays in `env.php`.
 
 After `bin/magento encryption:key:change`:
 

@@ -32,7 +32,7 @@
                 <field id="link" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>"Stop these emails" link</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment>Offered in marketing notifications whose template shows it (e.g. the abandoned cart reminder). Sign-ups for a stopped address are ignored.</comment>
+                    <comment>Offered in marketing notifications whose template shows it (e.g. the abandoned cart reminder). Sign-ups for a stopped address are ignored. Always on in opt-out mode, where it is the only way to stop the emails.</comment>
                 </field>
                 <field id="lift_days" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Lifts after (days without attempts)</label>

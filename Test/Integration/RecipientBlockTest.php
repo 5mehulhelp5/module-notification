@@ -282,8 +282,11 @@ class RecipientBlockTest extends TestCase
         $config = $this->createStub(\Magento\Framework\App\DeploymentConfig::class);
         $config->method('get')->willReturn(str_repeat('o', 32) . "\n" . $real);
         $fingerprint = new KeyFingerprint($this->om->get(\Magento\Framework\Encryption\EncryptorInterface::class), $config);
-        $this->assertCount(1, $fingerprint->earlier(), 'computing the newest key like the Encryptor is confirmed');
-        $this->assertSame([], $this->om->get(KeyFingerprint::class)->earlier(), 'this install has one key');
+        $installed = count(preg_split('/\s+/', trim($real)));
+        $this->assertCount($installed, $fingerprint->earlier(),
+            'computing the newest key like the Encryptor is confirmed: the extra key plus the install\'s older ones');
+        $this->assertCount($installed - 1, $this->om->get(KeyFingerprint::class)->earlier(),
+            'the install\'s own older keys (none on a fresh install)');
     }
 
     public function testTheCommandIsRegistered(): void

@@ -12,13 +12,16 @@ use Magento\Framework\App\CsrfAwareActionInterface;
 use Magento\Framework\App\Request\Http;
 use Magento\Framework\App\Request\InvalidRequestException;
 use Magento\Framework\App\RequestInterface;
+use Magento\Framework\Controller\Result\RawFactory;
 use Magento\Framework\Controller\ResultInterface;
 use Magento\Framework\Data\Form\FormKey\Validator;
 use Magento\Framework\View\Result\PageFactory;
 
 /**
  * GET shows the do-not-contact confirmation for a signed link; only the form-key POST blocks or undoes, so mail
- * scanners that open links change nothing. Extends Action so Magento sets the store and currency context.
+ * scanners that open links change nothing. An RFC 8058 one-click POST (body exactly List-Unsubscribe=One-Click) on the
+ * signed URL blocks without browser state – it can never undo. Extends Action so Magento sets the store and currency
+ * context.
  */
 class Index extends Action implements HttpGetActionInterface, HttpPostActionInterface, CsrfAwareActionInterface
 {
@@ -32,13 +35,17 @@ class Index extends Action implements HttpGetActionInterface, HttpPostActionInte
         private readonly Http $request,
         private readonly RecipientBlockInterface $blocks,
         private readonly PageFactory $pageFactory,
-        private readonly Validator $formKeyValidator
+        private readonly Validator $formKeyValidator,
+        private readonly RawFactory $rawFactory
     ) {
         parent::__construct($context);
     }
 
     public function execute(): ResultInterface
     {
+        if ($this->isOneClickRequest($this->request)) {
+            return $this->oneClick();
+        }
         // Magento also routes HEAD to GET actions: header inspection never renders or changes anything.
         if (!in_array($this->request->getMethod(), ['GET', 'POST'], true)) {
             return $this->resultRedirectFactory->create()->setPath('');
@@ -80,8 +87,37 @@ class Index extends Action implements HttpGetActionInterface, HttpPostActionInte
         return $page;
     }
 
+    /** The mail provider's unsubscribe: the signed URL authorizes it; the body and content type must be exact. */
+    private function oneClick(): ResultInterface
+    {
+        $recipient = $this->request->getQuery('r');
+        $signature = $this->request->getQuery('s');
+        $type = strtolower(trim(explode(';', (string)$this->request->getHeader('Content-Type'))[0]));
+        $link = in_array($type, ['application/x-www-form-urlencoded', 'multipart/form-data'], true)
+            && $this->request->getPostValue() === ['List-Unsubscribe' => 'One-Click']
+            && is_string($recipient) && is_string($signature)
+            ? $this->blocks->fromLink($recipient, $signature) : null;
+        if ($link !== null) {
+            $this->blocks->block($link['channel'], $link['recipient']);
+        }
+        return $this->rawFactory->create()->setHttpResponseCode($link !== null ? 200 : 400)
+            ->setHeader('Content-Type', 'text/plain; charset=UTF-8', true)
+            ->setHeader('Cache-Control', 'no-store', true)
+            ->setContents($link !== null ? 'OK' : 'Invalid unsubscribe request.');
+    }
+
+    private function isOneClickRequest(RequestInterface $request): bool
+    {
+        return $request instanceof Http && $request->getMethod() === 'POST'
+            && $request->getPost('List-Unsubscribe') !== null;
+    }
+
     public function validateForCsrf(RequestInterface $request): ?bool
     {
+        // the signed URL authorizes the mail provider's one-click POST; the browser form still needs its form key
+        if ($this->isOneClickRequest($request)) {
+            return true;
+        }
         // reject non-string keys before Magento's middleware compares them as strings
         $key = $request->getParam('form_key');
         return $key !== null && !is_string($key) ? false : null;

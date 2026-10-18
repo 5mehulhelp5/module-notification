@@ -57,17 +57,17 @@ withdrawing it removes the subscription, and notices are off by default.
 |---|---|
 | Email provider (website) | Magento email – provider modules add their own |
 | Cooldown (days, global) | 7 – minimum gap between notifications to one recipient on a channel; 0 turns it off |
-| One-click unsubscribe (website) | No – RFC 8058 headers; the feature's unsubscribe link must accept the POST |
-| Do not contact: "Stop these emails" link (store view) | Yes – one click stops all marketing emails to that address |
+| One-click unsubscribe (website) | No – RFC 8058 headers; the feature's unsubscribe link, or the "Stop these emails" link, accepts the POST |
+| Do not contact: "Stop these emails" link (store view) | Yes – one click stops all marketing emails to that address; always on in opt-out mode |
 | Do not contact: lifts after (days without attempts, global) | 90 – each sign-up attempt for a stopped address restarts it |
 
 ## Before going live
 
 - Run the consumer `commerceKingsNotificationSend` (RabbitMQ or Magento's database queue) with
   `--max-messages=1000`, and restart it after each deployment.
-- Rate-limit `POST /rest/<store>/V1/ck-notification/subscriptions` per IP in your web server, proxy or CDN, e.g. 10 a
-  minute – the first line of defense. Optional second line: [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit) (Magento 2.4.7+, limits set in
-  the admin).
+- **Recommended:** rate-limit `POST /rest/<store>/V1/ck-notification/subscriptions` per IP, e.g. 10 a minute – in your
+  web server, proxy or CDN first, and with [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit)
+  (Magento 2.4.7+, set in the admin). Without one, a script can make the shop email any address, up to the hourly cap.
 
 Both: [operations](docs/operations.md).
 
