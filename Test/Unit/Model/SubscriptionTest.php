@@ -30,7 +30,8 @@ class SubscriptionTest extends TestCase
         $permission = $this->createStub(SubscriptionPermissionInterface::class);
         $permission->method('validCondition')->willReturnCallback(fn ($column) => 'VALID(' . $column . ')');
         return new SubscriptionGuard($this->resource(),
-            new \CommerceKings\Notification\Model\PermissionResolver($permission, new \CommerceKings\Notification\Model\SubscriptionTypePool([])));
+            new \CommerceKings\Notification\Model\PermissionResolver($permission, new \CommerceKings\Notification\Model\SubscriptionTypePool([]),
+                $this->resource()));
     }
 
     public function testGuardConditionNeedsTheRowAndAValidConsent(): void

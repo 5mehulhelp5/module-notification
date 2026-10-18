@@ -9,7 +9,8 @@
   stoppable subscriptions on its channel. Proven with a test SMS and WhatsApp channel (`MultiChannelTest`).
 - **Permission per type:** `SubscriptionTypeInterface::getPermission()` – a type may bring its own permission (e.g. an
   SMS checkbox); `null` keeps the shop-wide one. Sign-up, the send-time guard and `Model\TypePermission` (a feature's
-  claim) all follow it.
+  claim) all follow it. `getSubscriber()` brings the matching subscriber (`Model\SubscriberResolver`,
+  `Model\TypeSubscriber`); type codes in SQL are quoted by the database adapter.
 - A provider without one-click unsubscribe (e.g. SMS) is not given the stop link as a one-click URL, so nothing is
   logged; the stop page says "messages" and "number" for channels other than email.
 - `ProviderPool` and `RecipientNormalizerPool` are `@api`: their di.xml arguments are stable extension points.

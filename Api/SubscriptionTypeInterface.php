@@ -28,6 +28,12 @@ interface SubscriptionTypeInterface
      */
     public function getPermission(): ?SubscriptionPermissionInterface;
 
+    /**
+     * The subscriber behind this type's own permission (recognizing the visitor, the unsubscribe link); comes with
+     * getPermission(). null: the shop-wide subscriber.
+     */
+    public function getSubscriber(): ?SubscriberInterface;
+
     /** The channel its subscribers are reached on (Channel::EMAIL or a provider module's code, e.g. "sms"). */
     public function getChannel(): string;
 

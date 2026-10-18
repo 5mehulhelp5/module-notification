@@ -83,7 +83,7 @@ class SubscriptionManagementTest extends TestCase
         $filters->method('get')->willReturn(new StringTrim());
         $types = new SubscriptionTypePool(['test_type' => $type]);
         return new SubscriptionManagement($this->resource(), $types,
-            new \CommerceKings\Notification\Model\PermissionResolver($permission, $types), $contacts, $stores,
+            new \CommerceKings\Notification\Model\PermissionResolver($permission, $types, $this->resource()), $contacts, $stores,
             new EmailAddress(), new StringLength(['max' => 255]), $filters, $this->stopList ?? $this->createStub(\CommerceKings\Notification\Api\StopListInterface::class),
             $this->customerRepository(), new \CommerceKings\Notification\Model\RecipientNormalizerPool(['sms' => new class
                 implements \CommerceKings\Notification\Api\RecipientNormalizerInterface {

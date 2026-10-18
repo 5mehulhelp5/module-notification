@@ -98,7 +98,10 @@ was given in, and the unsubscribe link is Consent's signed withdrawal page.
 
 That shop-wide permission applies to every type, unless a type brings its own: `getPermission()` on the type (below)
 returns its own `SubscriptionPermissionInterface` – e.g. an SMS offer with its own "text me offers" checkbox – and
-that one alone decides for its subscriptions, at sign-up and at send time. `null` keeps the shop-wide one.
+that one alone decides for its subscriptions, at sign-up and at send time. `null` keeps the shop-wide one. Its
+subscriber comes with it: `getSubscriber()` returns the matching `SubscriberInterface` (recognizing the visitor, the
+unsubscribe link), `null` the shop-wide one. Inject either for your type with a di.xml virtual type of
+`Model\TypePermission` / `Model\TypeSubscriber` (argument `typeCode`), so your code follows the type.
 
 ## Subscription types
 
@@ -110,7 +113,8 @@ For notifications a visitor signs up for, also:
      `sms`). Guests subscribe with `recipient` (REST `{"type", "reference", "recipient"}`): an email address, or e.g.
      a phone number; it is stored as a contact on that channel. An address the channel does not take is Magento's 400;
    - `isSingle()`: one subscription per reference (a new email replaces it) or one per person;
-   - `getPermission()`: your type's own permission, or `null` for the shop-wide one (see [Permission](#permission));
+   - `getPermission()` and `getSubscriber()`: your type's own permission and subscriber, or `null` for the shop-wide
+     ones (see [Permission](#permission));
    - `isStoppable()`: can the recipient stop it with Do not contact? true for marketing (a stop removes the
      subscription; pass the same value as `Delivery::$stoppable`), false for a service they asked for (a stop leaves
      it);

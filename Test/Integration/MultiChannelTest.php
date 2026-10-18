@@ -85,7 +85,7 @@ class MultiChannelTest extends TestCase
         $permission->method('check')->willReturn(Permission::granted(''));
         $permission->method('validCondition')->willReturn('1 = 1');
         $this->management = $this->om->create(SubscriptionManagement::class, ['types' => $types,
-            'permissions' => new PermissionResolver($permission, $types), 'contacts' => $this->contacts,
+            'permissions' => new PermissionResolver($permission, $types, $this->resource), 'contacts' => $this->contacts,
             'stopList' => $this->stopList, 'normalizers' => $this->normalizers]);
         $providers = new ProviderPool($this->om->get(Config::class),
             [$this->provider('acme_sms', 'sms'), $this->provider('acme_whatsapp', 'whatsapp')]);

@@ -116,7 +116,8 @@ class SubscriptionTest extends TestCase
         $filters = $this->om->create(FilterManager::class);
         $types = new SubscriptionTypePool([$this->type => $type]);
         return new SubscriptionManagement($this->resource, $types,
-            new \CommerceKings\Notification\Model\PermissionResolver($this->permission(), $types), $contacts ?? $this->om->get(ContactRepositoryInterface::class), $this->stores,
+            new \CommerceKings\Notification\Model\PermissionResolver($this->permission(), $types, $this->resource),
+            $contacts ?? $this->om->get(ContactRepositoryInterface::class), $this->stores,
             new EmailAddress(), new StringLength(['max' => 255]), $filters,
             $this->om->get(\CommerceKings\Notification\Api\StopListInterface::class), $this->om->get(\Magento\Customer\Api\CustomerRepositoryInterface::class),
             $this->om->get(\CommerceKings\Notification\Model\RecipientNormalizerPool::class));
@@ -239,7 +240,7 @@ class SubscriptionTest extends TestCase
         $this->assertTrue($management->subscribeGuest($this->type, 'ref', $this->email('guest')));
         $id = (int)$this->rows()[0]['subscription_id'];
         $guard = new SubscriptionGuard($this->resource, new \CommerceKings\Notification\Model\PermissionResolver($this->permission(),
-            $this->om->get(\CommerceKings\Notification\Model\SubscriptionTypePool::class)));
+            $this->om->get(\CommerceKings\Notification\Model\SubscriptionTypePool::class), $this->resource));
         $this->assertTrue($guard->isValid($id, $this->type));
         $this->assertFalse($guard->isValid($id, 'other_type'));
 
