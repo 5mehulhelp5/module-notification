@@ -82,6 +82,13 @@ Details, including how to build an SMS provider: [for module authors](docs/modul
 
 - No rate limit in code: protect the guest endpoint in front of Magento.
 - A failed send is not retried by Notification; the feature decides (abandoned cart queues the cart again).
+- Do-not-contact blocks, the cooldown and the "stop these emails" links are keyed with Magento's encryption key.
+  Changing the key (`encryption:key:change`) lifts every block, resets the cooldown and invalidates links already
+  sent; only the hash is stored, so nothing can be re-hashed. After a key change, run
+  `bin/magento notification:key-change:cleanup --dry-run`, then without `--dry-run`: it removes the old rows and,
+  when blocks were lifted, posts an admin notification with their number (with Magento_AdminNotification; otherwise
+  only the log records it). Nothing is removed automatically. Subscriptions, contacts and consent records are not
+  affected; consent withdrawal and cart restore links are (see those modules).
 
 ## More
 

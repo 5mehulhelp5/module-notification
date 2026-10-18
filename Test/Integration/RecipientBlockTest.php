@@ -5,6 +5,9 @@ namespace CommerceKings\Notification\Test\Integration;
 
 use CommerceKings\Notification\Api\Channel;
 use CommerceKings\Notification\Model\ContactRepository;
+use CommerceKings\Notification\Model\Cooldown;
+use CommerceKings\Notification\Model\KeyChangeCleanup;
+use CommerceKings\Notification\Model\KeyFingerprint;
 use CommerceKings\Notification\Model\RecipientBlock;
 use CommerceKings\Notification\Model\SubscriptionManagement;
 use Magento\Customer\Api\CustomerRepositoryInterface;
@@ -132,5 +135,90 @@ class RecipientBlockTest extends TestCase
             ['contact_id', 'customer_id'])->where('reference_id IN (?)', $this->references));
         $this->assertSame([['contact_id' => (string)$otherContact, 'customer_id' => null]], $left,
             'the guest and the customer subscription of the address are gone; another address keeps its own');
+    }
+
+    public function testRowsCarryTheCurrentKeyFingerprint(): void
+    {
+        $db = $this->resource->getConnection();
+        $current = $this->om->get(KeyFingerprint::class)->current();
+        $this->blocks->block(Channel::EMAIL, $this->email('a'));
+        $this->assertSame($current, $db->fetchOne($db->select()->from($this->resource->getTableName(RecipientBlock::TABLE), 'key_id')
+            ->where('recipient_hash = ?', $this->hashOf($this->email('a')))));
+        $cooldown = $this->om->get(Cooldown::class);
+        $token = $cooldown->claim($this->email('b'));
+        $this->assertNotNull($token);
+        $this->assertSame($current, $db->fetchOne($db->select()->from($this->resource->getTableName('ck_notification_cooldown'), 'key_id')
+            ->where('recipient_hash = ?', $cooldown->hash($this->email('b')))));
+        $cooldown->release($this->email('b'), $token);
+    }
+
+    public function testAWriteMarksARowThatHadNoFingerprint(): void
+    {
+        $db = $this->resource->getConnection();
+        $current = $this->om->get(KeyFingerprint::class)->current();
+        $blocks = $this->resource->getTableName(RecipientBlock::TABLE);
+        $cooldowns = $this->resource->getTableName('ck_notification_cooldown');
+        $cooldown = $this->om->get(Cooldown::class);
+        $db->insert($blocks, ['recipient_hash' => $this->hashOf($this->email('a')), 'key_id' => null]);
+        $db->insert($cooldowns, ['recipient_hash' => $cooldown->hash($this->email('b')), 'key_id' => null,
+            'sent_at' => new \Zend_Db_Expr('NOW() - INTERVAL 400 DAY')]);
+        try {
+            $this->blocks->block(Channel::EMAIL, $this->email('a'));
+            $this->assertNotNull($token = $cooldown->claim($this->email('b')), 'an expired claim is renewed');
+            $this->assertSame($current, $db->fetchOne($db->select()->from($blocks, 'key_id')
+                ->where('recipient_hash = ?', $this->hashOf($this->email('a')))), 'blocking again marks the row');
+            $this->assertSame($current, $db->fetchOne($db->select()->from($cooldowns, 'key_id')
+                ->where('recipient_hash = ?', $cooldown->hash($this->email('b')))), 'a renewed claim marks the row');
+            $cooldown->release($this->email('b'), $token);
+        } finally {
+            $db->delete($cooldowns, ['recipient_hash = ?' => $cooldown->hash($this->email('b'))]);
+        }
+    }
+
+    public function testKeyChangeRemovesOldRowsKeepsCurrentAndUnmarkedOnesAndNotifiesOnce(): void
+    {
+        if (!$this->om->get(\Magento\Framework\Module\Manager::class)->isEnabled('Magento_AdminNotification')) {
+            $this->markTestSkipped('Magento_AdminNotification is disabled: the notice has no inbox to check.');
+        }
+        $db = $this->resource->getConnection();
+        $blocks = $this->resource->getTableName(RecipientBlock::TABLE);
+        $cooldowns = $this->resource->getTableName('ck_notification_cooldown');
+        $inbox = $this->resource->getTableName('adminnotification_inbox');
+        $this->blocks->block(Channel::EMAIL, $this->email('a'));                 // current key
+        $old = ['ck_old_' . $this->run . '_1', 'ck_old_' . $this->run . '_2'];   // an earlier key
+        foreach ($old as $hash) {
+            $db->insert($blocks, ['recipient_hash' => $hash, 'key_id' => 'earlier-key-id']);
+        }
+        $unmarked = 'ck_nokey_' . $this->run;                                     // written by older code mid-deploy
+        $db->insert($blocks, ['recipient_hash' => $unmarked, 'key_id' => null]);
+        $db->insert($cooldowns, ['recipient_hash' => 'ck_old_' . $this->run . '_c', 'key_id' => 'earlier-key-id']);
+        $lastNotice = (int)$db->fetchOne("SELECT MAX(notification_id) FROM {$inbox}");
+        try {
+            $removed = $this->om->get(KeyChangeCleanup::class)->execute();
+            $this->assertGreaterThanOrEqual(2, $removed['blocks']);
+            $this->assertGreaterThanOrEqual(1, $removed['cooldowns']);
+            $this->assertSame(0, (int)$db->fetchOne($db->select()->from($blocks, 'COUNT(*)')->where('recipient_hash IN (?)', $old)),
+                'old-key blocks removed');
+            $this->assertSame(1, (int)$db->fetchOne($db->select()->from($blocks, 'COUNT(*)')->where('recipient_hash = ?', $unmarked)),
+                'a row without a fingerprint is never treated as an old key');
+            $this->assertTrue($this->blocks->isBlocked(Channel::EMAIL, $this->email('a')), 'the current block stays');
+            $notices = $db->fetchAll($db->select()->from($inbox)->where('notification_id > ?', $lastNotice)
+                ->where('title LIKE ?', '%encryption key was changed%'));
+            $this->assertCount(1, $notices, 'one admin notification');
+            $this->assertStringContainsString('do-not-contact block(s) were lifted', $notices[0]['description']);
+            $this->om->get(KeyChangeCleanup::class)->execute();
+            $this->assertSame(array_column($notices, 'notification_id'), $db->fetchCol($db->select()
+                ->from($inbox, 'notification_id')->where('notification_id > ?', $lastNotice)
+                ->where('title LIKE ?', '%encryption key was changed%')), 'nothing old left: no second notification');
+        } finally {
+            $db->delete($blocks, ['recipient_hash IN (?)' => [...$old, $unmarked]]);
+            $db->delete($cooldowns, ['recipient_hash = ?' => 'ck_old_' . $this->run . '_c']);
+            $db->delete($inbox, ['notification_id > ?' => $lastNotice, 'title LIKE ?' => '%encryption key was changed%']);
+        }
+    }
+
+    private function hashOf(string $email): string
+    {
+        return (fn () => $this->hash(Channel::EMAIL, $email))->call($this->blocks);
     }
 }

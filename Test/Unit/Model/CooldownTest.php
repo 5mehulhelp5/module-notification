@@ -5,6 +5,7 @@ namespace CommerceKings\Notification\Test\Unit\Model;
 
 use CommerceKings\Notification\Model\Config;
 use CommerceKings\Notification\Model\Cooldown;
+use CommerceKings\Notification\Model\KeyFingerprint;
 use CommerceKings\Notification\Test\Unit\DbTestTrait;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Math\Random;
@@ -18,6 +19,9 @@ class CooldownTest extends TestCase
     {
         $encryptor = $this->createStub(EncryptorInterface::class);
         $encryptor->method('hash')->willReturnCallback(function ($input) {
+            if ($input === 'commercekings_notification_key_id') {
+                return str_repeat('k', 64);   // the key fingerprint stored with the row
+            }
             $this->assertSame('commercekings_notification_recipient|guest@example.test', $input);
             return str_repeat('a', 64);
         });
@@ -25,7 +29,7 @@ class CooldownTest extends TestCase
         $random->method('getRandomString')->willReturn(str_repeat('b', 32));
         $config = $this->createStub(Config::class);
         $config->method('getCooldownDays')->willReturn($days);
-        return new Cooldown($this->resource(), $encryptor, $random, $config);
+        return new Cooldown($this->resource(), $encryptor, $random, $config, new KeyFingerprint($encryptor));
     }
 
     public function testNormalizationUsesTheNativeKeyedHash(): void
@@ -42,7 +46,8 @@ class CooldownTest extends TestCase
             $inputs[] = $input;
             return md5($input);
         });
-        $cooldown = new Cooldown($this->resource(), $encryptor, $this->createStub(Random::class), $this->createStub(Config::class));
+        $cooldown = new Cooldown($this->resource(), $encryptor, $this->createStub(Random::class), $this->createStub(Config::class),
+            new KeyFingerprint($encryptor));
         $composed = "Jos\u{00E9}@Example.Test";      // é as one code point
         $decomposed = " jose\u{0301}@example.test ";  // e + combining acute
         $this->assertSame($cooldown->hash($composed), $cooldown->hash($decomposed));
@@ -61,8 +66,11 @@ class CooldownTest extends TestCase
         $this->assertNull($cooldown->claim('guest@example.test'));
         $this->fetchOneResult = str_repeat('b', 32);
         $this->assertSame(str_repeat('b', 32), $cooldown->claim('guest@example.test'));
-        $this->assertSame([str_repeat('a', 64), str_repeat('b', 32)], $this->queries[0][1]);
+        $this->assertSame([str_repeat('a', 64), str_repeat('b', 32), str_repeat('k', 16)], $this->queries[0][1],
+            'hash, claim token and the key fingerprint');
         $this->assertStringContainsString('INTERVAL 7 DAY', $this->queries[0][0]);
+        $this->assertStringContainsString('key_id = VALUES(key_id)', $this->queries[0][0],
+            'a renewed claim carries the current key, so a key-change cleanup keeps it');
     }
 
     public function testReleaseRequiresTheClaimToken(): void

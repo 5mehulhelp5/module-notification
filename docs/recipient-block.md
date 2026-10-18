@@ -73,6 +73,30 @@ Global across stores, like the cooldown.
 - End-to-end on a sandbox: 3 attacker carts → block → no more email → a new attempt restarts the timer → 90 quiet
   days (simulated) → cron lifts the block → the next cart is reminded; plus Undo.
 
+## Encryption key change
+
+The hashes and links are keyed with Magento's encryption key, and only hashes are stored, so a key change cannot
+be re-hashed: every block lifts and links already sent expire. Each row stores a fingerprint of its key (`key_id`).
+Subscriptions, contacts and consent records are not affected.
+
+After `bin/magento encryption:key:change`, on a server with the shop's `env.php`:
+
+```sh
+bin/magento notification:key-change:cleanup --dry-run   # counts the rows of an earlier key, removes nothing
+bin/magento notification:key-change:cleanup             # removes them
+```
+
+The cleanup logs the counts and, when blocks were lifted, posts one admin notification with their number, so the
+shop owner knows that recipients who had stopped emails may get them again. It never runs automatically: a server
+with a different key (a build box, a wrong `env.php`) cannot remove anything on its own. Skipping it is harmless –
+the old rows only take space until the normal cleanups remove them.
+
+- Rows without a fingerprint (written by code from before it, e.g. a consumer not restarted after a deploy) are
+  never treated as old; they age out through the normal cleanups.
+- Every write stores the current fingerprint; `setup:upgrade` only adds the column and never changes rows.
+- Run the command where the shop's `env.php` is: on a server with another key every row looks old (the dry run
+  shows it – a count close to all rows means the wrong key).
+
 ## Later
 
 - Bounce and spam-complaint feedback from providers, blocking a recipient automatically.

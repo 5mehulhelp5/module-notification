@@ -22,7 +22,8 @@ class RecipientBlock implements RecipientBlockInterface
         private readonly EncryptorInterface $encryptor,
         private readonly UrlInterface $url,
         private readonly Config $config,
-        private readonly RecipientNormalizerPool $normalizers
+        private readonly RecipientNormalizerPool $normalizers,
+        private readonly KeyFingerprint $fingerprint
     ) {
     }
 
@@ -42,7 +43,8 @@ class RecipientBlock implements RecipientBlockInterface
                 'recipient_hash' => $this->hash($channel, $recipient),
                 'blocked_at' => new \Zend_Db_Expr('NOW()'),
                 'last_attempt_at' => new \Zend_Db_Expr('NOW()'),
-            ], ['last_attempt_at']);
+                'key_id' => $this->fingerprint->current(),
+            ], ['last_attempt_at', 'key_id']);
             if ($channel === Channel::EMAIL) {
                 $this->removeSubscriptions($recipient);
             }

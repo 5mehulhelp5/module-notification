@@ -3,13 +3,15 @@
         "column": {
             "recipient_hash": true,
             "sent_at": true,
-            "claim_token": true
+            "claim_token": true,
+            "key_id": true
         },
         "constraint": {
             "PRIMARY": true
         },
         "index": {
-            "CK_NOTIFICATION_COOLDOWN_SENT_AT": true
+            "CK_NOTIFICATION_COOLDOWN_SENT_AT": true,
+            "CK_NOTIFICATION_COOLDOWN_KEY_ID": true
         }
     },
     "ck_notification_contact": {
@@ -62,13 +64,15 @@
         "column": {
             "recipient_hash": true,
             "blocked_at": true,
-            "last_attempt_at": true
+            "last_attempt_at": true,
+            "key_id": true
         },
         "constraint": {
             "PRIMARY": true
         },
         "index": {
-            "CK_NOTIFICATION_RECIPIENT_BLOCK_LAST_ATTEMPT_AT": true
+            "CK_NOTIFICATION_RECIPIENT_BLOCK_LAST_ATTEMPT_AT": true,
+            "CK_NOTIFICATION_RECIPIENT_BLOCK_KEY_ID": true
         }
     }
 }

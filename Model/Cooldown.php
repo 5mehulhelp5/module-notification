@@ -17,7 +17,8 @@ class Cooldown implements CooldownInterface
         private readonly ResourceConnection $resource,
         private readonly EncryptorInterface $encryptor,
         private readonly Random $random,
-        private readonly Config $config
+        private readonly Config $config,
+        private readonly KeyFingerprint $fingerprint
     ) {
     }
 
@@ -52,9 +53,11 @@ class Cooldown implements CooldownInterface
         $token = $this->random->getRandomString(32, '0123456789abcdef');
         $days = $this->config->getCooldownDays();
         // Assign the token before the timestamp: both conditions must inspect the old timestamp.
-        $db->query("INSERT INTO {$table} (recipient_hash, sent_at, claim_token) VALUES (?, NOW(), ?)"
-            . " ON DUPLICATE KEY UPDATE claim_token = IF(sent_at < NOW() - INTERVAL {$days} DAY, VALUES(claim_token), claim_token),"
-            . " sent_at = IF(sent_at < NOW() - INTERVAL {$days} DAY, NOW(), sent_at)", [$hash, $token]);
+        $db->query("INSERT INTO {$table} (recipient_hash, sent_at, claim_token, key_id) VALUES (?, NOW(), ?, ?)"
+            . " ON DUPLICATE KEY UPDATE"
+            . " claim_token = IF(sent_at < NOW() - INTERVAL {$days} DAY, VALUES(claim_token), claim_token),"
+            . " sent_at = IF(sent_at < NOW() - INTERVAL {$days} DAY, NOW(), sent_at), key_id = VALUES(key_id)",
+            [$hash, $token, $this->fingerprint->current()]);
         $owner = $db->fetchOne($db->select()->from($this->resource->getTableName(self::TABLE), 'claim_token')
             ->where('recipient_hash = ?', $hash));
         return is_string($owner) && hash_equals($token, $owner) ? $token : null;
