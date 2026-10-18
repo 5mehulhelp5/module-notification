@@ -53,6 +53,9 @@ Each stop keeps the strongest reason it was given (reply, then link, then undeli
 | `REASON_REPLY` | a STOP reply or button | withdrawn | only by `resume()` (a START reply) |
 | `REASON_UNDELIVERABLE` | the service reported the address undeliverable | kept | by the cron |
 
+Every reason removes the recipient's stoppable subscriptions on the channel. An undeliverable stop keeps the consents,
+not the subscriptions: once it lifts, the shopper signs up again (the kept consent is reused).
+
 - **Automatically:** a nightly cron deletes link and undeliverable stops whose `last_attempt_at` is older than *N*
   days (default 90). An attacker who keeps trying keeps the stop alive; once they stop, it lifts by itself.
 - **Undo** on the page right after stopping – only for a link stop, so a stop link never lifts a STOP reply.

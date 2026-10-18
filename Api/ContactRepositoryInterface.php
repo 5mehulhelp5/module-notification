@@ -12,6 +12,12 @@ namespace CommerceKings\Notification\Api;
 interface ContactRepositoryInterface
 {
     /**
+     * The contacts table (contact_id, website_id, channel, recipient, ...), named for a module's own cleanup, e.g.
+     * deleting its rows whose contact no longer exists; rows are written only through this interface.
+     */
+    public const TABLE = 'ck_notification_contact';
+
+    /**
      * The contact for this address on the channel, created on first use. One contact per website, channel and
      * address in its channel's normal form (email: letter case and surrounding spaces ignored, every other difference
      * – e.g. an accent – is another address; other channels: their RecipientNormalizerInterface).

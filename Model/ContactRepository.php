@@ -10,8 +10,6 @@ use Magento\Framework\App\ResourceConnection;
 /** Guest recipients, one row per website, channel and address; customers keep using their account. */
 class ContactRepository implements ContactRepositoryInterface
 {
-    public const TABLE = 'ck_notification_contact';
-
     public function __construct(
         private readonly ResourceConnection $resource,
         private readonly RecipientNormalizerPool $normalizers

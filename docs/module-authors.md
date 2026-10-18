@@ -124,6 +124,9 @@ new channel (e.g. `telegram`) brings its own normalizer – without one it takes
 6. A timeout or lost connection after the request was sent: throw `Exception\MessageSentException`, not a plain
    error – the service may have accepted it, and a retry could deliver it twice (a missed reminder is better than a
    duplicate).
+7. Keep texts short: an SMS segment holds 160 GSM-7 characters, or 70 when any character needs Unicode (an accent
+   outside GSM-7, an emoji); longer texts are sent and billed as several segments of 153 / 67. Name your brand and
+   end with "Reply STOP to stop"; a long link costs segments, so prefer a short one.
 
 ### Templates (e.g. WhatsApp)
 
@@ -139,7 +142,10 @@ counts a failed attempt.
 
 - **Verify the signature first** (e.g. Twilio's `X-Twilio-Signature`) against the store's configured public URL, not
   the request's (a proxy changes it), and answer 403 without doing anything else when it fails. The controller
-  implements `CsrfAwareActionInterface`; the service posts without a store, so check against each configured account.
+  implements `CsrfAwareActionInterface`.
+- **One webhook URL for several stores:** the service posts without a store or website. Identify the account by the
+  request – try the signature with each configured account's credentials (per website) and use the one that matches;
+  its scope tells you the website. Refuse a request no account signs.
 - **Normalize the sender** before anything else: strip the service's prefixes (e.g. `whatsapp:`) and add a missing
   `+` (some services, e.g. Infobip, send `381601234567`), so `$from` is E.164 like the stored contacts. Every
   `StopListInterface` method (`stop()`, `resume()`, `touch()`, `isStopped()`, `getReason()`, `getStopUrl()`) throws
@@ -153,14 +159,17 @@ counts a failed attempt.
   are dropped from then on, in every website, its stoppable subscriptions and checkbox consents removed, and the stop
   holds until START (no lift timer; the stop link's Undo cannot lift it). Service messages still go out. Texts say
   "Reply STOP to stop" – a stop link (`getStopUrl()`) works too but is long (~200 characters).
+- **HELP** (INFO): leave it to the service's own auto-reply (set it up with your brand and how to stop); there is
+  nothing for Notification to do.
 - **START** (UNSTOP): `resume($channel, $from)`. It lifts the stop only – the removed subscriptions do not come back;
   the recipient signs up again (with consent).
-- **Undeliverable numbers** (invalid, a landline, not reachable): when the service refuses at once, `send()` throws,
-  so the feature counts a failed attempt and gives up after its retries. When it reports later (a status callback,
-  e.g. Twilio 30003/30005/30006, 21211), call `stop($channel, $to, StopListInterface::REASON_UNDELIVERABLE)`: the number
-  is suppressed, keeps its consents and lifts after the configured days. A number stopped at the carrier (e.g. Twilio
-  21610) is an opt-out: `stop(..., REASON_REPLY)`, and throw when it was refused at once. Keep personal data out of
-  your delivery log.
+- **Undeliverable numbers** (invalid, a landline, not reachable): when the service refuses at once, `send()` throws, so
+  the feature counts a failed attempt and gives up after its retries. When it reports later (a status callback, e.g.
+  Twilio 30003/30005/30006, 21211), call `stop($channel, $to, StopListInterface::REASON_UNDELIVERABLE)`: the number is
+  suppressed and keeps its consents, but its stoppable subscriptions are removed as with any stop – when the stop lifts
+  after the configured days, the shopper signs up again (the kept consent is reused). A number stopped at the carrier
+  (e.g. Twilio 21610) is an opt-out: `stop(..., REASON_REPLY)`, and throw when it was refused at once. Keep personal
+  data out of your delivery log.
 
 ### Opt-in confirmation
 
@@ -181,7 +190,8 @@ $first = $db->update($state->getTableName(), ['sent_at' => new \Zend_Db_Expr('NO
 
 The claim holds until you delete the row: delete it when the number should be confirmed again (e.g. after a stop).
 Notification's daily cleanup removes delivery state only for subscription types, so remove these rows yourself (e.g.
-a cron deleting rows whose contact no longer exists). Queue it rather than sending
+a cron deleting rows whose contact no longer exists in `Api\ContactRepositoryInterface::TABLE`). Queue it rather
+than sending
 from the request: a `NotificationTypeInterface` of your own in `Model\TypePool`, published with
 `Api\QueueInterface::publish('my_optin_confirmation', (string)$subscriptionId)`; its `process()` reads the
 subscription (`SubscriptionRepositoryInterface::get()`, `getRecipient()`) and sends with `useCooldown: false` (the
@@ -383,10 +393,11 @@ the same cart gets a fresh check and is refused. Evidence per consent in `ck_not
 its hash, the time, the store view, a keyed hash of the IP address, and the number only as a keyed hash
 (`Model\KeyedHash`, so it still matches after a key change) – enough to prove the consent for a given number and to
 find it on a stop, without storing the number. A stop (`StopListInterface::stop()`, e.g. a STOP reply) withdraws all
-of the number's consents. Active consents are kept; withdrawn ones for *Keep withdrawn consents (days)*, default 1825
-(5 years), then a daily cron deletes them. A checkbox can be ticked for someone else's number: send an
+of the number's consents, except an undeliverable stop (`REASON_UNDELIVERABLE`), which keeps them. Active consents
+are kept; withdrawn ones for *Keep withdrawn consents (days)*, default 1825
+(5 years), then a daily cron deletes them. A checkbox can be ticked for someone else's number: we advise an
 [opt-in confirmation](#opt-in-confirmation) (on `commercekings_notification_subscription_saved` when
-`first_for_address`) before marketing.
+`first_for_address`) before marketing – Notification does not enforce it; your provider or feature sends it.
 
 ## Opt-out notice
 
