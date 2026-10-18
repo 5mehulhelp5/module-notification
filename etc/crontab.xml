@@ -7,6 +7,9 @@
         <job name="commercekings_notification_subscription_cleanup" instance="CommerceKings\Notification\Cron\CleanUpSubscriptions" method="execute">
             <schedule>10 3 * * *</schedule>
         </job>
+        <job name="commercekings_notification_delivery_state_cleanup" instance="CommerceKings\Notification\Cron\CleanUpDeliveryState" method="execute">
+            <schedule>12 3 * * *</schedule>
+        </job>
         <job name="commercekings_notification_contact_cleanup" instance="CommerceKings\Notification\Cron\CleanUpContacts" method="execute">
             <schedule>15 3 * * *</schedule>
         </job>

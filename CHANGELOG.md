@@ -10,6 +10,12 @@
   (`ck_notification_address_consent`). Unchecking or a stop withdraws it and ends the subscriptions on it; withdrawn
   evidence is deleted after *Keep withdrawn consents (days)*, default 1825. Luma checkbox
   (`address-consent.phtml`, `js/address-consent`) on a framework-free `js/address-consent-core` (`record()`).
+- **Delivery state:** `Api\DeliveryStateInterface` and `ck_notification_delivery_state` – send history for every
+  feature (`queued_at`, `sent_at`, `skip_until`, `failed_sends`, `delivery_version`) per subscription key (type,
+  reference, subscriber), not per subscription id, so it survives a withdrawal and a new sign-up. The table is a
+  documented contract for atomic claims (`joinCondition()`, `keyCondition()` with aliases passed in, `ensure()`,
+  `load()`); the policy stays the feature's. A daily cleanup removes rows of vanished references and, after 90 days,
+  a person's rows without a subscription.
 - **Messaging in Notification:** `Channel::SMS` and `Channel::WHATSAPP`, one code per channel for every provider
   (shared contacts, stop list, cooldown and quiet hours). Phone numbers of both are strict E.164 out of the box
   (`Model\PhoneNormalizer`: "+", a country code and 8–15 digits; separators left out, anything else refused); a

@@ -11,8 +11,8 @@ use CommerceKings\Notification\Api\Data\Target;
  * owns the rest: email rules, the permission for getPurpose(), the contact and the subscription row.
  *
  * Messages of a subscription type are queued with the subscription id; the consumer only hands over
- * subscriptions that still exist with a valid permission. A feature keeps its own send history keyed by
- * what "once" means for it (e.g. the cart), not by the subscription, which a withdrawal deletes.
+ * subscriptions that still exist with a valid permission. Send history belongs to the subscription key (type,
+ * reference, subscriber), not to the subscription id, which a withdrawal deletes: DeliveryStateInterface keeps it so.
  *
  * @api
  */

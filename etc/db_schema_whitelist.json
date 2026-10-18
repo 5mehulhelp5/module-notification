@@ -91,5 +91,26 @@
             "PRIMARY": true,
             "CK_NOTIFICATION_ADDRESS_CONSENT_REFERENCE": true
         }
+    },
+    "ck_notification_delivery_state": {
+        "column": {
+            "type": true,
+            "reference_id": true,
+            "subject_key": true,
+            "queued_at": true,
+            "sent_at": true,
+            "skip_until": true,
+            "failed_sends": true,
+            "delivery_version": true,
+            "updated_at": true
+        },
+        "index": {
+            "CK_NOTIFICATION_DELIVERY_STATE_TYPE_QUEUED_AT": true,
+            "CK_NOTIFICATION_DELIVERY_STATE_TYPE_SENT_AT": true,
+            "CK_NOTIFICATION_DELIVERY_STATE_UPDATED_AT": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
     }
 }

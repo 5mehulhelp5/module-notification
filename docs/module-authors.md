@@ -256,8 +256,16 @@ For notifications a visitor signs up for, also:
        </arguments>
    </virtualType>
    ```
-4. Keep your send history keyed by what "once" means for you (e.g. the cart), never by the subscription id:
-   a withdrawal deletes the subscription, and subscribing again creates a new one.
+4. Keep your send history per subscription key, not per subscription id: a withdrawal deletes the subscription,
+   and subscribing again creates a new one – "already sent" must survive that. `Api\DeliveryStateInterface` does it
+   for you: one row per type, reference and subscriber (`subject_key`: `''` for a single type, so one per reference –
+   e.g. per cart), with `queued_at`, `sent_at`, `skip_until`, `failed_sends` and `delivery_version`. Claim with one
+   atomic UPDATE that joins it to the subscription (`joinCondition('d', 's')`) and names the key
+   (`keyCondition($type, $referenceId, $subjectKey, 'd')`); `ensure()` the row first. Notification only stores it –
+   what "due" means (once, again after N days, a retry backoff, an hourly cap) is yours; filter by your `type` in
+   statements of your own (the table is shared). Rows go with their reference (your `orphanCondition()`, daily); a
+   person's rows also go `DeliveryStateInterface::RETENTION_DAYS` (90) after their last change once no subscription
+   has their key.
 5. **Own consent per address:** `SubscriptionPermissionInterface::check($type, $target, $recipient)` gets the
    address the subscription will be stored with, in the sender's form (normalized; email trimmed) – the guest's
    address, the customer's account email on email types, the number a customer gave on other channels. A type's own

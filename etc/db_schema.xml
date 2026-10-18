@@ -120,4 +120,38 @@
             <column name="withdrawn_at"/>
         </index>
     </table>
+    <!-- send state per subscription key (type, reference, subscriber), not per subscription id: it survives a
+         withdrawal and a new sign-up. No foreign key - the daily cleanup removes rows of vanished references
+         (each type's orphanCondition()) and, after Api\DeliveryStateInterface::RETENTION_DAYS, a person's rows
+         without a subscription -->
+    <table name="ck_notification_delivery_state" resource="default" engine="innodb" comment="CK notification: send state per subscription key">
+        <column xsi:type="varchar" name="type" nullable="false" length="64" comment="Notification type code"/>
+        <column xsi:type="int" name="reference_id" unsigned="true" nullable="false" comment="The type's own id (quote, product, ...)"/>
+        <column xsi:type="varchar" name="subject_key" nullable="false" length="32" default="" comment="'' for single types, else c:contact or u:customer"/>
+        <column xsi:type="timestamp" name="queued_at" on_update="false" nullable="true" comment="Waiting in the queue since"/>
+        <column xsi:type="timestamp" name="sent_at" on_update="false" nullable="true" comment="Last sent"/>
+        <column xsi:type="timestamp" name="skip_until" on_update="false" nullable="true" comment="Left out until then (cooldown, failed send, quiet hours)"/>
+        <column xsi:type="smallint" name="failed_sends" unsigned="true" nullable="false" default="0" comment="Failed send attempts in a row"/>
+        <column xsi:type="int" name="delivery_version" unsigned="true" nullable="false" default="0" comment="Raised by every delivery claim"/>
+        <column xsi:type="timestamp" name="updated_at" on_update="true" nullable="false" default="CURRENT_TIMESTAMP" comment="Last change"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="type"/>
+            <column name="reference_id"/>
+            <column name="subject_key"/>
+        </constraint>
+        <!-- stuck queue marks and queued counts per type -->
+        <index referenceId="CK_NOTIFICATION_DELIVERY_STATE_TYPE_QUEUED_AT" indexType="btree">
+            <column name="type"/>
+            <column name="queued_at"/>
+        </index>
+        <!-- sent in the last hour per type (hourly caps) -->
+        <index referenceId="CK_NOTIFICATION_DELIVERY_STATE_TYPE_SENT_AT" indexType="btree">
+            <column name="type"/>
+            <column name="sent_at"/>
+        </index>
+        <!-- the retention cleanup -->
+        <index referenceId="CK_NOTIFICATION_DELIVERY_STATE_UPDATED_AT" indexType="btree">
+            <column name="updated_at"/>
+        </index>
+    </table>
 </schema>

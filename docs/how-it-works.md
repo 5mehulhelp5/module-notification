@@ -28,6 +28,12 @@ Each module answers one question:
   `Api\ContactReferenceInterface` (`Model\ContactReferencePool` "references").
   Guest capture acquires the contact and creates its subscription in one short transaction, so cleanup
   cannot remove an old contact while it is being reused. Failed storage rolls back both writes.
+- **Delivery state** (`Api\DeliveryStateInterface`, `ck_notification_delivery_state`): each feature's send history
+  (`queued_at`, `sent_at`, `skip_until`, `failed_sends`, `delivery_version`) per subscription key – type, reference,
+  subscriber – not per subscription id, so a withdrawal and a new sign-up keep "already sent". No foreign key: cron
+  `commercekings_notification_delivery_state_cleanup` (daily 03:12) removes rows of vanished references (the type's
+  `orphanCondition()`) and, after 90 days without a change, a person's rows that no subscription uses. The policy
+  (what is due) stays the feature's.
 - **One queue consumer** `commerceKingsNotificationSend` for every type. Messages are `<type>|<reference>`;
   for subscription types the reference is the subscription id, and only a subscription that still exists with
   a valid permission is handed over.
