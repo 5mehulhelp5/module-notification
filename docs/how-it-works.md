@@ -55,7 +55,8 @@ Each module answers one question:
   (*General > Locale Options*); on the day clocks go forward a time in the skipped hour means the first time after it,
   on the day they go back a time in the repeated hour means its first occurrence. Rules based on the recipient's local
   time – e.g. US state laws such as Florida's FTSA (08:00–20:00 in the recipient's time zone) – need a
-  `QuietHoursInterface` preference that knows it (a planned SMS provider module adds one).
+  `QuietHoursInterface` preference that knows it (a planned SMS provider module adds one): the sender asks with the
+  recipient; asked without one (a finder, before it knows the recipients), such a rule answers "not quiet".
 - **Encryption key change**: stops and stop links are checked under every key in `env.php` (`Model\KeyedHash`); a
   stop found under an older key moves to the newest one, and an older-key link can stop but never undo. Nothing to
   run: leftover rows go with the normal cleanups (cooldown period, lift days).

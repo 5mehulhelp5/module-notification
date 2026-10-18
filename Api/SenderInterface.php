@@ -16,8 +16,8 @@ interface SenderInterface
     /** A stoppable delivery to a recipient on the do-not-contact list; nothing was sent. */
     public const STOPPED = 'recipient stopped';
     /**
-     * A stoppable delivery in quiet hours (QuietHoursInterface): held, not dropped - nothing was sent or claimed;
-     * send it again at QuietHoursInterface::nextAllowedAt().
+     * A stoppable delivery in quiet hours for its recipient (QuietHoursInterface): held, not dropped - nothing was
+     * sent or claimed; send it again at QuietHoursInterface::nextAllowedAt() for the same store, channel and recipient.
      */
     public const QUIET_HOURS = 'quiet hours';
 

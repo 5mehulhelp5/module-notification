@@ -95,6 +95,17 @@ class QuietHoursTest extends TestCase
             '22:00 in New York: until 08:00 there, in UTC');
     }
 
+    /** The store's window is the same for everyone: asked with a recipient or for the whole store, one answer. */
+    public function testTheStoreWindowIgnoresTheRecipient(): void
+    {
+        $this->window('21,00,00', '08,00,00');
+        $quietHours = $this->quietHours('2026-06-10 22:00');
+        $this->assertTrue($quietHours->isQuiet(1, 'sms', '+381601234567'));
+        $this->assertTrue($quietHours->isQuiet(1, 'sms', null));
+        $this->assertEquals($quietHours->nextAllowedAt(1, 'sms'), $quietHours->nextAllowedAt(1, 'sms', '+12125550100'));
+        $this->assertFalse($this->quietHours('2026-06-10 12:00')->isQuiet(1, 'sms', '+381601234567'));
+    }
+
     public function testChannels(): void
     {
         $this->window('21,00,00', '08,00,00');

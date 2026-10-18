@@ -2,12 +2,16 @@
 
 ## Unreleased
 
-- **Quiet hours:** `QuietHoursInterface` (`isQuiet`, `nextAllowedAt`) and *Notifications > Quiet hours* (per store
+- **Notification type in deliveries:** `Delivery::$type` (and `Delivery::text(..., type:)`), the type code or `''`;
+  a provider with templates of its own (e.g. WhatsApp) maps type and locale to one. `Delivery::$templateId` is the
+  channel's template (an email template id, or e.g. a WhatsApp/Twilio content id).
+- **Quiet hours:** `QuietHoursInterface` (`isQuiet`, `nextAllowedAt`, each with an optional recipient: the sender
+  asks per recipient, `null` asks about the whole store) and *Notifications > Quiet hours* (per store
   view: from – to, may cross midnight; channels, by default every channel except email; off by default). The sender
   holds a stoppable delivery in quiet hours with the new status `SenderInterface::QUIET_HOURS` before any cooldown
   claim: held, not dropped – the feature sends it again at `nextAllowedAt()`. Service messages are never held. Times
   are in the store's time zone; rules in the recipient's local time (e.g. Florida's FTSA, 08:00–20:00) need a
-  `QuietHoursInterface` preference.
+  `QuietHoursInterface` preference (answering `false` for `null`).
 - **Channel-generic sign-ups:** contacts store `channel` and `recipient` (an email address, a phone number, …);
   `SubscriptionTypeInterface::getChannel()` says which channel a type's subscribers are reached on, and guests
   subscribe with one `recipient` field (REST `{"type", "reference", "recipient"}`), validated by the channel's

@@ -13,8 +13,8 @@ use Magento\Store\Model\ScopeInterface;
 /**
  * The store's quiet hours (Stores > Configuration > CommerceKings > Notifications > Quiet hours), in the store's time
  * zone: a daily window from - to that may cross midnight, for the selected channels (none selected: every channel
- * except email). Wall-clock times: on the day clocks go forward, a time in the skipped hour means the first time after
- * it; on the day they go back, a time in the repeated hour means its first occurrence.
+ * except email), the same for every recipient. Wall-clock times: on the day clocks go forward, a time in the skipped
+ * hour means the first time after it; on the day they go back, a time in the repeated hour means its first occurrence.
  */
 class QuietHours implements QuietHoursInterface
 {
@@ -27,12 +27,13 @@ class QuietHours implements QuietHoursInterface
     ) {
     }
 
-    public function isQuiet(int $storeId, string $channel): bool
+    /** The store's window is the same for every recipient: the recipient is not needed. */
+    public function isQuiet(int $storeId, string $channel, ?string $recipient = null): bool
     {
         return $this->windowEnd($storeId, $channel) !== null;
     }
 
-    public function nextAllowedAt(int $storeId, string $channel): ?\DateTimeImmutable
+    public function nextAllowedAt(int $storeId, string $channel, ?string $recipient = null): ?\DateTimeImmutable
     {
         return $this->windowEnd($storeId, $channel)?->setTimezone(new \DateTimeZone('UTC'));
     }
@@ -49,7 +50,7 @@ class QuietHours implements QuietHoursInterface
         if ($from === null || $to === null || $from === $to) {
             return null;
         }
-        $zone = (string)$this->timezone->getConfigTimezone(ScopeInterface::SCOPE_STORE, $storeId);
+        $zone = (string)$this->timezone->getConfigTimezone(ScopeInterface::SCOPE_STORE, (string)$storeId);
         $now = (new \DateTimeImmutable('@' . $this->dateTime->gmtTimestamp()))
             ->setTimezone(new \DateTimeZone($zone !== '' ? $zone : 'UTC'));
         // Compared as instants, not wall-clock minutes, so a window is never interrupted when clocks go back.

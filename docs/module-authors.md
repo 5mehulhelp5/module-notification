@@ -25,11 +25,14 @@ unsubscribe link of its own gets the stop link as its one-click URL. Marketing t
 `{{depend stop_url}}…{{var stop_url}}…{{/depend}}`, the URL from
 `Api\StopListInterface::getStopUrl(Channel::EMAIL, $email, $storeId)` ('' when the shop turned it off).
 `SenderInterface::send()` returns `SENT`, `COOLDOWN`, `RECIPIENT_CHANGED`, `STOPPED` or `QUIET_HOURS`; on anything
-but `SENT`, undo your own claim. `QUIET_HOURS` means held, not dropped: a stoppable delivery in the store's quiet hours
-for its channel; nothing was sent or claimed. Send it again at `QuietHoursInterface::nextAllowedAt($storeId, $channel)`
-(UTC), keeping your own retry state (it is not a failure); a finder can leave out a store while `isQuiet()`.
-Deliveries with `$stoppable = false` are never held. Replace the cooldown with a `CooldownInterface` preference, the
-quiet hours with a `QuietHoursInterface` preference (e.g. one that uses the recipient's time zone).
+but `SENT`, undo your own claim. `QUIET_HOURS` means held, not dropped: a stoppable delivery in quiet hours for its
+channel and recipient; nothing was sent or claimed. Send it again at
+`QuietHoursInterface::nextAllowedAt($storeId, $channel, $recipient)` (UTC), keeping your own retry state (it is not a
+failure). A finder can leave out a store while `isQuiet($storeId, $channel)` – without a recipient it asks whether
+everyone is held, and a per-recipient rule answers no. Deliveries with `$stoppable = false` are never held. Pass your
+notification type code as `Delivery::$type` (e.g. `type: 'cart_reminder'`), so providers with templates of their own
+can pick one. Replace the cooldown with a `CooldownInterface` preference, the quiet hours with a `QuietHoursInterface`
+preference (e.g. one that uses the recipient's time zone: answer for the recipient, and `false` for `null`).
 
 ## Providers
 
@@ -75,6 +78,16 @@ separate opt-in, see [Permission](#permission)) and its content (`DeliveryConten
 With one SMS provider installed it is used automatically; to choose between several, set
 `commercekings_notification/general/provider_sms` to the provider's code (your module may add the field).
 Any other channel works the same way: pick a code (e.g. `whatsapp`) and use it in both places.
+
+### Template-based channels (e.g. WhatsApp)
+
+A channel that only sends approved templates (a WhatsApp template, a Twilio Content SID) keeps the mapping in the
+provider module, not in the feature: a setting per notification type and locale – `$delivery->type` and the store's
+locale (`send()` runs in the store's environment, so read `general/locale/code` for `$delivery->storeId`) – gives
+the template, and the template's placeholders name the variables to fill from `DeliveryContent::$vars` (plain text
+only, e.g. `customer_name`, `restore_url`; leave out HTML such as `items_html`). `Delivery::$templateId` is the
+channel's template when the feature sets one. A delivery of an unknown type (`''`) or without a mapping cannot be
+sent: throw, so the sender releases the cooldown claim and the feature counts a failed attempt.
 
 ## Permission
 

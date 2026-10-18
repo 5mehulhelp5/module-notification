@@ -45,6 +45,10 @@ class SenderTest extends TestCase
     private string $stopUrl = '';
     /** channels in quiet hours */
     private array $quiet = [];
+    /** "channel:recipient" in quiet hours of their own (a recipient-time-zone preference) */
+    private array $quietRecipients = [];
+    /** quiet hours calls: [store, channel, recipient] */
+    private array $quietAsked = [];
 
     /** @param object|null $mailMessage the transport's message; null: Magento 2.4.8+ (Symfony) */
     /** @param ProviderInterface[] $extra more providers; $selected the stored provider code */
@@ -97,7 +101,11 @@ class SenderTest extends TestCase
         $stopList->method('isStopped')->willReturnCallback(fn ($channel, $recipient) => in_array($channel . ':' . $recipient, $this->stopped, true));
         $stopList->method('getStopUrl')->willReturnCallback(fn () => $this->stopUrl);
         $quietHours = $this->createStub(\CommerceKings\Notification\Api\QuietHoursInterface::class);
-        $quietHours->method('isQuiet')->willReturnCallback(fn ($storeId, $channel) => in_array($channel, $this->quiet, true));
+        $quietHours->method('isQuiet')->willReturnCallback(function ($storeId, $channel, $recipient = null) {
+            $this->quietAsked[] = [$storeId, $channel, $recipient];
+            return in_array($channel, $this->quiet, true)
+                || ($recipient !== null && in_array($channel . ':' . $recipient, $this->quietRecipients, true));
+        });
         return new Sender($this->pool, $emulation, $cooldown, $config, $logger, new RecipientNormalizerPool($normalizers),
             $stopList, $quietHours);
     }
@@ -226,6 +234,7 @@ class SenderTest extends TestCase
                 throw $error;
             }
             $this->mail['text'] = [$delivery->recipient, $content->text];
+            $this->mail['text_type'] = $delivery->type;
             $this->mail['text_one_click'] = $content->oneClickUnsubscribeUrl;
         });
         return $provider;
@@ -309,6 +318,36 @@ class SenderTest extends TestCase
         $this->assertSame(SenderInterface::SENT, $sender->send($this->message()), 'email is not in quiet hours here');
         $this->assertSame(SenderInterface::QUIET_HOURS, $sender->send(Delivery::text(3, 'text', '+381601234567',
             fn () => new DeliveryContent([], text: 'Your cart is waiting'))));
+    }
+
+    /** Quiet hours are asked with the normalized recipient, so a preference can hold one and send another. */
+    public function testQuietHoursAreAskedPerRecipient(): void
+    {
+        $digits = new class implements RecipientNormalizerInterface {
+            public function normalize(string $recipient): string { return '+' . preg_replace('/\D/', '', $recipient); }
+        };
+        $this->quietRecipients = ['text:+12125550100'];
+        $sender = $this->sender(extra: [$this->textProvider()], normalizers: ['text' => $digits]);
+        $text = fn (string $to) => Delivery::text(3, 'text', $to, fn () => new DeliveryContent([], text: 'Your cart is waiting'));
+        $this->assertSame(SenderInterface::QUIET_HOURS, $sender->send($text('+1 (212) 555-0100')), 'night in New York');
+        $this->assertSame(SenderInterface::SENT, $sender->send($text('+381 60 123 4567')), 'day in Belgrade');
+        $this->assertSame([[3, 'text', '+12125550100'], [3, 'text', '+381601234567']], $this->quietAsked);
+    }
+
+    /** The notification type reaches the provider unchanged, also when the sender rebuilds the delivery. */
+    public function testTheProviderSeesTheNotificationType(): void
+    {
+        $digits = new class implements RecipientNormalizerInterface {
+            public function normalize(string $recipient): string { return '+' . preg_replace('/\D/', '', $recipient); }
+        };
+        $sender = $this->sender(extra: [$this->textProvider()], normalizers: ['text' => $digits]);
+        $sender->send(Delivery::text(3, 'text', '+381 60 123 4567', fn () => new DeliveryContent([], text: 'Hi'),
+            type: 'cart_reminder'));
+        $this->assertSame(['+381601234567', 'cart_reminder'], [$this->mail['text'][0], $this->mail['text_type']]);
+        $sender->send(Delivery::text(3, 'text', '+381601234567', fn () => new DeliveryContent([], text: 'Hi')));
+        $this->assertSame('', $this->mail['text_type'], 'unknown when the feature does not say');
+        $email = new Delivery(3, 'tpl', 'general', 'a@test.com', fn () => new DeliveryContent([], 'Jane'), type: 'back_in_stock');
+        $this->assertSame('back_in_stock', $email->type);
     }
 
     /** Stopped is final and wins: a held delivery would only be dropped later. */
