@@ -39,6 +39,8 @@ class SenderTest extends TestCase
     private array $warnings = [];
     private \Symfony\Component\Mime\Email $native;
     private ProviderPool $pool;
+    /** "channel:recipient" on the do-not-contact list */
+    private array $blocked = [];
 
     /** @param object|null $mailMessage the transport's message; null: Magento 2.4.8+ (Symfony) */
     /** @param ProviderInterface[] $extra more providers; $selected the stored provider code */
@@ -86,7 +88,9 @@ class SenderTest extends TestCase
         $logger = $this->createStub(\Psr\Log\LoggerInterface::class);
         $logger->method('warning')->willReturnCallback(function ($text) { $this->warnings[] = $text; });
         $this->pool = new ProviderPool($config, [new MagentoEmail($builder, new OneClickHeaders(), $logger), ...$extra]);
-        return new Sender($this->pool, $emulation, $cooldown, $config, $logger, new RecipientNormalizerPool($normalizers));
+        $blocks = $this->createStub(\CommerceKings\Notification\Api\RecipientBlockInterface::class);
+        $blocks->method('isBlocked')->willReturnCallback(fn ($channel, $recipient) => in_array($channel . ':' . $recipient, $this->blocked, true));
+        return new Sender($this->pool, $emulation, $cooldown, $config, $logger, new RecipientNormalizerPool($normalizers), $blocks);
     }
 
     private function message(bool $useCooldown = true, ?\Closure $current = null, ?string $oneClick = null,
@@ -259,6 +263,17 @@ class SenderTest extends TestCase
         $this->claims = [];
         $this->assertSame(SenderInterface::SENT, $this->sender()->send($this->message(recipient: '  a@test.com ')));
         $this->assertSame(['a@test.com'], $this->claims, 'without a normalizer the recipient is trimmed');
+    }
+
+    public function testMarketingToABlockedRecipientIsDroppedAndServiceMessagesStillGo(): void
+    {
+        $this->blocked = ['email:a@test.com'];
+        $this->assertSame(SenderInterface::BLOCKED, $this->sender()->send($this->message()));
+        $this->assertSame([0, [], []], [$this->sent, $this->claims, $this->emulated], 'nothing claimed, built or sent');
+        $service = new Delivery(3, 'tpl', 'general', 'a@test.com', fn () => new DeliveryContent([], 'Jane'),
+            false, null, Channel::EMAIL, false);
+        $this->assertSame(SenderInterface::SENT, $this->sender()->send($service), 'an order email ignores the block');
+        $this->assertSame(1, $this->sent);
     }
 
     public function testProviderReportingSentKeepsTheClaim(): void

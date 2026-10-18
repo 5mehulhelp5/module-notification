@@ -10,5 +10,8 @@
         <job name="commercekings_notification_contact_cleanup" instance="CommerceKings\Notification\Cron\CleanUpContacts" method="execute">
             <schedule>15 3 * * *</schedule>
         </job>
+        <job name="commercekings_notification_recipient_block_cleanup" instance="CommerceKings\Notification\Cron\CleanUpRecipientBlocks" method="execute">
+            <schedule>20 3 * * *</schedule>
+        </job>
     </group>
 </config>

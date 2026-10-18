@@ -22,6 +22,8 @@ use PHPUnit\Framework\TestCase;
 
 class SubscriptionManagementTest extends TestCase
 {
+    private ?\CommerceKings\Notification\Api\RecipientBlockInterface $blocks = null;
+
     use DbTestTrait;
 
     private ?Target $target;
@@ -71,7 +73,8 @@ class SubscriptionManagementTest extends TestCase
         $filters->method('get')->willReturn(new StringTrim());
         return new SubscriptionManagement($this->resource(), new SubscriptionTypePool(['test_type' => $type]),
             $permission, $contacts, $stores,
-            new EmailAddress(), new StringLength(['max' => 255]), $filters);
+            new EmailAddress(), new StringLength(['max' => 255]), $filters, $this->blocks ?? $this->createStub(\CommerceKings\Notification\Api\RecipientBlockInterface::class),
+            $this->customerRepository());
     }
 
     private function assertNothingWritten(): void
@@ -143,6 +146,23 @@ class SubscriptionManagementTest extends TestCase
         $this->assertSame(['test_type', 42, 1, '', 5, null, 'new-consent'], array_slice($bind, 0, 7));
         $this->assertSame([5, null, 'new-consent'], array_slice($bind, 7, 3), 'compared before replacing');
         $this->assertSame(['beginTransaction', 'commit'], $this->transactionEvents);
+    }
+
+    public function testBlockedRecipientIsAnsweredLikeAStoredSubscriptionButNothingIsWritten(): void
+    {
+        $touched = [];
+        $this->blocks = $this->createStub(\CommerceKings\Notification\Api\RecipientBlockInterface::class);
+        $this->blocks->method('touch')->willReturnCallback(function ($channel, $recipient) use (&$touched) {
+            $touched[] = [$channel, $recipient];
+            return true;
+        });
+        $this->assertTrue($this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test'),
+            'the same answer as a stored subscription: the list cannot be probed');
+        $this->assertTrue($this->management()->subscribeCustomer(9, 'test_type', 'masked'));
+        $this->assertSame([], $this->queries, 'no subscription written');
+        $this->assertSame([], $this->contacts, 'no contact (no address) stored');
+        $this->assertSame([['email', 'guest@example.test'], ['email', 'customer@test.com']], $touched,
+            'each attempt restarts the lift timer');
     }
 
     public function testOnePerPersonTypesKeyByContactOrCustomer(): void
@@ -284,5 +304,14 @@ class SubscriptionManagementTest extends TestCase
         $this->assertFalse($anonymous->isCurrentVisitor('any'));
         $this->assertNull($anonymous->getUnsubscribeUrl(new \CommerceKings\Notification\Api\Data\Subscription(7, 'test_type',
             42, 1, 5, null, '', '2026-01-01 00:00:00')));
+    }
+
+    private function customerRepository(): \Magento\Customer\Api\CustomerRepositoryInterface
+    {
+        $customer = $this->createStub(\Magento\Customer\Api\Data\CustomerInterface::class);
+        $customer->method('getEmail')->willReturn('customer@test.com');
+        $customers = $this->createStub(\Magento\Customer\Api\CustomerRepositoryInterface::class);
+        $customers->method('getById')->willReturn($customer);
+        return $customers;
     }
 }

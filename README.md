@@ -38,6 +38,8 @@ withdrawing it removes the subscription, and notices are off by default.
 | Email provider (website) | Magento email – provider modules add their own |
 | Cooldown (days, global) | 7 – minimum gap between notifications to one recipient on a channel; 0 turns it off |
 | One-click unsubscribe (website) | No – RFC 8058 headers; the feature's unsubscribe link must accept the POST |
+| Do not contact: "Stop these emails" link (store view) | Yes – one click stops all marketing emails to that address |
+| Do not contact: lifts after (days without attempts, global) | 90 – each sign-up attempt for a stopped address restarts it |
 
 ## Before going live
 
@@ -61,6 +63,8 @@ service messages and staff alerts.
 `Api\ProviderInterface` – deliver on a channel; Magento email is built in, SMS or WhatsApp come as provider modules
 
 `Api\RecipientNormalizerInterface` – one canonical recipient form per channel (e.g. phone numbers in E.164)
+
+`Api\RecipientBlockInterface` – do not contact: the "stop these emails" link and its list
 
 `Api\SubscriptionTypeInterface` – something a shopper subscribes to
 

@@ -8,7 +8,6 @@
             <resource>CommerceKings_Notification::config</resource>
             <group id="general" translate="label comment" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
                 <label>Email delivery</label>
-                <fieldset_css>commercekings-config-section</fieldset_css>
                 <comment>Shared by all CommerceKings notifications.</comment>
                 <field id="provider_email" translate="label comment" type="select" sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Email provider</label>
@@ -24,6 +23,21 @@
                     <label>One-click unsubscribe</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <comment><![CDATA[Adds an unsubscribe option in supported email apps, alongside the unsubscribe link in the email. Requires DKIM signing by your mail provider. See <a href="https://www.rfc-editor.org/rfc/rfc8058" target="_blank" rel="noopener noreferrer">RFC 8058</a>.]]></comment>
+                </field>
+            </group>
+            <group id="do_not_contact" translate="label comment" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Do not contact</label>
+                <fieldset_css>commercekings-config-section</fieldset_css>
+                <comment>A recipient can stop all marketing notifications to their address with one click; emails about orders still arrive.</comment>
+                <field id="link" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>"Stop these emails" link</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Offered in marketing notifications whose template shows it (e.g. the abandoned cart reminder). Sign-ups for a stopped address are ignored.</comment>
+                </field>
+                <field id="lift_days" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Lifts after (days without attempts)</label>
+                    <comment>Each sign-up attempt for a stopped address restarts this count. Default: 90 days.</comment>
+                    <validate>required-entry validate-digits validate-greater-than-zero</validate>
                 </field>
             </group>
         </section>

@@ -15,6 +15,7 @@ class Delivery
      * @param \Closure(): DeliveryContent $content built inside the store's environment (translations, URLs)
      * @param bool $useCooldown false for notifications the recipient asked for (e.g. back in stock)
      * @param (\Closure(): bool)|null $isRecipientCurrent re-checked after the cooldown claim, before sending
+     * @param bool $marketing false for service messages (orders, payments): they ignore the do-not-contact list
      */
     public function __construct(
         public readonly int $storeId,
@@ -24,7 +25,8 @@ class Delivery
         public readonly \Closure $content,
         public readonly bool $useCooldown = true,
         public readonly ?\Closure $isRecipientCurrent = null,
-        public readonly string $channel = Channel::EMAIL
+        public readonly string $channel = Channel::EMAIL,
+        public readonly bool $marketing = true
     ) {
     }
 
@@ -42,8 +44,10 @@ class Delivery
         string $recipient,
         \Closure $content,
         bool $useCooldown = true,
-        ?\Closure $isRecipientCurrent = null
+        ?\Closure $isRecipientCurrent = null,
+        bool $marketing = true
     ): self {
-        return new self($storeId, '', '', $recipient, $content, $useCooldown, $isRecipientCurrent, $channel);
+        return new self($storeId, '', '', $recipient, $content, $useCooldown, $isRecipientCurrent, $channel,
+            $marketing);
     }
 }

@@ -42,6 +42,12 @@ Each module answers one question:
   replaced by an extension (e.g. an SMTP module) sends without them and logs a warning.
 - **Recipient cooldown**: minimum gap between emails to the same address across all notifications that
   use it and all stores. Keyed hashes only (`ck_notification_cooldown`), never an address.
+- **Do not contact** (`Api\RecipientBlockInterface`): a signed "stop these emails" link in marketing notifications
+  opens `/cknotification/block`; only its form-key POST blocks, so mail scanners change nothing. Blocking removes
+  the recipient's subscriptions; sign-ups for a blocked recipient are answered as stored but not written and restart
+  the lift timer; the sender drops marketing deliveries (`BLOCKED`) and passes service ones (`Delivery::$marketing
+  = false`). A cron lifts blocks after *N* days without attempts. Keyed hashes only
+  (`ck_notification_recipient_block`); the link carries the recipient encrypted. Design: [recipient block](recipient-block.md).
 
 ## Subscribe
 

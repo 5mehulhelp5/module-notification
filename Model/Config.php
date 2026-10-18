@@ -29,6 +29,19 @@ class Config
         return is_string($code) && $code !== '' ? $code : null;
     }
 
+    /** The "stop these emails" link in marketing notifications of this store. */
+    public function isBlockLinkEnabled(int $storeId): bool
+    {
+        return $this->scopeConfig->isSetFlag('commercekings_notification/do_not_contact/link', ScopeInterface::SCOPE_STORE,
+            $storeId);
+    }
+
+    /** Days without a sign-up attempt after which a block lifts; at least 1. */
+    public function getBlockLiftDays(): int
+    {
+        return max(1, (int)$this->scopeConfig->getValue('commercekings_notification/do_not_contact/lift_days'));
+    }
+
     /** RFC 8058 List-Unsubscribe headers on emails of this store; the type's unsubscribe link must accept them. */
     public function isOneClickUnsubscribeEnabled(int $storeId): bool
     {

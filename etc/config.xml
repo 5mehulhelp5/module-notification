@@ -8,6 +8,10 @@
                 <cooldown_days>7</cooldown_days>
                 <one_click_unsubscribe>0</one_click_unsubscribe>
             </general>
+            <do_not_contact>
+                <link>1</link>
+                <lift_days>90</lift_days>
+            </do_not_contact>
         </commercekings_notification>
     </default>
 </config>

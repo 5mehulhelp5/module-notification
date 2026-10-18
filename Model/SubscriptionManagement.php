@@ -3,11 +3,15 @@ declare(strict_types=1);
 
 namespace CommerceKings\Notification\Model;
 
+use CommerceKings\Notification\Api\Channel;
 use CommerceKings\Notification\Api\ContactRepositoryInterface;
+use CommerceKings\Notification\Api\RecipientBlockInterface;
 use CommerceKings\Notification\Api\Data\Target;
 use CommerceKings\Notification\Api\SubscriptionManagementInterface;
 use CommerceKings\Notification\Api\SubscriptionPermissionInterface;
 use CommerceKings\Notification\Api\SubscriptionTypeInterface;
+use Magento\Customer\Api\CustomerRepositoryInterface;
+use Magento\Framework\App\ObjectManager;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Exception\InputException;
 use Magento\Framework\Filter\FilterManager;
@@ -19,10 +23,15 @@ use Magento\Store\Model\StoreManagerInterface;
  * Subscribe in this order, nothing written before the last step: email rules, the type's authorize(),
  * the permission (SubscriptionPermissionInterface), the guest contact, then one INSERT ... SELECT whose WHERE
  * holds the permission's condition and the type's condition. Direct SQL - no models are saved.
+ * A recipient on the do-not-contact list is not stored; the answer is the same as a stored subscription, so the
+ * list cannot be probed, and the attempt restarts the block's lift timer.
  */
 class SubscriptionManagement implements SubscriptionManagementInterface
 {
     public const TABLE = 'ck_notification_subscription';
+
+    private readonly RecipientBlockInterface $blocks;
+    private readonly CustomerRepositoryInterface $customers;
 
     public function __construct(
         private readonly ResourceConnection $resource,
@@ -32,8 +41,12 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         private readonly StoreManagerInterface $stores,
         private readonly EmailAddress $emailValidator,
         private readonly StringLength $emailLengthValidator,
-        private readonly FilterManager $filterManager
+        private readonly FilterManager $filterManager,
+        ?RecipientBlockInterface $blocks = null,
+        ?CustomerRepositoryInterface $customers = null
     ) {
+        $this->blocks = $blocks ?? ObjectManager::getInstance()->get(RecipientBlockInterface::class);
+        $this->customers = $customers ?? ObjectManager::getInstance()->get(CustomerRepositoryInterface::class);
     }
 
     public function subscribeGuest(string $type, string $reference, mixed $email): bool
@@ -51,6 +64,9 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         }
         if (!$permission->isGranted()) {
             return false;
+        }
+        if ($this->blocks->touch(Channel::EMAIL, $email)) {
+            return true;
         }
         $db = $this->resource->getConnection();
         $db->beginTransaction();
@@ -80,7 +96,21 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         if (!$permission->isGranted()) {
             return false;
         }
+        if ($this->isBlockedCustomer($customerId)) {
+            return true;
+        }
         return $this->store($type, $subscriptionType, $target, (string)$permission->reference, null, $customerId);
+    }
+
+    /** A customer that no longer exists has no address to check: the guarded write refuses it as before. */
+    private function isBlockedCustomer(int $customerId): bool
+    {
+        try {
+            $email = (string)$this->customers->getById($customerId)->getEmail();
+        } catch (\Magento\Framework\Exception\NoSuchEntityException) {
+            return false;
+        }
+        return $email !== '' && $this->blocks->touch(Channel::EMAIL, $email);
     }
 
     /** Trimmed address or '' (unsubscribe); anything else is Magento's 400 without echoing the input. */

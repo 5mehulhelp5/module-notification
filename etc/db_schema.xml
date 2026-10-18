@@ -13,6 +13,18 @@
             <column name="sent_at"/>
         </index>
     </table>
+    <!-- do not contact: recipients who stopped marketing notifications; keyed hashes only, never an address -->
+    <table name="ck_notification_recipient_block" resource="default" engine="innodb" comment="CK notification: do not contact">
+        <column xsi:type="varchar" name="recipient_hash" nullable="false" length="64" comment="Keyed hash of channel and normalized recipient"/>
+        <column xsi:type="timestamp" name="blocked_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="Blocked at"/>
+        <column xsi:type="timestamp" name="last_attempt_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="Last sign-up attempt (restarts the lift timer)"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="recipient_hash"/>
+        </constraint>
+        <index referenceId="CK_NOTIFICATION_RECIPIENT_BLOCK_LAST_ATTEMPT_AT" indexType="btree">
+            <column name="last_attempt_at"/>
+        </index>
+    </table>
     <!-- guest email addresses, one row per website and address; features point to contact_id -->
     <table name="ck_notification_contact" resource="default" engine="innodb" comment="CK notification: guest contacts">
         <column xsi:type="int" name="contact_id" unsigned="true" nullable="false" identity="true" comment="Contact ID"/>

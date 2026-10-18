@@ -19,8 +19,12 @@ Building a notification type on `commercekings/module-notification`. Start with 
 3. Queue work with `Api\QueueInterface::publish('my_notification', $reference)`.
 
 `Delivery::$useCooldown = false` for notifications the recipient asked for (e.g. back in stock): they are always
-sent and do not start the cooldown. `SenderInterface::send()` returns `SENT`, `COOLDOWN` or
-`RECIPIENT_CHANGED`; on anything but `SENT`, undo your own claim. Replace the cooldown with a
+sent and do not start the cooldown. `Delivery::$marketing = false` for service messages (orders, payments): they
+ignore the do-not-contact list. Marketing templates show the stop link with
+`{{depend block_url}}…{{var block_url}}…{{/depend}}`, the URL from
+`Api\RecipientBlockInterface::getBlockUrl(Channel::EMAIL, $email, $storeId)` ('' when the shop turned it off).
+`SenderInterface::send()` returns `SENT`, `COOLDOWN`, `RECIPIENT_CHANGED` or `BLOCKED`; on anything but `SENT`,
+undo your own claim. Replace the cooldown with a
 `CooldownInterface` preference.
 
 ## Providers

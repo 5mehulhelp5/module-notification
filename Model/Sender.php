@@ -9,23 +9,26 @@ use CommerceKings\Notification\Api\Data\Delivery;
 use CommerceKings\Notification\Api\Data\DeliveryContent;
 use CommerceKings\Notification\Api\ProviderInterface;
 use CommerceKings\Notification\Api\ProviderPoolInterface;
+use CommerceKings\Notification\Api\RecipientBlockInterface;
 use CommerceKings\Notification\Api\SenderInterface;
 use CommerceKings\Notification\Exception\MessageSentException;
 use Magento\Framework\App\Area;
+use Magento\Framework\App\ObjectManager;
 use Magento\Store\Model\App\Emulation;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
 /**
- * Sends one notification: optional recipient cooldown claim, recipient re-check, content built in the delivery's
- * store, then the provider selected for the channel. A one-click unsubscribe URL only reaches providers that
- * support it. A notification the provider accepted can't be recalled - a
- * later failure must never cause a second one, so it surfaces as MessageSentException.
+ * Sends one notification: marketing deliveries to a blocked recipient are dropped, then the optional recipient
+ * cooldown claim, recipient re-check, content built in the delivery's store, and the provider selected for the
+ * channel. A one-click unsubscribe URL only reaches providers that support it. A notification the provider accepted
+ * can't be recalled - a later failure must never cause a second one, so it surfaces as MessageSentException.
  */
 class Sender implements SenderInterface
 {
     private readonly LoggerInterface $logger;
     private readonly RecipientNormalizerPool $normalizers;
+    private readonly RecipientBlockInterface $blocks;
 
     public function __construct(
         private readonly ProviderPoolInterface $providers,
@@ -33,10 +36,12 @@ class Sender implements SenderInterface
         private readonly CooldownInterface $cooldown,
         private readonly Config $config,
         ?LoggerInterface $logger = null,
-        ?RecipientNormalizerPool $normalizers = null
+        ?RecipientNormalizerPool $normalizers = null,
+        ?RecipientBlockInterface $blocks = null
     ) {
         $this->logger = $logger ?? new NullLogger();
         $this->normalizers = $normalizers ?? new RecipientNormalizerPool();
+        $this->blocks = $blocks ?? ObjectManager::getInstance()->get(RecipientBlockInterface::class);
     }
 
     public function send(Delivery $delivery): string
@@ -45,6 +50,9 @@ class Sender implements SenderInterface
         // other channels are kept apart by a prefix.
         $recipient = $this->normalizers->normalize($delivery->channel, $delivery->recipient);
         $delivery = $this->withRecipient($delivery, $recipient);
+        if ($delivery->marketing && $this->blocks->isBlocked($delivery->channel, $delivery->recipient)) {
+            return self::BLOCKED;
+        }
         $key = $delivery->channel === Channel::EMAIL
             ? $delivery->recipient : $delivery->channel . ':' . $delivery->recipient;
         $claim = null;

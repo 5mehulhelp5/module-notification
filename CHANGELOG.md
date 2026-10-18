@@ -4,6 +4,11 @@
 
 First release. Features:
 
+- **Do not contact:** a signed "stop these emails" link in marketing notifications (`RecipientBlockInterface`,
+  `/cknotification/block` with a confirmation and Undo) stops all marketing notifications to that address. Blocked
+  recipients are not subscribed again (answered as stored, so the list cannot be probed); the sender drops marketing
+  deliveries (`BLOCKED`) and passes service ones (`Delivery::$marketing = false`). Each attempt restarts the lift
+  timer; a cron lifts blocks after *Lifts after (days without attempts)*, default 90. Keyed hashes only.
 - **Providers:** sending goes through `SenderInterface` to the provider selected per channel (`ProviderInterface`,
   `ProviderPool`; setting *Email provider*, per website, default *Magento email*). Provider modules add their own
   provider and settings. Replaces `MailerInterface`, `Message` and `MessageContent` (now `Delivery` and

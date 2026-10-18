@@ -57,5 +57,18 @@
             "CK_NTFC_SUBSCRIPTION_CONTACT_ID_CK_NTFC_CONTACT_CONTACT_ID": true,
             "CK_NTFC_SUBSCRIPTION_CSTR_ID_CSTR_ENTT_ENTT_ID": true
         }
+    },
+    "ck_notification_recipient_block": {
+        "column": {
+            "recipient_hash": true,
+            "blocked_at": true,
+            "last_attempt_at": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        },
+        "index": {
+            "CK_NOTIFICATION_RECIPIENT_BLOCK_LAST_ATTEMPT_AT": true
+        }
     }
 }

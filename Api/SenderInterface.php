@@ -13,14 +13,17 @@ interface SenderInterface
     public const COOLDOWN = 'recipient cooldown';
     /** Delivery::$isRecipientCurrent said no after the cooldown claim; nothing was sent. */
     public const RECIPIENT_CHANGED = 'recipient changed';
+    /** A marketing delivery to a recipient on the do-not-contact list; nothing was sent. */
+    public const BLOCKED = 'recipient blocked';
 
     /**
-     * Claims the recipient cooldown (if the delivery uses it and it is on), re-checks the recipient, builds the
+     * Drops marketing deliveries to recipients on the do-not-contact list, claims the recipient cooldown (if the
+     * delivery uses it and it is on), re-checks the recipient, builds the
      * content in the delivery's store and hands it to the provider selected for the channel. A failure before
      * the provider accepted it releases the cooldown claim and is rethrown; a failure after it is rethrown as
      * \CommerceKings\Notification\Exception\MessageSentException - it is out, never send it again.
      *
-     * @return string self::SENT, self::COOLDOWN or self::RECIPIENT_CHANGED
+     * @return string self::SENT, self::COOLDOWN, self::RECIPIENT_CHANGED or self::BLOCKED
      */
     public function send(Delivery $delivery): string;
 }
