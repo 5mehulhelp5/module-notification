@@ -26,7 +26,7 @@ class StopListSubscriptionsTest extends TestCase
     private array $withdrawn = [];
     private array $withdrawCalls = [];
 
-    private function stop(array $customers, array $types): void
+    private function stop(array $customers, array $types, string $reason = StopList::REASON_LINK): void
     {
         $select = $this->createStub(Select::class);
         foreach (['from', 'where'] as $method) {
@@ -55,7 +55,7 @@ class StopListSubscriptionsTest extends TestCase
             $this->createStub(SubscriptionPermissionInterface::class), $hashes, new SubscriptionTypePool($types),
             new \CommerceKings\Notification\Model\ContactRepository($resource, new RecipientNormalizerPool()),
             $this->addressConsents()))
-            ->stop(Channel::EMAIL, 'jose@example.test');
+            ->stop(Channel::EMAIL, 'jose@example.test', $reason);
     }
 
     private function addressConsents(): \CommerceKings\Notification\Model\AddressConsentRepository
@@ -104,5 +104,21 @@ class StopListSubscriptionsTest extends TestCase
         $this->assertSame([[Channel::EMAIL, 'jose@example.test', null, null]], $this->withdrawCalls, 'all types and websites');
         $this->assertSame(['permission_ref IN (?)' => ['ac:one', 'ac:two']], end($this->deleted),
             'also a type the recipient cannot stop: its consent is gone');
+    }
+
+    /** An undeliverable number is suppressed, but the person did not say stop: their checkbox consents stay. */
+    public function testAnUndeliverableNumberKeepsItsConsents(): void
+    {
+        $this->withdrawn = ['ac:one'];
+        $this->stop([], [], StopList::REASON_UNDELIVERABLE);
+        $this->assertSame([], $this->withdrawCalls);
+        $this->stop([], [], StopList::REASON_REPLY);
+        $this->assertCount(1, $this->withdrawCalls, 'a STOP reply withdraws them');
+    }
+
+    public function testAnUnknownReasonIsRefused(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->stop([], [], 'bounced');
     }
 }

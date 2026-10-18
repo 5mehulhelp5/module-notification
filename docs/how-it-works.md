@@ -58,12 +58,14 @@ Each module answers one question:
   2.4.4–2.4.7 through a polyfill for Magento's Laminas transport (`Model\OneClickHeaders`). A mail transport
   replaced by an extension (e.g. an SMTP module) sends without them and logs a warning.
 - **Recipient cooldown**: minimum gap between notifications to the same recipient on a channel, across all
-  notifications that use it and all stores. Keyed hashes only (`ck_notification_cooldown`), never an address.
+  notifications that use it and all stores. One number of days for all channels (global); the keys are per channel. Keyed hashes only (`ck_notification_cooldown`), never an address.
 - **Do not contact** (`Api\StopListInterface`): a signed "stop these emails" link in marketing notifications
   opens `/cknotification/stop`; only its form-key POST stops, so mail scanners change nothing. Stopping removes
   the recipient's subscriptions; sign-ups for a stopped recipient are answered as stored but not written and restart
   the lift timer; the sender drops stoppable deliveries (`STOPPED`) and passes the others (`Delivery::$stoppable
-  = false`); a stoppable send without its own unsubscribe link gets the stop link as its one-click URL. A cron lifts stops after *N* days without attempts. Keyed hashes only
+  = false`); a stoppable send without its own unsubscribe link gets the stop link as its one-click URL. Each stop has a reason: a stop link's or an
+  undeliverable number's lifts after *N* days without attempts (cron), a STOP reply's only by `resume()` (START), and
+  the link's Undo lifts only a link stop; an undeliverable number keeps its checkbox consents. Keyed hashes only
   (`ck_notification_stop`); the link carries the recipient encrypted. Design: [stop list](stop-list.md).
 - **Quiet hours** (`Api\QuietHoursInterface`): a daily window (e.g. 21:00–08:00, may cross midnight) in which
   stoppable deliveries on the selected channels are held (`QUIET_HOURS`, before any cooldown claim) and sent by the
@@ -106,7 +108,7 @@ type or invalid address is Magento's 400 without echoing it.
 
 **Stores > Configuration > CommerceKings > Notifications**, *Delivery*: *Email provider*, default *Magento email*
 (per website; a provider module adds the selector for its channel here);
-*Cooldown (days)*, per channel, default 7, **0 turns it off** (global); *One-click unsubscribe*, default No (per website) – RFC 8058 headers on every
+*Cooldown (days)*, default 7, **0 turns it off** (global, for every channel; kept per channel); *One-click unsubscribe*, default No (per website) – RFC 8058 headers on every
 notification whose content passes an HTTPS unsubscribe URL (an http URL sends the email without them and logs a
 warning); that URL must accept the mail client's POST.
 **Do not contact**: *"Stop these emails" link* (store view, default Yes) and *Lifts after (days without attempts)*

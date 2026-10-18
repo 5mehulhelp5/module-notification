@@ -62,8 +62,9 @@ class Index extends Action implements HttpGetActionInterface, HttpPostActionInte
                 return $this->resultRedirectFactory->create()->setPath('');
             }
             if ($this->request->getParam('do') === 'undo') {
-                // only a newest-key link may turn emails back on; an older one changes nothing
-                if ($link['current']) {
+                // only a newest-key link may turn emails back on, and only a stop it made: a STOP reply or an
+                // undeliverable number is not the link's to lift
+                if ($link['current'] && $this->isLinkStop($link)) {
                     $this->stopList->resume($link['channel'], $link['recipient']);
                     $state = self::STATE_RESUMED;
                 } elseif ($this->stopList->isStopped($link['channel'], $link['recipient'])) {
@@ -93,10 +94,18 @@ class Index extends Action implements HttpGetActionInterface, HttpPostActionInte
             $block->setData('is_email', $email);
             $block->setData('link_recipient', $link !== null ? $recipient : '');
             $block->setData('link_signature', $link !== null ? $signature : '');
-            // undo turns emails back on: only with a link signed by the newest key
-            $block->setData('can_undo', $link !== null && $link['current']);
+            // undo turns emails back on: only with a link signed by the newest key, for a stop made by a link
+            $block->setData('can_undo', $link !== null && $link['current']
+                && ($state === self::STATE_CONFIRM || $this->isLinkStop($link)));
         }
         return $page;
+    }
+
+    /** Is the recipient stopped by a link (or not stopped)? Only such a stop may the link's Undo lift. */
+    private function isLinkStop(array $link): bool
+    {
+        $reason = $this->stopList->getReason($link['channel'], $link['recipient']);
+        return $reason === null || $reason === StopListInterface::REASON_LINK;
     }
 
     /** The mail provider's unsubscribe: the signed URL authorizes it; the body and content type must be exact. */

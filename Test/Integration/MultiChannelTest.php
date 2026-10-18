@@ -298,4 +298,19 @@ class MultiChannelTest extends TestCase
         $this->resource->getConnection()->delete($this->resource->getTableName(ContactRepository::TABLE),
             ['contact_id = ?' => $this->saved[1]['contact_id']]);
     }
+
+    /** first_for_address: the first subscription of a number in the website, not every new one of a known number. */
+    public function testOnlyTheFirstSubscriptionOfANumberIsFirstForTheAddress(): void
+    {
+        $this->management->subscribeGuest($this->type('sms'), 'ref', $this->number());
+        $this->references['sms'] = random_int(1000000000, 2000000000);   // another cart, the same number
+        $this->management->subscribeGuest($this->type('sms'), 'ref', $this->number());
+        $other = substr($this->number(), 0, -1) . (((int)substr($this->number(), -1) + 1) % 10);
+        $this->management->subscribeGuest($this->type('sms'), 'ref', $other);
+        $this->assertSame([true, false, true], array_map(fn ($event) => $event['first_for_address'], $this->saved),
+            'first cart: confirm; second cart of the number: not again; a new number: confirm');
+        $db = $this->resource->getConnection();
+        $db->delete($this->resource->getTableName(SubscriptionManagement::TABLE), ['contact_id = ?' => $this->saved[2]['contact_id']]);
+        $db->delete($this->resource->getTableName(ContactRepository::TABLE), ['contact_id = ?' => $this->saved[2]['contact_id']]);
+    }
 }

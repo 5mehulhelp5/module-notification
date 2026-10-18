@@ -34,7 +34,7 @@ interface SubscriptionTypeInterface
      */
     public function getSubscriber(): ?SubscriberInterface;
 
-    /** The channel its subscribers are reached on (Channel::EMAIL or a provider module's code, e.g. "sms"). */
+    /** The channel its subscribers are reached on: Channel::EMAIL, SMS or WHATSAPP; a module's own code only for another channel. */
     public function getChannel(): string;
 
     /** true: one subscription per reference (a new email replaces it); false: one per person. */

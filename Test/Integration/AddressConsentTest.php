@@ -140,6 +140,17 @@ class AddressConsentTest extends TestCase
         $this->assertNotNull($this->evidence()[0]['withdrawn_at']);
     }
 
+    /** An undeliverable number is suppressed, but its consent stays for when it works again. */
+    public function testAnUndeliverableNumberKeepsItsConsent(): void
+    {
+        $this->consents->recordGuest($this->code, 'ref', $this->number, $this->wordingHash());
+        $this->stopList->stop('sms', $this->number, StopList::REASON_UNDELIVERABLE);
+        $this->assertNull($this->evidence()[0]['withdrawn_at']);
+        $this->stopList->resume('sms', $this->number);
+        $this->assertTrue($this->subscriptions->subscribeGuest($this->code, 'ref', $this->number),
+            'once lifted, the number subscribes on its consent');
+    }
+
     public function testTheCleanupKeepsEvidenceForTheConfiguredDays(): void
     {
         $this->consents->recordGuest($this->code, 'ref', $this->number, $this->wordingHash());

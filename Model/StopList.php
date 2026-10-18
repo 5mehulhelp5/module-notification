@@ -32,31 +32,54 @@ class StopList implements StopListInterface
     ) {
     }
 
+    /** How strong a reason is: a stop keeps the strongest it was given. */
+    private const STRENGTH = [self::REASON_UNDELIVERABLE => 1, self::REASON_LINK => 2, self::REASON_REPLY => 3];
+
     public function isStopped(string $channel, string $recipient): bool
     {
         return $this->find($this->hashes($channel, $recipient)) !== null;
     }
 
-    public function stop(string $channel, string $recipient): void
+    public function getReason(string $channel, string $recipient): ?string
     {
+        $hash = $this->find($this->hashes($channel, $recipient));
+        if ($hash === null) {
+            return null;
+        }
+        $db = $this->resource->getConnection();
+        $reason = $db->fetchOne($db->select()->from($this->resource->getTableName(self::TABLE), 'reason')
+            ->where('recipient_hash = ?', $hash));
+        return is_string($reason) && $reason !== '' ? $reason : null;
+    }
+
+    public function stop(string $channel, string $recipient, string $reason = self::REASON_LINK): void
+    {
+        if (!isset(self::STRENGTH[$reason])) {
+            throw new \InvalidArgumentException(sprintf('Unknown stop reason "%s".', $reason));
+        }
         $db = $this->resource->getConnection();
         $db->beginTransaction();
         try {
+            $stored = $this->getReason($channel, $recipient);
+            $kept = $stored !== null && (self::STRENGTH[$stored] ?? 0) > self::STRENGTH[$reason] ? $stored : $reason;
             $hashes = $this->hashes($channel, $recipient);
             $db->insertOnDuplicate($this->resource->getTableName(self::TABLE), [
                 'recipient_hash' => $hashes[0],
+                'reason' => $kept,
                 'stopped_at' => new \Zend_Db_Expr('NOW()'),
                 'last_attempt_at' => new \Zend_Db_Expr('NOW()'),
-            ], ['last_attempt_at']);
+            ], ['last_attempt_at', 'reason']);
             if (count($hashes) > 1) {
                 // the same recipient stopped under an older key: one row, under the newest key
                 $db->delete($this->resource->getTableName(self::TABLE), ['recipient_hash IN (?)' => array_slice($hashes, 1)]);
             }
             $this->removeSubscriptions($channel, $recipient);
-            // a stop also withdraws the address's checkbox consents, and ends every subscription that rested on them
-            $withdrawn = $this->addressConsents->withdraw($channel, $this->normalizers->normalize($channel, $recipient));
-            if ($withdrawn) {
-                $db->delete($this->resource->getTableName(SubscriptionManagement::TABLE), ['permission_ref IN (?)' => $withdrawn]);
+            if ($reason !== self::REASON_UNDELIVERABLE) {
+                // the recipient said stop: their checkbox consents go too, with every subscription that rested on them
+                $withdrawn = $this->addressConsents->withdraw($channel, $this->normalizers->normalize($channel, $recipient));
+                if ($withdrawn) {
+                    $db->delete($this->resource->getTableName(SubscriptionManagement::TABLE), ['permission_ref IN (?)' => $withdrawn]);
+                }
             }
             $db->commit();
         } catch (\Throwable $error) {
@@ -119,11 +142,13 @@ class StopList implements StopListInterface
             ? ['channel' => $parts[0], 'recipient' => $parts[1], 'current' => $current] : null;
     }
 
-    /** Lifts stops without a sign-up attempt for the configured days. */
+    /** Lifts link and undeliverable stops without a sign-up attempt for the configured days; a reply stays. */
     public function cleanUp(): int
     {
-        return $this->resource->getConnection()->delete($this->resource->getTableName(self::TABLE),
-            ['last_attempt_at < NOW() - INTERVAL ? DAY' => $this->config->getStopLiftDays()]);
+        return $this->resource->getConnection()->delete($this->resource->getTableName(self::TABLE), [
+            'last_attempt_at < NOW() - INTERVAL ? DAY' => $this->config->getStopLiftDays(),
+            'reason <> ?' => self::REASON_REPLY,
+        ]);
     }
 
     /**
@@ -156,8 +181,8 @@ class StopList implements StopListInterface
             return null;
         }
         if (!in_array($hashes[0], $found, true)) {
-            $db->query("INSERT IGNORE INTO {$table} (recipient_hash, stopped_at, last_attempt_at)"
-                . " SELECT ?, stopped_at, last_attempt_at FROM {$table} WHERE recipient_hash = ?", [$hashes[0], $found[0]]);
+            $db->query("INSERT IGNORE INTO {$table} (recipient_hash, reason, stopped_at, last_attempt_at)"
+                . " SELECT ?, reason, stopped_at, last_attempt_at FROM {$table} WHERE recipient_hash = ?", [$hashes[0], $found[0]]);
         }
         $older = array_values(array_diff($found, [$hashes[0]]));
         if ($older) {

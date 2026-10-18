@@ -43,6 +43,10 @@ class Sender implements SenderInterface
         // One canonical recipient for the cooldown and the provider. Email keeps the plain address as its cooldown key;
         // other channels are kept apart by a prefix.
         $recipient = $this->normalizers->normalize($delivery->channel, $delivery->recipient);
+        if ($recipient === '') {
+            // nothing the channel can deliver to (e.g. not a phone number): never claimed, never handed to a provider
+            throw new \InvalidArgumentException(sprintf('No valid recipient for a "%s" delivery.', $delivery->channel));
+        }
         $delivery = $this->withRecipient($delivery, $recipient);
         if ($delivery->stoppable && $this->stopList->isStopped($delivery->channel, $delivery->recipient)) {
             return self::STOPPED;

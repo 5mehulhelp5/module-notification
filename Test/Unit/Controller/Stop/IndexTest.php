@@ -26,6 +26,8 @@ class IndexTest extends TestCase
     private ?Redirect $redirect = null;
     private bool $validKey = true;
     private bool $alreadyStopped = false;
+    /** the stored stop's reason (getReason()), null when not stopped */
+    private ?string $reason = null;
     private ?int $status = null;
     private array $post = [];
     private string $contentType = 'application/x-www-form-urlencoded';
@@ -48,6 +50,7 @@ class IndexTest extends TestCase
                 ? ['channel' => $this->linkChannel, 'recipient' => 'a@example.test', 'current' => $s === 'sig'] : null;
         });
         $stopList->method('isStopped')->willReturnCallback(fn () => $this->alreadyStopped);
+        $stopList->method('getReason')->willReturnCallback(fn () => $this->reason);
         $stopList->method('stop')->willReturnCallback(function ($c, $r) { $this->calls[] = ['stop', $c, $r]; });
         $stopList->method('resume')->willReturnCallback(function ($c, $r) { $this->calls[] = ['resume', $c, $r]; });
         $this->redirect = $this->createStub(Redirect::class);
@@ -166,6 +169,25 @@ class IndexTest extends TestCase
         $this->post = ['List-Unsubscribe' => 'One-Click'];
         $this->controller('POST', ['r' => 'enc', 's' => 'oldsig'])->execute();
         $this->assertSame(200, $this->status, 'one-click from the old email still works');
+    }
+
+    /** A STOP reply (or an undeliverable number) is not the link's to lift: no Undo, and a forged one changes nothing. */
+    public function testTheLinksUndoNeverLiftsAStopReply(): void
+    {
+        foreach ([\CommerceKings\Notification\Api\StopListInterface::REASON_REPLY,
+            \CommerceKings\Notification\Api\StopListInterface::REASON_UNDELIVERABLE] as $reason) {
+            $this->alreadyStopped = true;
+            $this->reason = $reason;
+            $this->calls = [];
+            $this->controller('GET', ['r' => 'enc', 's' => 'sig'])->execute();
+            $this->assertSame([Index::STATE_STOPPED, false], [$this->blockData['state'], $this->blockData['can_undo']], $reason);
+            $this->controller('POST', ['r' => 'enc', 's' => 'sig', 'form_key' => 'ok', 'do' => 'undo'])->execute();
+            $this->assertSame([], $this->changes(), $reason . ': nothing lifted');
+            $this->assertSame(Index::STATE_STOPPED, $this->blockData['state']);
+        }
+        $this->reason = \CommerceKings\Notification\Api\StopListInterface::REASON_LINK;
+        $this->controller('POST', ['r' => 'enc', 's' => 'sig', 'form_key' => 'ok', 'do' => 'undo'])->execute();
+        $this->assertSame([['resume', 'email', 'a@example.test']], $this->changes(), 'a link stop: Undo lifts it');
     }
 
     public function testANewestKeyLinkOffersUndo(): void

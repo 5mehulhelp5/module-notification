@@ -8,7 +8,8 @@ First release. Requires Magento 2.4.4 or later (`magento/framework ^103.0.4`).
   `<type>|<reference>` to registered notification types (`NotificationTypeInterface`, `Model\TypePool`). The sender
   (`SenderInterface`, `Data\Delivery`) checks Do not contact, quiet hours and the recipient cooldown, re-checks the
   recipient, builds the content in the delivery's store and hands it to the provider selected for the channel;
-  `MessageSentException` when a step fails after the provider accepted it. `Delivery::$type` names the notification
+  `MessageSentException` when a step fails after the provider accepted it; a recipient the channel cannot take is an
+  `InvalidArgumentException` before any claim. `Delivery::$type` names the notification
   type (templates of template-based channels), `Delivery::text()` builds a plain-text delivery.
 - **Providers and channels:** `ProviderInterface` per channel (`Model\ProviderPool`; *Delivery > Email provider*, and
   `provider_<channel>` selectors that provider modules add). Built in: *Magento email*, with optional RFC 8058 one-click
@@ -18,8 +19,8 @@ First release. Requires Magento 2.4.4 or later (`magento/framework ^103.0.4`).
 - **Subscriptions:** `SubscriptionTypeInterface` (channel, single or per person, stoppable, own permission and
   subscriber, authorization, orphan condition), one REST sign-up for every type (`/V1/ck-notification/subscriptions`
   with `recipient`, `/mine` for customers – the account email on email types, a given recipient on other channels),
-  one guarded write, and `commercekings_notification_subscription_saved` after the commit (with `created` and
-  `previous_contact_id`). Guest addresses are contacts (`ck_notification_contact`, one per website, channel and
+  one guarded write, and `commercekings_notification_subscription_saved` after the commit (with `created`,
+  `previous_contact_id` and `first_for_address`). Guest addresses are contacts (`ck_notification_contact`, one per website, channel and
   address), removed when nothing uses them (`ContactReferenceInterface`).
 - **Permissions:** `SubscriptionPermissionInterface` (`check()` with the address the subscription is stored with, a
   SQL condition for every write and send, a send-time recheck) and `SubscriberInterface` (visitor recognition, the
@@ -35,7 +36,9 @@ First release. Requires Magento 2.4.4 or later (`magento/framework ^103.0.4`).
 - **Do not contact:** `StopListInterface`. A signed stop link in stoppable notifications (`/cknotification/stop`,
   confirmation and Undo; also the one-click URL) or a STOP reply stops all stoppable notifications to a recipient on a
   channel and removes those subscriptions; sign-ups for a stopped recipient are answered as stored but not written.
-  Stops lift after *Lifts after (days without attempts)*, default 90. Stops and links survive
+  Each stop has a reason (`REASON_LINK`, `REASON_REPLY`, `REASON_UNDELIVERABLE`; the strongest is kept): link and
+  undeliverable stops lift after *Lifts after (days without attempts)*, default 90; a STOP reply only by `resume()`
+  (START); an undeliverable number keeps its consents. Stops and links survive
   `encryption:key:change` while the old key stays in `env.php` (`Model\KeyedHash`).
 - **Quiet hours:** `QuietHoursInterface` and *Quiet hours* (per store view: from – to, may cross midnight; channels;
   off by default). Stoppable deliveries are held (`SenderInterface::QUIET_HOURS`) and sent after `nextAllowedAt()`.

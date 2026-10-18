@@ -132,21 +132,25 @@ counts a failed attempt.
   service does not send it again – a STOP would be lost. The signature check is its protection. A delivery status
   callback may be limited.
 - **STOP** and similar words (UNSUBSCRIBE, CANCEL, END, QUIT; a WhatsApp "Stop promotions" button):
-  `Api\StopListInterface::stop($channel, $from)`. Stoppable deliveries to the number are dropped from then on and its
-  stoppable subscriptions removed. Service messages still go out. Texts say "Reply STOP to stop" – a stop link
+  `Api\StopListInterface::stop($channel, $from, StopListInterface::REASON_REPLY)`. Stoppable deliveries to the number
+  are dropped from then on, its stoppable subscriptions and checkbox consents removed, and the stop holds until START
+  (no lift timer; the stop link's Undo cannot lift it). Service messages still go out. Texts say "Reply STOP to stop" – a stop link
   (`getStopUrl()`) works too but is long (~200 characters).
 - **START** (UNSTOP): `resume($channel, $from)`. It lifts the stop only – the removed subscriptions do not come back;
-  the recipient signs up again (with consent). A stop also lifts by itself after the configured days without sign-up
-  attempts, but a stop at the carrier (e.g. Twilio's own STOP handling) stays until the recipient sends START.
-- **Undeliverable numbers** (invalid, a landline, not reachable): `send()` throws, so the feature counts a failed
-  attempt and gives up after its retries. A number that stopped at the carrier (e.g. Twilio error 21610) is an opt-out:
-  call `stop()` too. Delivery status callbacks are for your own log; keep personal data out of it.
+  the recipient signs up again (with consent).
+- **Undeliverable numbers** (invalid, a landline, not reachable): when the service refuses at once, `send()` throws,
+  so the feature counts a failed attempt and gives up after its retries. When it reports later (a status callback,
+  e.g. Twilio 30003/30005/30006, 21211), call `stop($channel, $to, StopListInterface::REASON_UNDELIVERABLE)`: the number
+  is suppressed, keeps its consents and lifts after the configured days. A number stopped at the carrier (e.g. Twilio
+  21610) is an opt-out: `stop(..., REASON_REPLY)`, and throw when it was refused at once. Keep personal data out of
+  your delivery log.
 
 ### Opt-in confirmation
 
 Some rules (e.g. US carriers for 10DLC) want a confirmation text after a sign-up. Observe
 `commercekings_notification_subscription_saved` (`SubscriptionManagementInterface::EVENT_SAVED`) for your channel and
-send one for a new number only: `created`, or a changed contact (`previous_contact_id`). Queue it rather than sending
+send one only when `first_for_address` is true – no subscription of any type had that number in the website
+before, so a new cart of a known number gets none. Queue it rather than sending
 from the request: a `NotificationTypeInterface` of your own in `Model\TypePool`, published with
 `Api\QueueInterface::publish('my_optin_confirmation', (string)$subscriptionId)`; its `process()` reads the
 subscription (`SubscriptionRepositoryInterface::get()`, `getRecipient()`) and sends with `useCooldown: false` (the
@@ -219,8 +223,8 @@ For notifications a visitor signs up for, also:
 
 1. Implement `Api\SubscriptionTypeInterface`:
    - `getPurpose()`: what the subscription is for (with the consent bridge: the Consent purpose your module declares);
-   - `getChannel()`: the channel its subscribers are reached on – `Channel::EMAIL`, or your provider's code (e.g.
-     `sms`). Guests subscribe with `recipient` (REST `{"type", "reference", "recipient"}`): an email address, or e.g.
+   - `getChannel()`: the channel its subscribers are reached on – `Channel::EMAIL`, `Channel::SMS` or
+     `Channel::WHATSAPP`; a code of your own only for another channel. Guests subscribe with `recipient` (REST `{"type", "reference", "recipient"}`): an email address, or e.g.
      a phone number; it is stored as a contact on that channel. An address the channel does not take is Magento's 400.
      Signed-in customers (`subscribeCustomer()`, REST `/mine`) use the account email on email types; on other
      channels they pass `recipient` too (required), stored as their contact next to the customer id;
@@ -283,7 +287,8 @@ For notifications a visitor signs up for, also:
    `commercekings_notification_subscription_saved` (`SubscriptionManagementInterface::EVENT_SAVED`). It is dispatched
    after the row is committed, with `subscription_id`, `type`, `channel`, `store_id`, `contact_id`, `customer_id` and
    `created` (true for a new row; false when an existing one changed, e.g. a new number or permission) and
-   `previous_contact_id` (the changed row's contact before; differs from `contact_id` for a new address); not for a
+   `previous_contact_id` (the changed row's contact before; differs from `contact_id` for a new address) and
+   `first_for_address` (no subscription of any type had this address in the website before); not for a
    refusal, a stopped recipient or an identical retry. Read the address with
    `SubscriptionRepositoryInterface::get()` and `getRecipient()`. Your observer's error is logged (its class only)
    and never fails the sign-up – send or queue from it, but do not rely on it to block one.
@@ -345,7 +350,7 @@ find it on a stop, without storing the number. A stop (`StopListInterface::stop(
 of the number's consents. Active consents are kept; withdrawn ones for *Keep withdrawn consents (days)*, default 1825
 (5 years), then a daily cron deletes them. A checkbox can be ticked for someone else's number: send an
 [opt-in confirmation](#opt-in-confirmation) (on `commercekings_notification_subscription_saved` when
-`contact_id !== previous_contact_id`) before marketing.
+`first_for_address`) before marketing.
 
 ## Opt-out notice
 

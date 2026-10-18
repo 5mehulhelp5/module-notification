@@ -17,8 +17,10 @@ interface SubscriptionManagementInterface
      * a stopped recipient or an identical retry that changed nothing. Data: subscription_id, type, channel, store_id,
      * contact_id (or null), customer_id (or null), created (true: a new row; false: an existing one changed, e.g. its
      * address or permission), previous_contact_id (the changed row's contact before the write; null for a new row or
-     * when it had none) - contact_id !== previous_contact_id means a new address (e.g. send an opt-in confirmation
-     * then), equal means a renewal (e.g. a new consent). An observer error is logged and never fails the sign-up.
+     * when it had none) - contact_id !== previous_contact_id means a new address, equal a renewal (e.g. a new
+     * consent) - and first_for_address (true when no subscription of any type had this address in the website before
+     * this write: send an opt-in confirmation then, not for every new cart of a known number). An observer error is
+     * logged and never fails the sign-up.
      */
     public const EVENT_SAVED = 'commercekings_notification_subscription_saved';
 

@@ -434,7 +434,8 @@ class SubscriptionManagementTest extends TestCase
         $this->assertTrue($this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test'));
         $this->assertSame([[SubscriptionManagementInterface::EVENT_SAVED, ['subscription_id' => 31, 'type' => 'test_type',
             'channel' => 'email', 'store_id' => 1, 'contact_id' => 5, 'customer_id' => null, 'created' => true,
-            'previous_contact_id' => null]]], $this->events);
+            'previous_contact_id' => null, 'first_for_address' => false]]], $this->events,
+            'the stub answers every read with 31, so the address counts as seen (real reads: MultiChannelTest)');
         $this->assertStringContainsString('subscription_id = LAST_INSERT_ID(subscription_id)', $this->queries[0][0],
             'an update reports the existing row\'s id');
     }

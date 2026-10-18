@@ -114,7 +114,8 @@ class SubscriptionManagement implements SubscriptionManagementInterface
                 return true;
             }
             $contactId = null;
-            $result = $this->store($type, $subscriptionType, $target, (string)$permission->reference, null, $customerId);
+            $result = $this->store($type, $subscriptionType, $target, (string)$permission->reference, null, $customerId,
+                $stored);
         } else {
             // other channels: the given recipient, checked and stored as a contact next to the customer, like a guest's
             if ($this->stopList->touch($channel, $address)) {
@@ -156,7 +157,7 @@ class SubscriptionManagement implements SubscriptionManagementInterface
     /**
      * EVENT_SAVED for a written row, after the commit; an observer's error is logged, never the sign-up's.
      *
-     * @param array{stored: bool, id: ?int, created: bool, previous_contact_id: ?int} $result
+     * @param array{stored: bool, id: ?int, created: bool, previous_contact_id: ?int, first_for_address: bool} $result
      */
     private function saved(array $result, string $code, SubscriptionTypeInterface $type, Target $target, ?int $contactId,
         ?int $customerId): void
@@ -174,6 +175,7 @@ class SubscriptionManagement implements SubscriptionManagementInterface
                 'customer_id' => $customerId,
                 'created' => $result['created'],
                 'previous_contact_id' => $result['previous_contact_id'],
+                'first_for_address' => $result['first_for_address'],
             ]);
         } catch (\Throwable $error) {
             $this->logger->error('CommerceKings_Notification: subscription saved event failed after commit.', [
@@ -269,12 +271,14 @@ class SubscriptionManagement implements SubscriptionManagementInterface
     }
 
     /**
-     * @return array{stored: bool, id: ?int, created: bool, previous_contact_id: ?int} stored also for an identical
-     *         retry; id only when a row was written (created: inserted, else changed; previous_contact_id: the changed
-     *         row's contact before the write)
+     * @param string $accountEmail a customer's account email, when it is the address (email types without a contact)
+     * @return array{stored: bool, id: ?int, created: bool, previous_contact_id: ?int, first_for_address: bool} stored
+     *         also for an identical retry; id only when a row was written (created: inserted, else changed;
+     *         previous_contact_id: the changed row's contact before the write; first_for_address: no subscription of
+     *         any type had this address in the website before)
      */
     private function store(string $code, SubscriptionTypeInterface $type, Target $target, string $reference,
-        ?int $contactId, ?int $customerId): array
+        ?int $contactId, ?int $customerId, string $accountEmail = ''): array
     {
         $db = $this->resource->getConnection();
         $subjectKey = $this->subjectKey($type, $contactId, $customerId);
@@ -283,6 +287,7 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         $previous = (string)$db->fetchOne($db->select()->from($this->resource->getTableName(self::TABLE), 'contact_id')
             ->where('type = ?', $code)->where('reference_id = ?', $target->referenceId)
             ->where('subject_key = ?', $subjectKey));
+        $first = !$this->addressSubscribed($target, $contactId, $customerId, $accountEmail);
         $statement = $db->query(sprintf(
             'INSERT INTO %s (type, reference_id, store_id, subject_key, contact_id, customer_id, permission_ref, captured_at)'
             . ' SELECT ?, ?, ?, ?, ?, ?, ?, NOW() FROM DUAL WHERE %s ON DUPLICATE KEY UPDATE'
@@ -302,7 +307,8 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         $rows = $statement->rowCount();
         if ($rows > 0) {
             return ['stored' => true, 'id' => (int)$db->fetchOne('SELECT LAST_INSERT_ID()'), 'created' => $rows === 1,
-                'previous_contact_id' => $rows === 1 || $previous === '' ? null : (int)$previous];
+                'previous_contact_id' => $rows === 1 || $previous === '' ? null : (int)$previous,
+                'first_for_address' => $first];
         }
         // Zero rows: refused, or an identical retry of an acknowledged-but-lost response.
         $select = $db->select()->from($this->resource->getTableName(self::TABLE), 'subscription_id')
@@ -313,7 +319,27 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         foreach ($conditions as $condition) {
             $select->where($condition);
         }
-        return ['stored' => (bool)$db->fetchOne($select), 'id' => null, 'created' => false, 'previous_contact_id' => null];
+        return ['stored' => (bool)$db->fetchOne($select), 'id' => null, 'created' => false, 'previous_contact_id' => null,
+            'first_for_address' => false];
+    }
+
+    /**
+     * Did any subscription (any type) have this address in the target's website before this write? A contact is one
+     * address per website and channel; a customer's account email also counts as the email contact of that address.
+     */
+    private function addressSubscribed(Target $target, ?int $contactId, ?int $customerId, string $accountEmail): bool
+    {
+        $db = $this->resource->getConnection();
+        $select = $db->select()->from($this->resource->getTableName(self::TABLE), 'subscription_id')->limit(1);
+        if ($contactId !== null) {
+            return (bool)$db->fetchOne($select->where('contact_id = ?', $contactId));
+        }
+        $contact = $accountEmail === '' ? null : $this->contacts->find($this->websiteId($target), $accountEmail);
+        $select->where('customer_id = ?', (int)$customerId)->where('contact_id IS NULL');
+        if ($contact !== null) {
+            $select->orWhere('contact_id = ?', $contact);
+        }
+        return (bool)$db->fetchOne($select);
     }
 
     /** A guest can only remove the one subscription of a single type; per-person ones need the withdrawal link. */

@@ -16,7 +16,8 @@
         "column": {
             "recipient_hash": true,
             "stopped_at": true,
-            "last_attempt_at": true
+            "last_attempt_at": true,
+            "reason": true
         },
         "index": {
             "CK_NOTIFICATION_STOP_LAST_ATTEMPT_AT": true

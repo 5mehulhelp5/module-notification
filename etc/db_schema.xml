@@ -16,6 +16,7 @@
     <!-- do not contact: recipients who stopped stoppable notifications; keyed hashes only, never an address -->
     <table name="ck_notification_stop" resource="default" engine="innodb" comment="CK notification: do not contact">
         <column xsi:type="varchar" name="recipient_hash" nullable="false" length="64" comment="Keyed hash of channel and normalized recipient"/>
+        <column xsi:type="varchar" name="reason" nullable="false" length="16" default="link" comment="link, reply or undeliverable (StopListInterface::REASON_*)"/>
         <column xsi:type="timestamp" name="stopped_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="Stopped at"/>
         <column xsi:type="timestamp" name="last_attempt_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="Last sign-up attempt (restarts the lift timer)"/>
         <constraint xsi:type="primary" referenceId="PRIMARY">

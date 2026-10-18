@@ -111,6 +111,36 @@ class StopListTest extends TestCase
         $this->assertFalse($this->stopList->isStopped(Channel::EMAIL, $this->email('b')), 'quiet for too long: lifted');
     }
 
+    /** A STOP reply holds until START; link and undeliverable stops lift; a stop keeps its strongest reason. */
+    public function testAStopReplyHoldsUntilResumeAndAStopKeepsItsStrongestReason(): void
+    {
+        $db = $this->resource->getConnection();
+        $table = $this->resource->getTableName(StopList::TABLE);
+        $hash = fn (string $recipient) => (fn () => $this->hashes(Channel::EMAIL, $recipient)[0])->call($this->stopList);
+        $this->stopList->stop(Channel::EMAIL, $this->email('a'), StopList::REASON_REPLY);
+        $this->stopList->stop(Channel::EMAIL, $this->email('b'), StopList::REASON_UNDELIVERABLE);
+        $this->stopList->stop(Channel::EMAIL, $this->email('c'));
+        $this->assertSame([StopList::REASON_REPLY, StopList::REASON_UNDELIVERABLE, StopList::REASON_LINK],
+            array_map(fn ($name) => $this->stopList->getReason(Channel::EMAIL, $this->email($name)), ['a', 'b', 'c']));
+
+        $this->stopList->stop(Channel::EMAIL, $this->email('a'), StopList::REASON_UNDELIVERABLE);
+        $this->stopList->stop(Channel::EMAIL, $this->email('a'));
+        $this->assertSame(StopList::REASON_REPLY, $this->stopList->getReason(Channel::EMAIL, $this->email('a')),
+            'a reply is never weakened');
+        $this->stopList->stop(Channel::EMAIL, $this->email('b'));
+        $this->assertSame(StopList::REASON_LINK, $this->stopList->getReason(Channel::EMAIL, $this->email('b')),
+            'a stronger reason replaces a weaker one');
+
+        $db->update($table, ['last_attempt_at' => new \Zend_Db_Expr('NOW() - INTERVAL 400 DAY')],
+            ['recipient_hash IN (?)' => [$hash($this->email('a')), $hash($this->email('b')), $hash($this->email('c'))]]);
+        $this->stopList->cleanUp();
+        $this->assertTrue($this->stopList->isStopped(Channel::EMAIL, $this->email('a')), 'a STOP reply is not lifted by time');
+        $this->assertFalse($this->stopList->isStopped(Channel::EMAIL, $this->email('b')));
+        $this->assertFalse($this->stopList->isStopped(Channel::EMAIL, $this->email('c')));
+        $this->stopList->resume(Channel::EMAIL, $this->email('a'));
+        $this->assertNull($this->stopList->getReason(Channel::EMAIL, $this->email('a')), 'START lifts it');
+    }
+
     public function testBlockRemovesEveryGuestAndCustomerSubscriptionOfTheAddress(): void
     {
         $db = $this->resource->getConnection();

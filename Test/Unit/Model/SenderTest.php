@@ -308,6 +308,22 @@ class SenderTest extends TestCase
             'nothing claimed, built or sent');
     }
 
+    /** A recipient the channel cannot take (normalizes to '') never reaches a claim or a provider. */
+    public function testAnInvalidRecipientIsRefusedBeforeAnyClaim(): void
+    {
+        $digits = new class implements RecipientNormalizerInterface {
+            public function normalize(string $recipient): string { return ''; }
+        };
+        $sender = $this->sender(extra: [$this->textProvider()], normalizers: ['text' => $digits]);
+        try {
+            $sender->send(Delivery::text(3, 'text', 'not a number', fn () => new DeliveryContent([], text: 'Hi')));
+            $this->fail('Expected an InvalidArgumentException');
+        } catch (\InvalidArgumentException $error) {
+            $this->assertStringNotContainsString('not a number', $error->getMessage(), 'no address in the message');
+        }
+        $this->assertSame([[], [], []], [$this->claims, $this->mail['text'] ?? [], $this->emulated]);
+    }
+
     public function testQuietHoursNeverHoldServiceMessagesOrOtherChannels(): void
     {
         $this->quiet = ['text'];

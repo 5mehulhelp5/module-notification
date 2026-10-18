@@ -29,6 +29,10 @@ interface SenderInterface
      * \CommerceKings\Notification\Exception\MessageSentException - it is out, never send it again.
      *
      * @return string self::SENT, self::COOLDOWN, self::RECIPIENT_CHANGED, self::STOPPED or self::QUIET_HOURS
+     * @throws \InvalidArgumentException when the recipient is not valid for the channel (normalizes to ''), before any
+     *     claim
+     * @throws \CommerceKings\Notification\Exception\MessageSentException when a step failed after the provider
+     *     accepted it
      */
     public function send(Delivery $delivery): string;
 }
