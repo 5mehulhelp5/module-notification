@@ -8,6 +8,11 @@
                 <cooldown_days>7</cooldown_days>
                 <one_click_unsubscribe>0</one_click_unsubscribe>
             </general>
+            <quiet_hours>
+                <enabled>0</enabled>
+                <from>21,00,00</from>
+                <to>08,00,00</to>
+            </quiet_hours>
             <do_not_contact>
                 <link>1</link>
                 <lift_days>90</lift_days>

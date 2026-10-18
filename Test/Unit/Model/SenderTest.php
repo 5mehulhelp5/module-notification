@@ -43,6 +43,8 @@ class SenderTest extends TestCase
     private array $stopped = [];
     private bool $oneClick = false;
     private string $stopUrl = '';
+    /** channels in quiet hours */
+    private array $quiet = [];
 
     /** @param object|null $mailMessage the transport's message; null: Magento 2.4.8+ (Symfony) */
     /** @param ProviderInterface[] $extra more providers; $selected the stored provider code */
@@ -94,7 +96,10 @@ class SenderTest extends TestCase
         $stopList = $this->createStub(\CommerceKings\Notification\Api\StopListInterface::class);
         $stopList->method('isStopped')->willReturnCallback(fn ($channel, $recipient) => in_array($channel . ':' . $recipient, $this->stopped, true));
         $stopList->method('getStopUrl')->willReturnCallback(fn () => $this->stopUrl);
-        return new Sender($this->pool, $emulation, $cooldown, $config, $logger, new RecipientNormalizerPool($normalizers), $stopList);
+        $quietHours = $this->createStub(\CommerceKings\Notification\Api\QuietHoursInterface::class);
+        $quietHours->method('isQuiet')->willReturnCallback(fn ($storeId, $channel) => in_array($channel, $this->quiet, true));
+        return new Sender($this->pool, $emulation, $cooldown, $config, $logger, new RecipientNormalizerPool($normalizers),
+            $stopList, $quietHours);
     }
 
     private function message(bool $useCooldown = true, ?\Closure $current = null, ?string $oneClick = null,
@@ -278,6 +283,40 @@ class SenderTest extends TestCase
             false, null, Channel::EMAIL, false);
         $this->assertSame(SenderInterface::SENT, $this->sender()->send($service), 'an order email ignores the stop');
         $this->assertSame(1, $this->sent);
+    }
+
+    /** Held, not dropped: nothing is claimed, built or sent, so the caller can send it again when the window ends. */
+    public function testAStoppableSendInQuietHoursIsHeldBeforeAnyClaim(): void
+    {
+        $this->quiet = [Channel::EMAIL];
+        $content = 0;
+        $marketing = new Delivery(3, 'tpl', 'general', 'a@test.com', function () use (&$content) {
+            $content++;
+            return new DeliveryContent([], 'Jane');
+        });
+        $this->assertSame(SenderInterface::QUIET_HOURS, $this->sender()->send($marketing));
+        $this->assertSame([0, 0, [], [], []], [$this->sent, $content, $this->claims, $this->released, $this->emulated],
+            'nothing claimed, built or sent');
+    }
+
+    public function testQuietHoursNeverHoldServiceMessagesOrOtherChannels(): void
+    {
+        $this->quiet = ['text'];
+        $service = Delivery::text(3, 'text', '+381601234567', fn () => new DeliveryContent([], text: 'Shipped'),
+            stoppable: false);
+        $sender = $this->sender(extra: [$this->textProvider()]);
+        $this->assertSame(SenderInterface::SENT, $sender->send($service), 'an order message is never held');
+        $this->assertSame(SenderInterface::SENT, $sender->send($this->message()), 'email is not in quiet hours here');
+        $this->assertSame(SenderInterface::QUIET_HOURS, $sender->send(Delivery::text(3, 'text', '+381601234567',
+            fn () => new DeliveryContent([], text: 'Your cart is waiting'))));
+    }
+
+    /** Stopped is final and wins: a held delivery would only be dropped later. */
+    public function testAStoppedRecipientIsDroppedEvenInQuietHours(): void
+    {
+        $this->quiet = [Channel::EMAIL];
+        $this->stopped = ['email:a@test.com'];
+        $this->assertSame(SenderInterface::STOPPED, $this->sender()->send($this->message()));
     }
 
     public function testServiceMessageKeepsGoingWhenItsRecipientIsNormalized(): void

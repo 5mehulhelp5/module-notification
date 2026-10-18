@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Quiet hours:** `QuietHoursInterface` (`isQuiet`, `nextAllowedAt`) and *Notifications > Quiet hours* (per store
+  view: from – to, may cross midnight; channels, by default every channel except email; off by default). The sender
+  holds a stoppable delivery in quiet hours with the new status `SenderInterface::QUIET_HOURS` before any cooldown
+  claim: held, not dropped – the feature sends it again at `nextAllowedAt()`. Service messages are never held. Times
+  are in the store's time zone; rules in the recipient's local time (e.g. Florida's FTSA, 08:00–20:00) need a
+  `QuietHoursInterface` preference.
 - **Channel-generic sign-ups:** contacts store `channel` and `recipient` (an email address, a phone number, …);
   `SubscriptionTypeInterface::getChannel()` says which channel a type's subscribers are reached on, and guests
   subscribe with one `recipient` field (REST `{"type", "reference", "recipient"}`), validated by the channel's

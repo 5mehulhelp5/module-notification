@@ -31,10 +31,10 @@ Each module answers one question:
 - **One queue consumer** `commerceKingsNotificationSend` for every type. Messages are `<type>|<reference>`;
   for subscription types the reference is the subscription id, and only a subscription that still exists with
   a valid permission is handed over.
-- **Sender** (`Api\SenderInterface`): optional recipient cooldown, recipient re-check, content built in the delivery's
-  store, then the provider selected for the channel (**Email provider**, per website, default *Magento email*). A
-  failure before the provider accepted it releases the cooldown claim; a failure after it surfaces as
-  `MessageSentException` so it is never sent twice.
+- **Sender** (`Api\SenderInterface`): stop list and quiet hours for stoppable deliveries, optional recipient cooldown,
+  recipient re-check, content built in the delivery's store, then the provider selected for the channel (**Email
+  provider**, per website, default *Magento email*). A failure before the provider accepted it releases the cooldown
+  claim; a failure after it surfaces as `MessageSentException` so it is never sent twice.
 - **Providers** (`Api\ProviderInterface`, registered in `Model\ProviderPool`): deliver a notification on one channel.
   The built-in *Magento email* provider uses Magento's email templates and mail transport, with
   optional RFC 8058 one-click unsubscribe headers (**One-click unsubscribe**, Yes/No per website, default No; the
@@ -49,6 +49,13 @@ Each module answers one question:
   the lift timer; the sender drops stoppable deliveries (`STOPPED`) and passes the others (`Delivery::$stoppable
   = false`); a stoppable send without its own unsubscribe link gets the stop link as its one-click URL. A cron lifts stops after *N* days without attempts. Keyed hashes only
   (`ck_notification_stop`); the link carries the recipient encrypted. Design: [stop list](stop-list.md).
+- **Quiet hours** (`Api\QuietHoursInterface`): a daily window (e.g. 21:00–08:00, may cross midnight) in which
+  stoppable deliveries on the selected channels are held (`QUIET_HOURS`, before any cooldown claim) and sent by the
+  feature after it (`nextAllowedAt()`, UTC). Service messages are never held. The default uses the store's time zone
+  (*General > Locale Options*); on the day clocks go forward a time in the skipped hour means the first time after it,
+  on the day they go back a time in the repeated hour means its first occurrence. Rules based on the recipient's local
+  time – e.g. US state laws such as Florida's FTSA (08:00–20:00 in the recipient's time zone) – need a
+  `QuietHoursInterface` preference that knows it (a planned SMS provider module adds one).
 - **Encryption key change**: stops and stop links are checked under every key in `env.php` (`Model\KeyedHash`); a
   stop found under an older key moves to the newest one, and an older-key link can stop but never undo. Nothing to
   run: leftover rows go with the normal cleanups (cooldown period, lift days).
@@ -82,6 +89,8 @@ notification whose content passes an HTTPS unsubscribe URL (an http URL sends th
 warning); that URL must accept the mail client's POST.
 **Do not contact**: *"Stop these emails" link* (store view, default Yes) and *Lifts after (days without attempts)*
 (global, default 90) – see [stop list](stop-list.md).
+**Quiet hours** (store view): *Enabled* (default No), *From* / *To* (default 21:00 / 08:00, store time zone) and
+*Channels* (none selected, the default: every channel except email).
 
 ## Tests
 

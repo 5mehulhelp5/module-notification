@@ -9,6 +9,7 @@ use CommerceKings\Notification\Api\Data\Delivery;
 use CommerceKings\Notification\Api\Data\DeliveryContent;
 use CommerceKings\Notification\Api\ProviderInterface;
 use CommerceKings\Notification\Api\ProviderPoolInterface;
+use CommerceKings\Notification\Api\QuietHoursInterface;
 use CommerceKings\Notification\Api\StopListInterface;
 use CommerceKings\Notification\Api\SenderInterface;
 use CommerceKings\Notification\Exception\MessageSentException;
@@ -17,10 +18,11 @@ use Magento\Store\Model\App\Emulation;
 use Psr\Log\LoggerInterface;
 
 /**
- * Sends one notification: stoppable deliveries to a stopped recipient are dropped, then the optional recipient
- * cooldown claim, recipient re-check, content built in the delivery's store, and the provider selected for the
- * channel. A one-click unsubscribe URL only reaches providers that support it. A notification the provider accepted
- * can't be recalled - a later failure must never cause a second one, so it surfaces as MessageSentException.
+ * Sends one notification: a stoppable delivery to a stopped recipient is dropped, and one in quiet hours is held
+ * (before any claim); then the optional recipient cooldown claim, recipient re-check, content built in the delivery's
+ * store, and the provider selected for the channel. A one-click unsubscribe URL only reaches providers that support
+ * it. A notification the provider accepted can't be recalled - a later failure must never cause a second one, so it
+ * surfaces as MessageSentException.
  */
 class Sender implements SenderInterface
 {
@@ -31,7 +33,8 @@ class Sender implements SenderInterface
         private readonly Config $config,
         private readonly LoggerInterface $logger,
         private readonly RecipientNormalizerPool $normalizers,
-        private readonly StopListInterface $stopList
+        private readonly StopListInterface $stopList,
+        private readonly QuietHoursInterface $quietHours
     ) {
     }
 
@@ -43,6 +46,10 @@ class Sender implements SenderInterface
         $delivery = $this->withRecipient($delivery, $recipient);
         if ($delivery->stoppable && $this->stopList->isStopped($delivery->channel, $delivery->recipient)) {
             return self::STOPPED;
+        }
+        // service messages (not stoppable) are never held
+        if ($delivery->stoppable && $this->quietHours->isQuiet($delivery->storeId, $delivery->channel)) {
+            return self::QUIET_HOURS;
         }
         $key = $delivery->channel === Channel::EMAIL
             ? $delivery->recipient : $delivery->channel . ':' . $delivery->recipient;

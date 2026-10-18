@@ -24,9 +24,12 @@ contact (orders, payments); a feature's marketing is stoppable (the default). A 
 unsubscribe link of its own gets the stop link as its one-click URL. Marketing templates show the stop link with
 `{{depend stop_url}}…{{var stop_url}}…{{/depend}}`, the URL from
 `Api\StopListInterface::getStopUrl(Channel::EMAIL, $email, $storeId)` ('' when the shop turned it off).
-`SenderInterface::send()` returns `SENT`, `COOLDOWN`, `RECIPIENT_CHANGED` or `STOPPED`; on anything but `SENT`,
-undo your own claim. Replace the cooldown with a
-`CooldownInterface` preference.
+`SenderInterface::send()` returns `SENT`, `COOLDOWN`, `RECIPIENT_CHANGED`, `STOPPED` or `QUIET_HOURS`; on anything
+but `SENT`, undo your own claim. `QUIET_HOURS` means held, not dropped: a stoppable delivery in the store's quiet hours
+for its channel; nothing was sent or claimed. Send it again at `QuietHoursInterface::nextAllowedAt($storeId, $channel)`
+(UTC), keeping your own retry state (it is not a failure); a finder can leave out a store while `isQuiet()`.
+Deliveries with `$stoppable = false` are never held. Replace the cooldown with a `CooldownInterface` preference, the
+quiet hours with a `QuietHoursInterface` preference (e.g. one that uses the recipient's time zone).
 
 ## Providers
 

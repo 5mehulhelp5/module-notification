@@ -15,15 +15,20 @@ interface SenderInterface
     public const RECIPIENT_CHANGED = 'recipient changed';
     /** A stoppable delivery to a recipient on the do-not-contact list; nothing was sent. */
     public const STOPPED = 'recipient stopped';
+    /**
+     * A stoppable delivery in quiet hours (QuietHoursInterface): held, not dropped - nothing was sent or claimed;
+     * send it again at QuietHoursInterface::nextAllowedAt().
+     */
+    public const QUIET_HOURS = 'quiet hours';
 
     /**
-     * Drops stoppable deliveries to recipients on the do-not-contact list, claims the recipient cooldown (if the
-     * delivery uses it and it is on), re-checks the recipient, builds the
+     * Drops stoppable deliveries to recipients on the do-not-contact list, holds stoppable deliveries in quiet hours,
+     * claims the recipient cooldown (if the delivery uses it and it is on), re-checks the recipient, builds the
      * content in the delivery's store and hands it to the provider selected for the channel. A failure before
      * the provider accepted it releases the cooldown claim and is rethrown; a failure after it is rethrown as
      * \CommerceKings\Notification\Exception\MessageSentException - it is out, never send it again.
      *
-     * @return string self::SENT, self::COOLDOWN, self::RECIPIENT_CHANGED or self::STOPPED
+     * @return string self::SENT, self::COOLDOWN, self::RECIPIENT_CHANGED, self::STOPPED or self::QUIET_HOURS
      */
     public function send(Delivery $delivery): string;
 }

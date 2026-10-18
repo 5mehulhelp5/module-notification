@@ -40,6 +40,31 @@
                     <validate>required-entry validate-digits validate-greater-than-zero</validate>
                 </field>
             </group>
+            <group id="quiet_hours" translate="label comment" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Quiet hours</label>
+                <fieldset_css>commercekings-config-section</fieldset_css>
+                <comment>Marketing notifications are held during these hours and go out after them; messages about orders are never held. Times are in the store's time zone (General > Locale Options), not the recipient's: rules based on the recipient's local time (e.g. some US states) need a module for that.</comment>
+                <field id="enabled" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enabled</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="from" translate="label" type="time" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>From</label>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+                <field id="to" translate="label comment" type="time" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>To</label>
+                    <comment>May be earlier than From: the window then crosses midnight (e.g. 21:00 to 08:00).</comment>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+                <field id="channels" translate="label comment" type="multiselect" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1" canRestore="1">
+                    <label>Channels</label>
+                    <source_model>CommerceKings\Notification\Model\Config\Source\Channel</source_model>
+                    <can_be_empty>1</can_be_empty>
+                    <comment>None selected: every channel except email (e.g. SMS, WhatsApp).</comment>
+                    <depends><field id="enabled">1</field></depends>
+                </field>
+            </group>
         </section>
     </system>
 </config>
