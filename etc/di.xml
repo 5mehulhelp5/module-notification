@@ -65,19 +65,6 @@
             </argument>
         </arguments>
     </type>
-    <!-- run by hand after encryption:key:change; the proxy avoids building the cleanup on every bin/magento run -->
-    <type name="CommerceKings\Notification\Console\Command\KeyChangeCleanup">
-        <arguments>
-            <argument name="cleanup" xsi:type="object">CommerceKings\Notification\Model\KeyChangeCleanup\Proxy</argument>
-        </arguments>
-    </type>
-    <type name="Magento\Framework\Console\CommandList">
-        <arguments>
-            <argument name="commands" xsi:type="array">
-                <item name="notification_key_change_cleanup" xsi:type="object">CommerceKings\Notification\Console\Command\KeyChangeCleanup</item>
-            </argument>
-        </arguments>
-    </type>
     <!-- feature modules register their notification types here (argument "types": code => NotificationTypeInterface) -->
     <type name="CommerceKings\Notification\Model\TypePool">
         <arguments>

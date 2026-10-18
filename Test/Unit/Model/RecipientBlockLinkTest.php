@@ -6,7 +6,6 @@ namespace CommerceKings\Notification\Test\Unit\Model;
 use CommerceKings\Notification\Api\Channel;
 use CommerceKings\Notification\Api\SubscriptionPermissionInterface;
 use CommerceKings\Notification\Model\Config;
-use CommerceKings\Notification\Model\KeyFingerprint;
 use CommerceKings\Notification\Model\RecipientBlock;
 use CommerceKings\Notification\Model\RecipientNormalizerPool;
 use Magento\Framework\App\ResourceConnection;
@@ -32,7 +31,7 @@ class RecipientBlockLinkTest extends TestCase
         $url->method('getUrl')->willReturnCallback(fn ($route, $params) => 'https://shop.test/' . $route . '?'
             . http_build_query($params['_query']));
         return (new RecipientBlock($this->createStub(ResourceConnection::class), $encryptor, $url, $config,
-            new RecipientNormalizerPool(), $this->createStub(KeyFingerprint::class), $permission, $hashes))
+            new RecipientNormalizerPool(), $permission, $hashes))
             ->getBlockUrl(Channel::EMAIL, 'a@example.test', 1);
     }
 

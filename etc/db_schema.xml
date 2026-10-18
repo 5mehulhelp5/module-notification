@@ -6,15 +6,11 @@
         <column xsi:type="varchar" name="recipient_hash" nullable="false" length="64" comment="Keyed hash of normalized recipient"/>
         <column xsi:type="timestamp" name="sent_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="Claim time"/>
         <column xsi:type="varchar" name="claim_token" nullable="true" length="32" comment="Owner of delivery claim"/>
-        <column xsi:type="varchar" name="key_id" nullable="true" length="16" comment="Fingerprint of the encryption key that made the hash"/>
         <constraint xsi:type="primary" referenceId="PRIMARY">
             <column name="recipient_hash"/>
         </constraint>
         <index referenceId="CK_NOTIFICATION_COOLDOWN_SENT_AT" indexType="btree">
             <column name="sent_at"/>
-        </index>
-        <index referenceId="CK_NOTIFICATION_COOLDOWN_KEY_ID" indexType="btree">
-            <column name="key_id"/>
         </index>
     </table>
     <!-- do not contact: recipients who stopped marketing notifications; keyed hashes only, never an address -->
@@ -22,15 +18,11 @@
         <column xsi:type="varchar" name="recipient_hash" nullable="false" length="64" comment="Keyed hash of channel and normalized recipient"/>
         <column xsi:type="timestamp" name="blocked_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="Blocked at"/>
         <column xsi:type="timestamp" name="last_attempt_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="Last sign-up attempt (restarts the lift timer)"/>
-        <column xsi:type="varchar" name="key_id" nullable="true" length="16" comment="Fingerprint of the encryption key that made the hash"/>
         <constraint xsi:type="primary" referenceId="PRIMARY">
             <column name="recipient_hash"/>
         </constraint>
         <index referenceId="CK_NOTIFICATION_RECIPIENT_BLOCK_LAST_ATTEMPT_AT" indexType="btree">
             <column name="last_attempt_at"/>
-        </index>
-        <index referenceId="CK_NOTIFICATION_RECIPIENT_BLOCK_KEY_ID" indexType="btree">
-            <column name="key_id"/>
         </index>
     </table>
     <!-- guest email addresses, one row per website and address; features point to contact_id -->

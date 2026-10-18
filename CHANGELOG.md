@@ -6,10 +6,7 @@
   and the stop link accepts the mail provider's RFC 8058 one-click POST (blocks, never undoes).
 - **Encryption key change:** blocks and stop links keep working after `encryption:key:change` while the old key stays
   in `env.php`: blocks are looked up under every listed key and moved to the newest one when found; older-key links
-  can block (also one-click) but never undo. Rows store a fingerprint of their key;
-  `bin/magento notification:key-change:cleanup` (`--dry-run` counts rows per key) removes earlier-key cooldown rows,
-  and with `--force` the rows of keys no longer listed, posting an admin notification when blocks were lifted (needs
-  Magento_AdminNotification, which is suggested, not required). It runs only by hand, never on a schedule.
+  can block (also one-click) but never undo. Nothing to run; leftover rows go with the normal cleanups.
 - **Do not contact:** a signed "stop these emails" link in marketing notifications (`RecipientBlockInterface`,
   `/cknotification/block` with a confirmation and Undo) stops all marketing notifications to that address. Blocked
   recipients are not subscribed again (answered as stored, so the list cannot be probed); the sender drops marketing

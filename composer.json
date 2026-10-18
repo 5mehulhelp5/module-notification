@@ -20,7 +20,6 @@
         "commercekings/module-core": "^0.1"
     },
     "suggest": {
-        "magento/module-admin-notification": "Shows the admin notification after an encryption key change (without it, only the log records it).",
         "magento/module-mysql-mq": "Use Magento's native database queue transport when RabbitMQ is unavailable.",
         "commercekings/module-consent-notification": "Require a consent (commercekings/module-consent) for every subscription",
         "commercekings/module-rate-limit": "Rate limits for the guest subscribe endpoint in the admin (Magento 2.4.7+); a web server or CDN rule works too"

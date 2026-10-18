@@ -48,13 +48,9 @@ Each module answers one question:
   the lift timer; the sender drops marketing deliveries (`BLOCKED`) and passes service ones (`Delivery::$marketing
   = false`). A cron lifts blocks after *N* days without attempts. Keyed hashes only
   (`ck_notification_recipient_block`); the link carries the recipient encrypted. Design: [recipient block](recipient-block.md).
-- **Encryption key change**: blocks and cooldown rows store a fingerprint of the key that made their hash (`key_id`).
-  Blocks and stop links are checked under every key in `env.php` (`Model\KeyedHash`); a block found under an older
-  key moves to the newest one, and an older-key link can block but never undo. `bin/magento
-  notification:key-change:cleanup` (run by hand, `--dry-run` counts rows per key) removes earlier-key cooldown rows;
-  `--force` also removes rows of keys no longer listed (never rows without a fingerprint), logs the counts and, when
-  blocks were lifted, posts one admin notification
-  (`Magento\Framework\Notification\NotifierInterface`; shown by Magento_AdminNotification when installed).
+- **Encryption key change**: blocks and stop links are checked under every key in `env.php` (`Model\KeyedHash`); a
+  block found under an older key moves to the newest one, and an older-key link can block but never undo. Nothing to
+  run: leftover rows go with the normal cleanups (cooldown period, lift days).
 
 ## Subscribe
 

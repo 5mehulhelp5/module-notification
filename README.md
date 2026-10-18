@@ -114,11 +114,10 @@ Details, including how to build an SMS provider: [for module authors](docs/modul
   [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit).
 - A failed send is not retried by Notification; the feature decides (abandoned cart queues the cart again).
 - Do not contact blocks, the "stop these emails" links and the cooldown are keyed with Magento's encryption key.
-  After `encryption:key:change` blocks and stop links keep working while the old key stays in `env.php` (Magento
-  keeps it): a block found under an older key moves to the newest one, and an old stop link can still stop the
-  emails (one-click too) but not turn them back on. The cooldown restarts. Removing an old key from `env.php` lifts
-  the blocks not yet moved and ends links signed with it; `bin/magento notification:key-change:cleanup --force`
-  then removes those rows and tells the shop owner in the admin
+  After `encryption:key:change` nothing needs to be run: blocks and stop links keep working while the old key stays
+  in `env.php` (Magento keeps it) – a block found under an older key moves to the newest one, and an old stop link
+  can still stop the emails (one-click too) but not turn them back on. The cooldown restarts. Don't remove an old key
+  from `env.php` while blocks may still use it: those not yet moved would lift
   ([details](docs/recipient-block.md#encryption-key-change)). Subscriptions, contacts and consent records are not
   affected, and consent withdrawal links keep working the same way; cart restore links expire (see those modules).
 

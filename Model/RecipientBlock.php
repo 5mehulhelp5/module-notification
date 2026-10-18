@@ -24,7 +24,6 @@ class RecipientBlock implements RecipientBlockInterface
         private readonly UrlInterface $url,
         private readonly Config $config,
         private readonly RecipientNormalizerPool $normalizers,
-        private readonly KeyFingerprint $fingerprint,
         private readonly SubscriptionPermissionInterface $permission,
         private readonly KeyedHash $keyedHash
     ) {
@@ -45,8 +44,7 @@ class RecipientBlock implements RecipientBlockInterface
                 'recipient_hash' => $hashes[0],
                 'blocked_at' => new \Zend_Db_Expr('NOW()'),
                 'last_attempt_at' => new \Zend_Db_Expr('NOW()'),
-                'key_id' => $this->fingerprint->current(),
-            ], ['last_attempt_at', 'key_id']);
+            ], ['last_attempt_at']);
             if (count($hashes) > 1) {
                 // the same recipient blocked under an older key: one row, under the newest key
                 $db->delete($this->resource->getTableName(self::TABLE), ['recipient_hash IN (?)' => array_slice($hashes, 1)]);
@@ -152,9 +150,8 @@ class RecipientBlock implements RecipientBlockInterface
             return null;
         }
         if (!in_array($hashes[0], $found, true)) {
-            $db->query("INSERT IGNORE INTO {$table} (recipient_hash, blocked_at, last_attempt_at, key_id)"
-                . " SELECT ?, blocked_at, last_attempt_at, ? FROM {$table} WHERE recipient_hash = ?",
-                [$hashes[0], $this->fingerprint->current(), $found[0]]);
+            $db->query("INSERT IGNORE INTO {$table} (recipient_hash, blocked_at, last_attempt_at)"
+                . " SELECT ?, blocked_at, last_attempt_at FROM {$table} WHERE recipient_hash = ?", [$hashes[0], $found[0]]);
         }
         $older = array_values(array_diff($found, [$hashes[0]]));
         if ($older) {

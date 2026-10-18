@@ -86,7 +86,7 @@ The hashes and links are keyed with Magento's encryption key. Only hashes are st
 re-hashed from its address – but Magento keeps the old keys in `env.php` after `encryption:key:change`, so:
 
 - **Blocks keep working.** A recipient is looked up under every listed key; a block found under an older key is
-  moved to the newest one (and its fingerprint, `key_id`, updated), so it also survives the later removal of the
+  moved to the newest one, so it also survives the later removal of the
   old key.
 - **Stop links in emails already sent keep working**, by page and by RFC 8058 one-click – but only to **block**.
   Undo needs a link signed with the newest key, so a leaked old key can never turn emails back on.
@@ -97,25 +97,13 @@ re-hashed from its address – but Magento keeps the old keys in `env.php` after
 Subscriptions, contacts and consent records are not affected, and consent withdrawal links in emails already sent
 keep working while the old key stays in `env.php`.
 
-After `bin/magento encryption:key:change`, restart the queue consumers and PHP-FPM (or reset opcache), so no
-running process keeps using the old key. Then, on a server with the shop's `env.php`:
+Nothing needs to be run after a key change; restart the queue consumers and PHP-FPM (or reset opcache), so no
+running process keeps using the old key. Leftover rows go by themselves: cooldown rows of an older key within the
+cooldown period, blocks within *Lifts after (days without attempts)* once nothing matches them.
 
-```sh
-bin/magento notification:key-change:cleanup --dry-run   # rows per key; removes nothing
-bin/magento notification:key-change:cleanup             # removes cooldown rows of earlier keys
-```
-
-The dry run shows, per table, the rows of the **current** key, of an **earlier** key still listed in `env.php`, of
-an **unknown** key (no longer listed) and **unmarked** rows. By default the cleanup removes only earlier-key cooldown
-rows – blocks of a listed key are never removed. If you removed an old key from `env.php` (e.g. because it leaked),
-its blocks not yet moved can no longer match: `--force` removes those unknown-key rows, logs the counts and posts
-one admin notification with their number, so the shop owner knows that recipients who had stopped emails may get
-them again. A server with the wrong `env.php` sees every row as unknown, so never run `--force` there (the dry run
-shows it: many unknown and no current rows). Unmarked rows are never removed; they age out through the normal
-cleanups. Removed blocks cannot be restored. The command never runs automatically.
-
-- Blocking and cooldown claims store the current fingerprint; `setup:upgrade` only adds the column and never
-  changes rows.
+**Don't remove an old key from `env.php`** while blocks may still be stored under it (e.g. soon after the change, or
+because it leaked): blocks not yet moved to the newest key would no longer match and lift, and stop links signed
+with it would stop working. Removed blocks cannot be restored.
 
 ## Later
 
