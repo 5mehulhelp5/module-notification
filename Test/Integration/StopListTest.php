@@ -141,6 +141,26 @@ class StopListTest extends TestCase
         $this->assertNull($this->stopList->getReason(Channel::EMAIL, $this->email('a')), 'START lifts it');
     }
 
+    /** Parallel stops of one recipient (e.g. a STOP reply and a link click at once) all succeed; the strongest wins. */
+    public function testParallelStopsOfOneRecipientAllSucceed(): void
+    {
+        $start = (string)(microtime(true) + 2);
+        $processes = [];
+        foreach ([StopList::REASON_LINK, StopList::REASON_REPLY, StopList::REASON_UNDELIVERABLE, StopList::REASON_LINK] as $reason) {
+            $process = proc_open([PHP_BINARY, '-d', 'opcache.enable_cli=0', __DIR__ . '/stop-worker.php', $this->email('a'),
+                $reason, $start], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, BP, ['MAGENTO_ROOT' => BP] + getenv());
+            $this->assertIsResource($process);
+            $processes[] = [$process, $pipes];
+        }
+        $results = [];
+        foreach ($processes as [$process, $pipes]) {
+            $results[] = trim(stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]));
+            proc_close($process);
+        }
+        $this->assertSame(['ok', 'ok', 'ok', 'ok'], $results, 'no deadlock or "record has changed" error');
+        $this->assertSame(StopList::REASON_REPLY, $this->stopList->getReason(Channel::EMAIL, $this->email('a')));
+    }
+
     public function testBlockRemovesEveryGuestAndCustomerSubscriptionOfTheAddress(): void
     {
         $db = $this->resource->getConnection();

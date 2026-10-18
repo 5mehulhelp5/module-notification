@@ -76,6 +76,7 @@
          A provider module adds its item here and its settings group in its own system.xml. -->
     <type name="CommerceKings\Notification\Model\ProviderPool">
         <arguments>
+            <argument name="logger" xsi:type="object">Psr\Log\LoggerInterface</argument>
             <argument name="providers" xsi:type="array">
                 <item name="magento_email" xsi:type="object">CommerceKings\Notification\Model\Provider\MagentoEmail</item>
             </argument>

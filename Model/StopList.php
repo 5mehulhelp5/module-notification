@@ -57,24 +57,32 @@ class StopList implements StopListInterface
         if (!isset(self::STRENGTH[$reason])) {
             throw new \InvalidArgumentException(sprintf('Unknown stop reason "%s".', $reason));
         }
+        $hashes = $this->hashes($channel, $recipient);
+        $requested = $reason;
         $db = $this->resource->getConnection();
+        $table = $this->resource->getTableName(self::TABLE);
         $db->beginTransaction();
         try {
-            $stored = $this->getReason($channel, $recipient);
-            $kept = $stored !== null && (self::STRENGTH[$stored] ?? 0) > self::STRENGTH[$reason] ? $stored : $reason;
-            $hashes = $this->hashes($channel, $recipient);
-            $db->insertOnDuplicate($this->resource->getTableName(self::TABLE), [
-                'recipient_hash' => $hashes[0],
-                'reason' => $kept,
-                'stopped_at' => new \Zend_Db_Expr('NOW()'),
-                'last_attempt_at' => new \Zend_Db_Expr('NOW()'),
-            ], ['last_attempt_at', 'reason']);
+            // First statement, and the stronger reason wins inside it: it takes the row lock before anything is read, so
+            // parallel stops of one recipient wait for each other instead of conflicting (MariaDB refuses to update a
+            // row changed since the transaction first read).
+            $strength = "FIELD(%s, 'undeliverable', 'link', 'reply')";
+            $upsert = sprintf('INSERT INTO %s (recipient_hash, reason, stopped_at, last_attempt_at) VALUES (?, ?, NOW(), NOW())'
+                . ' ON DUPLICATE KEY UPDATE last_attempt_at = NOW(), reason = IF(%s > %s, VALUES(reason), reason)',
+                $db->quoteIdentifier($table), sprintf($strength, 'VALUES(reason)'), sprintf($strength, 'reason'));
+            $db->query($upsert, [$hashes[0], $reason]);
             if (count($hashes) > 1) {
-                // the same recipient stopped under an older key: one row, under the newest key
-                $db->delete($this->resource->getTableName(self::TABLE), ['recipient_hash IN (?)' => array_slice($hashes, 1)]);
+                // the same recipient stopped under an older key: its reason counts too, then one row under the newest key
+                foreach ($db->fetchCol($db->select()->from($table, 'reason')
+                    ->where('recipient_hash IN (?)', array_slice($hashes, 1))) as $older) {
+                    if (isset(self::STRENGTH[$older])) {
+                        $db->query($upsert, [$hashes[0], (string)$older]);
+                    }
+                }
+                $db->delete($table, ['recipient_hash IN (?)' => array_slice($hashes, 1)]);
             }
             $this->removeSubscriptions($channel, $recipient);
-            if ($reason !== self::REASON_UNDELIVERABLE) {
+            if ($requested !== self::REASON_UNDELIVERABLE) {
                 // the recipient said stop: their checkbox consents go too, with every subscription that rested on them
                 $withdrawn = $this->addressConsents->withdraw($channel, $this->normalizers->normalize($channel, $recipient));
                 if ($withdrawn) {
@@ -107,6 +115,7 @@ class StopList implements StopListInterface
 
     public function getStopUrl(string $channel, string $recipient, int $storeId): string
     {
+        $this->address($channel, $recipient);
         // in opt-out mode the link is the only way to stop the emails: it is always offered there
         if (!$this->config->isStopLinkEnabled($storeId) && !$this->permission->isOptOut()) {
             return '';
@@ -159,7 +168,7 @@ class StopList implements StopListInterface
      */
     private function hashes(string $channel, string $recipient): array
     {
-        $recipient = $this->normalizers->normalize($channel, $recipient);
+        $recipient = $this->address($channel, $recipient);
         if ($channel === Channel::EMAIL) {
             $recipient = ContactRepository::normalize($recipient);
         }
@@ -189,6 +198,19 @@ class StopList implements StopListInterface
             $db->delete($table, ['recipient_hash IN (?)' => $older]);
         }
         return $hashes[0];
+    }
+
+    /**
+     * The recipient in the channel's form; one that normalizes to '' (e.g. a number without "+") is refused rather than
+     * stored or looked up as an empty address, which would lose a STOP. The message never contains the input.
+     */
+    private function address(string $channel, string $recipient): string
+    {
+        $normalized = $this->normalizers->normalize($channel, $recipient);
+        if ($normalized === '') {
+            throw new \InvalidArgumentException(sprintf('No valid recipient for the "%s" channel.', $channel));
+        }
+        return $normalized;
     }
 
     private function sign(string $encrypted): string

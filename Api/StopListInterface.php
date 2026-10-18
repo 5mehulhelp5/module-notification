@@ -21,9 +21,16 @@ interface StopListInterface
     /** The service reported the address undeliverable: suppresses it, keeps its consents; lifts after the configured days. */
     public const REASON_UNDELIVERABLE = 'undeliverable';
 
+    /**
+     * @throws \InvalidArgumentException when the recipient is not valid for the channel (normalizes to '')
+     */
     public function isStopped(string $channel, string $recipient): bool;
 
-    /** Why the recipient is stopped (a REASON_* constant), or null when not stopped. */
+    /**
+     * Why the recipient is stopped (a REASON_* constant), or null when not stopped.
+     *
+     * @throws \InvalidArgumentException when the recipient is not valid for the channel (normalizes to '')
+     */
     public function getReason(string $channel, string $recipient): ?string;
 
     /**
@@ -31,20 +38,32 @@ interface StopListInterface
      * checkbox consents (and the subscriptions on them). A stronger reason already stored is kept.
      *
      * @param string $reason a REASON_* constant
-     * @throws \InvalidArgumentException for an unknown reason
+     * @throws \InvalidArgumentException for an unknown reason, or a recipient not valid for the channel (normalizes to '')
      */
     public function stop(string $channel, string $recipient, string $reason = self::REASON_LINK): void;
 
-    /** Lifts the stop, whatever its reason (e.g. a START reply). Removed subscriptions do not come back. */
+    /**
+     * Lifts the stop, whatever its reason (e.g. a START reply). Removed subscriptions do not come back.
+     *
+     * @throws \InvalidArgumentException when the recipient is not valid for the channel (normalizes to '')
+     */
     public function resume(string $channel, string $recipient): void;
 
     /** Lifts link and undeliverable stops without a sign-up attempt for the configured days; returns how many. */
     public function cleanUp(): int;
 
-    /** A sign-up attempt for a stopped recipient: restarts the lift timer. False when not stopped. */
+    /**
+     * A sign-up attempt for a stopped recipient: restarts the lift timer. False when not stopped.
+     *
+     * @throws \InvalidArgumentException when the recipient is not valid for the channel (normalizes to '')
+     */
     public function touch(string $channel, string $recipient): bool;
 
-    /** The signed stop link for a recipient on a channel in this store; '' when the link is turned off. */
+    /**
+     * The signed stop link for a recipient on a channel in this store; '' when the link is turned off.
+     *
+     * @throws \InvalidArgumentException when the recipient is not valid for the channel (normalizes to '')
+     */
     public function getStopUrl(string $channel, string $recipient, int $storeId): string;
 
     /**
