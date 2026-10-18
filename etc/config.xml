@@ -9,8 +9,8 @@
                 <one_click_unsubscribe>0</one_click_unsubscribe>
             </general>
             <quiet_hours>
-                <enabled>0</enabled>
-                <from>21,00,00</from>
+                <enabled>1</enabled>
+                <from>20,00,00</from>
                 <to>08,00,00</to>
             </quiet_hours>
             <do_not_contact>

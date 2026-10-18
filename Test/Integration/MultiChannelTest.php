@@ -8,6 +8,7 @@ use CommerceKings\Notification\Api\Data\DeliveryContent;
 use CommerceKings\Notification\Api\Data\Permission;
 use CommerceKings\Notification\Api\Data\Target;
 use CommerceKings\Notification\Api\ProviderInterface;
+use CommerceKings\Notification\Api\QuietHoursInterface;
 use CommerceKings\Notification\Api\RecipientNormalizerInterface;
 use CommerceKings\Notification\Api\SenderInterface;
 use CommerceKings\Notification\Api\SubscriptionPermissionInterface;
@@ -92,8 +93,9 @@ class MultiChannelTest extends TestCase
             'stopList' => $this->stopList, 'normalizers' => $this->normalizers, 'events' => $this->events()]);
         $providers = new ProviderPool($this->om->get(Config::class),
             [$this->provider('acme_sms', 'sms'), $this->provider('acme_whatsapp', 'whatsapp')]);
-        $this->sender = $this->om->create(Sender::class,
-            ['providers' => $providers, 'normalizers' => $this->normalizers, 'stopList' => $this->stopList]);
+        // quiet hours are on by default: never held here, whatever the time of the run
+        $this->sender = $this->om->create(Sender::class, ['providers' => $providers, 'normalizers' => $this->normalizers,
+            'stopList' => $this->stopList, 'quietHours' => $this->createStub(QuietHoursInterface::class)]);
     }
 
     private function events(): \Magento\Framework\Event\ManagerInterface

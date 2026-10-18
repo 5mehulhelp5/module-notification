@@ -203,7 +203,8 @@ target for SMS pumping.
 
 ### Quiet hours in the recipient's time zone
 
-The store's quiet hours (*Quiet hours*: from – to, channels) are kept in the store's time zone. US state laws such as
+The store's quiet hours (*Quiet hours*: from – to, channels; on by default, 20:00–08:00 for every channel except
+email) are kept in the store's time zone. US state laws such as
 Florida's FTSA go by the recipient's local time: register a zone provider for your channel instead of replacing
 `QuietHoursInterface` – Notification keeps the settings, the window and clock changes:
 

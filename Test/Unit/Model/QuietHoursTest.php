@@ -50,6 +50,27 @@ class QuietHoursTest extends TestCase
         return $next?->format('Y-m-d H:i');
     }
 
+    /**
+     * The shipped defaults (etc/config.xml): on, 20:00-08:00, every channel except email - a merchant who turns on text
+     * reminders without opening Quiet hours does not text at night, and email is never held by default.
+     */
+    public function testTheDefaultsHoldTextsAtNightButNeverEmail(): void
+    {
+        $defaults = simplexml_load_file(__DIR__ . '/../../../etc/config.xml')->default->commercekings_notification->quiet_hours;
+        $this->settings[1] = ['enabled' => (string)$defaults->enabled === '1', 'from' => (string)$defaults->from,
+            'to' => (string)$defaults->to, 'channels' => isset($defaults->channels) ? (string)$defaults->channels : null];
+        // the store is in Berlin: 21:00 UTC is 23:00 there
+        $quietHours = $this->quietHours('2026-06-10 21:00');
+        foreach (['sms', 'whatsapp', 'viber'] as $channel) {
+            $this->assertTrue($quietHours->isQuiet(1, $channel), $channel . ' at 23:00 store time');
+        }
+        $this->assertSame('2026-06-11 06:00', $this->next('2026-06-10 21:00'), 'until 08:00 store time');
+        $this->assertFalse($quietHours->isQuiet(1, 'email'), 'email is not held by default');
+        $this->assertNull($this->next('2026-06-10 17:59'), '19:59: not yet');
+        $this->assertSame('2026-06-11 06:00', $this->next('2026-06-10 18:00'), '20:00: quiet');
+        $this->assertNull($this->next('2026-06-11 06:00'), '08:00: over');
+    }
+
     public function testAWindowCrossingMidnight(): void
     {
         $this->window('21,00,00', '08,00,00');

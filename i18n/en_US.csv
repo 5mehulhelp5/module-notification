@@ -34,7 +34,7 @@
 "Link not valid","Link not valid"
 "Magento email","Magento email"
 "Marketing notifications are held during these hours and go out after them; messages about orders are never held. Times are in the store's time zone (General > Locale Options), unless a provider module keeps them in the recipient's (e.g. for US state rules).","Marketing notifications are held during these hours and go out after them; messages about orders are never held. Times are in the store's time zone (General > Locale Options), unless a provider module keeps them in the recipient's (e.g. for US state rules)."
-"May be earlier than From: the window then crosses midnight (e.g. 21:00 to 08:00).","May be earlier than From: the window then crosses midnight (e.g. 21:00 to 08:00)."
+"May be earlier than From: the window then crosses midnight (e.g. 20:00 to 08:00).","May be earlier than From: the window then crosses midnight (e.g. 20:00 to 08:00)."
 "Messages about your orders still arrive.","Messages about your orders still arrive."
 "Messages allowed again","Messages allowed again"
 "Messages stopped","Messages stopped"
@@ -72,3 +72,4 @@
 "WhatsApp","WhatsApp"
 "Who delivers the emails. Magento email uses the store's mail settings; an installed provider module adds its own options and settings.","Who delivers the emails. Magento email uses the store's mail settings; an installed provider module adds its own options and settings."
 "Yes","Yes"
+"On by default: 20:00 to 08:00 for every channel except email, as US state rules allow texts from 8 am to 8 pm only. Email is held only if you select it below.","On by default: 20:00 to 08:00 for every channel except email, as US state rules allow texts from 8 am to 8 pm only. Email is held only if you select it below."

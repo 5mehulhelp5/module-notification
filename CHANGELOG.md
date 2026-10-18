@@ -42,7 +42,7 @@ First release. Requires Magento 2.4.4 or later (`magento/framework ^103.0.4`).
   (START); an undeliverable number keeps its consents. Stops and links survive
   `encryption:key:change` while the old key stays in `env.php` (`Model\KeyedHash`).
 - **Quiet hours:** `QuietHoursInterface` and *Quiet hours* (per store view: from – to, may cross midnight; channels;
-  off by default). Stoppable deliveries are held (`SenderInterface::QUIET_HOURS`) and sent after `nextAllowedAt()`.
+  on by default: 20:00–08:00 for every channel except email). Stoppable deliveries are held (`SenderInterface::QUIET_HOURS`) and sent after `nextAllowedAt()`.
   The window is kept in the store's time zone, or in the recipient's through a zone provider per channel
   (`QuietHoursZoneInterface`, `Model\QuietHours` "zones").
 - **Recipient cooldown:** an optional minimum gap per recipient and channel (*Cooldown (days)*, default 7);

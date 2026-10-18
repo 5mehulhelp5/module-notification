@@ -68,7 +68,7 @@ Each module answers one question:
   attempts (cron), a STOP reply's only by `resume()` (START), and the link's Undo lifts only a link stop; an
   undeliverable number keeps its checkbox consents. Keyed hashes only (`ck_notification_stop`); the link carries the
   recipient encrypted. Design: [stop list](stop-list.md).
-- **Quiet hours** (`Api\QuietHoursInterface`): a daily window (e.g. 21:00–08:00, may cross midnight) in which
+- **Quiet hours** (`Api\QuietHoursInterface`): a daily window (by default 20:00–08:00, may cross midnight) in which
   stoppable deliveries on the selected channels are held (`QUIET_HOURS`, before any cooldown claim) and sent by the
   feature after it (`nextAllowedAt()`, UTC). Service messages are never held. The default uses the store's time zone
   (*General > Locale Options*); on the day clocks go forward a time in the skipped hour means the first time after it,
@@ -115,8 +115,9 @@ notification whose content passes an HTTPS unsubscribe URL (an http URL sends th
 warning); that URL must accept the mail client's POST.
 **Do not contact**: *"Stop these emails" link* (store view, default Yes) and *Lifts after (days without attempts)*
 (global, default 90) – see [stop list](stop-list.md).
-**Quiet hours** (store view): *Enabled* (default No), *From* / *To* (default 21:00 / 08:00, store time zone) and
-*Channels* (none selected, the default: every channel except email).
+**Quiet hours** (store view): *Enabled* (default Yes), *From* / *To* (default 20:00 / 08:00, store time zone – US
+state rules allow texts 8 am to 8 pm) and *Channels* (none selected, the default: every channel except email – so
+email is not held unless selected).
 **Consent for an address** (store view): *Checkbox text* for text messages, WhatsApp and Viber (empty: no checkbox) and
 *Keep withdrawn consents (days)*, default 1825.
 

@@ -44,9 +44,10 @@
                 <label>Quiet hours</label>
                 <fieldset_css>commercekings-config-section</fieldset_css>
                 <comment>Marketing notifications are held during these hours and go out after them; messages about orders are never held. Times are in the store's time zone (General > Locale Options), unless a provider module keeps them in the recipient's (e.g. for US state rules).</comment>
-                <field id="enabled" translate="label" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                <field id="enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Enabled</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>On by default: 20:00 to 08:00 for every channel except email, as US state rules allow texts from 8 am to 8 pm only. Email is held only if you select it below.</comment>
                 </field>
                 <field id="from" translate="label" type="time" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>From</label>
@@ -54,7 +55,7 @@
                 </field>
                 <field id="to" translate="label comment" type="time" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>To</label>
-                    <comment>May be earlier than From: the window then crosses midnight (e.g. 21:00 to 08:00).</comment>
+                    <comment>May be earlier than From: the window then crosses midnight (e.g. 20:00 to 08:00).</comment>
                     <depends><field id="enabled">1</field></depends>
                 </field>
                 <field id="channels" translate="label comment" type="multiselect" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1" canRestore="1">

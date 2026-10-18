@@ -61,7 +61,7 @@ withdrawing it removes the subscription, and notices are off by default.
 |---|---|
 | Delivery | Provider per channel (Magento email); Cooldown in days (7, global, 0 = off); One-click unsubscribe (No) |
 | Do not contact | "Stop these emails" link (Yes; always on in opt-out mode); Lifts after days without attempts (90) |
-| Quiet hours | Enabled (No); From – To (21:00 – 08:00, may cross midnight); Channels (all but email) |
+| Quiet hours | Enabled (Yes); From – To (20:00 – 08:00, may cross midnight); Channels (all but email) |
 | Consent for an address | Checkbox text for text messages, WhatsApp and Viber, per store view; Keep withdrawn consents (1825 days) |
 
 ## Before going live
