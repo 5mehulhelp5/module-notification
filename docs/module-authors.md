@@ -221,9 +221,9 @@ The `zones` argument of `Model\QuietHours` is `@api`: a stable extension point.
 
 `Api\QuietHoursZoneInterface::getZones($storeId, $channel, $recipient)` returns the zones the number may be in (e.g.
 from its country and area code): quiet while the window is on in any of them, until the latest end. Return `[]` when
-you cannot tell and for a `null` recipient (the whole store, asked by a finder before it knows the recipients) – the
-sender then holds each delivery on its own. Fall back to the store's zone yourself if you prefer that for unknown
-numbers.
+you cannot tell: for a recipient, Notification then keeps the store's time zone, so a number of unknown zone is still
+quiet at night. Return `[]` for a `null` recipient too (the whole store, asked by a finder before it knows the
+recipients): that means not quiet store-wide, and the sender holds each delivery on its own.
 
 ### Consent for an address
 

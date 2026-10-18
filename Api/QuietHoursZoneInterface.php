@@ -16,9 +16,10 @@ interface QuietHoursZoneInterface
 {
     /**
      * The zones the recipient may be in (several, e.g., for a number whose area spans zones): quiet when the window is
-     * on in any of them, until the latest of their ends. [] when it cannot tell - not quiet; for a null recipient (the
-     * whole store, asked before the recipients are known, see QuietHoursInterface) a recipient-based provider returns
-     * [], so each delivery is held on its own.
+     * on in any of them, until the latest of their ends. [] when it cannot tell: for a recipient, Notification then
+     * keeps the store's time zone (an unknown zone is never "not quiet"); for a null recipient (the whole store, asked
+     * before the recipients are known, see QuietHoursInterface) [] means not quiet store-wide - a recipient-based
+     * provider returns it, so each delivery is held on its own.
      *
      * @param string|null $recipient the delivery's address on the channel (Delivery::$recipient), null for the store
      * @return \DateTimeZone[]

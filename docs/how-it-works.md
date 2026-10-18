@@ -76,9 +76,9 @@ Each module answers one question:
   time – e.g. US state laws such as Florida's FTSA (08:00–20:00 in the recipient's time zone) – need a zone provider
   for the channel (`Api\QuietHoursZoneInterface`, di.xml `Model\QuietHours` "zones"): a provider module adds one
   for its channel, one per channel – two SMS provider modules would replace each other's, so install one per
-  channel. The window is then kept in the recipient's zones, quiet while it is on in any of them. Asked without a
-  recipient (a finder, before it knows the recipients), such a provider gives no zone – "not quiet" – and the sender
-  holds each delivery on its own.
+  channel. The window is then kept in the recipient's zones, quiet while it is on in any of them; a number the
+  provider cannot place keeps the store's zone. Asked without a recipient (a finder, before it knows the
+  recipients), such a provider gives no zone – "not quiet" – and the sender holds each delivery on its own.
 - **Encryption key change**: stops and stop links are checked under every key in `env.php` (`Model\KeyedHash`); a
   stop found under an older key moves to the newest one, and an older-key link can stop but never undo. Nothing to
   run: leftover rows go with the normal cleanups (cooldown period, lift days).

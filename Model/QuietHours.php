@@ -15,7 +15,8 @@ use Magento\Store\Model\ScopeInterface;
  * The store's quiet hours (Stores > Configuration > CommerceKings > Notifications > Quiet hours), in the store's time
  * zone: a daily window from - to that may cross midnight, for the selected channels (none selected: every channel
  * except email). The window is kept in the store's time zone, or in the zones the channel's zone provider gives
- * (di.xml "zones", e.g. the recipient's): quiet when it is on in any of them, until the latest end. Wall-clock times:
+ * (di.xml "zones", e.g. the recipient's): quiet when it is on in any of them, until the latest end - a recipient the
+ * provider cannot place keeps the store's time zone. Wall-clock times:
  * on the day clocks go forward, a time in the skipped hour means the first time after it; on the day they go back, a
  * time in the repeated hour means its first occurrence.
  *
@@ -72,14 +73,20 @@ class QuietHours implements QuietHoursInterface
         return $latest;
     }
 
-    /** @return \DateTimeZone[] the channel's zone provider's, else the store's time zone */
+    /**
+     * @return \DateTimeZone[] the channel's zone provider's, else the store's time zone - also for a recipient the
+     *     provider cannot place ([]): a number of unknown zone is never "not quiet". Only the whole store (a null
+     *     recipient) may get none from the provider: each delivery is then held on its own.
+     */
     private function zonesFor(int $storeId, string $channel, ?string $recipient): array
     {
         if (!isset($this->zones[$channel])) {
-            $zone = (string)$this->timezone->getConfigTimezone(ScopeInterface::SCOPE_STORE, (string)$storeId);
-            return [new \DateTimeZone($zone !== '' ? $zone : 'UTC')];
+            return [$this->storeZone($storeId)];
         }
         $zones = $this->zones[$channel]->getZones($storeId, $channel, $recipient);
+        if ($zones === [] && $recipient !== null) {
+            return [$this->storeZone($storeId)];
+        }
         foreach ($zones as $zone) {
             if (!$zone instanceof \DateTimeZone) {
                 throw new \UnexpectedValueException(sprintf('Quiet hours zones for "%s" must be DateTimeZone objects.',
@@ -87,6 +94,12 @@ class QuietHours implements QuietHoursInterface
             }
         }
         return $zones;
+    }
+
+    private function storeZone(int $storeId): \DateTimeZone
+    {
+        $zone = (string)$this->timezone->getConfigTimezone(ScopeInterface::SCOPE_STORE, (string)$storeId);
+        return new \DateTimeZone($zone !== '' ? $zone : 'UTC');
     }
 
     /** The end of the window on at $now (in its zone), in that zone; null when it is not on. */
