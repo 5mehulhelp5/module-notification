@@ -56,7 +56,9 @@ type's own job (e.g. abandoned cart releases its claim so the next finder run qu
 - Cron `commercekings_notification_cooldown_cleanup` (daily 03:00) removes expired cooldown rows.
 - Cron `commercekings_notification_subscription_cleanup` (daily 03:10) removes subscriptions whose item is gone
   (each type's `orphanCondition()`); subscriptions of a type that is no longer registered are left alone.
-  The contact cleanup (03:15) then removes addresses nothing uses.
+- Cron `commercekings_notification_contact_cleanup` (daily 03:15) then removes contacts nothing uses.
+- Cron `commercekings_notification_recipient_block_cleanup` (daily 03:20) lifts Do not contact blocks after
+  *Lifts after (days without attempts)*.
 
 ## Rate limiting
 
@@ -85,5 +87,5 @@ recipient cooldown on and set the feature's hourly sending limit (e.g. abandoned
 A bot challenge (e.g. Cloudflare Turnstile) can be added at the same layer; none is shipped.
 
 **Optional, inside Magento:** [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit) (Magento 2.4.7+) limits this endpoint per guest IP
-and per customer from the admin and answers 429 before it runs. Keep the rule above as the first line of defence –
+and per customer from the admin and answers 429 before it runs. Keep the rule above as the first line of defense –
 it stops a flood before PHP starts; the module is the second line.

@@ -20,7 +20,7 @@ Building a notification type on `commercekings/module-notification`. Start with 
 
 `Delivery::$useCooldown = false` for notifications the recipient asked for (e.g. back in stock): they are always
 sent and do not start the cooldown. `Delivery::$marketing = false` for service messages (orders, payments): they
-ignore the do-not-contact list. Marketing templates show the stop link with
+ignore the Do not contact list. Marketing templates show the stop link with
 `{{depend block_url}}…{{var block_url}}…{{/depend}}`, the URL from
 `Api\RecipientBlockInterface::getBlockUrl(Channel::EMAIL, $email, $storeId)` ('' when the shop turned it off).
 `SenderInterface::send()` returns `SENT`, `COOLDOWN`, `RECIPIENT_CHANGED` or `BLOCKED`; on anything but `SENT`,
@@ -118,7 +118,7 @@ For notifications a visitor signs up for, also:
    contact's address or the customer's current one). Repeat the check inside your atomic claim: without the
    subscription table in the UPDATE, add `Api\SubscriptionGuardInterface::validCondition('<subscription id>')`;
    with it joined (e.g. `… JOIN ck_notification_subscription AS s`), check the same row (`s.subscription_id = ?`)
-   and `Api\SubscriptionPermissionInterface::validCondition('s.permission_ref')` instead - MySQL does
+   and `Api\SubscriptionPermissionInterface::validCondition('s.permission_ref')` instead – MySQL does
    not allow a subquery on a table the UPDATE itself joins (error 1093).
 4. Keep your send history keyed by what "once" means for you (e.g. the cart), never by the subscription id:
    a withdrawal deletes the subscription, and subscribing again creates a new one.

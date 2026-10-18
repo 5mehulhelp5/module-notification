@@ -49,8 +49,8 @@ Global across stores, like the cooldown.
 
 - `Api\RecipientBlockInterface`: `isBlocked()`, `block()`, `unblock()`, `touch()` (restart the timer),
   `getBlockUrl()`. Replaceable with a di.xml preference.
-- **Stores > Configuration > CommerceKings > Notifications**: *Do not contact link in emails* (default Yes),
-  *Do not contact lifts after (days without attempts)* (default 90).
+- **Stores > Configuration > CommerceKings > Notifications > Do not contact**: *"Stop these emails" link* (store
+  view, default Yes), *Lifts after (days without attempts)* (global, default 90).
 
 ## Where it lives
 

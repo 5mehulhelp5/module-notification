@@ -1,4 +1,4 @@
-# Notification Engine with Zero Storefront Impact<a href="https://commercekings.net"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/commercekings/module-notification/main/.github/commercekings-dark.svg"><img align="right" width="152" src="https://raw.githubusercontent.com/commercekings/module-notification/main/.github/commercekings-light.svg" alt="Built by CommerceKings. Ready to sell more? Talk to us"></picture></a>
+# Heavy-Lifting Notification Engine<a href="https://commercekings.net"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/commercekings/module-notification/main/.github/commercekings-dark.svg"><img align="right" width="152" src="https://raw.githubusercontent.com/commercekings/module-notification/main/.github/commercekings-light.svg" alt="Built by CommerceKings. Ready to sell more? Talk to us"></picture></a>
 
 Works with Magento 2.4.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQL queue
 
@@ -66,7 +66,7 @@ withdrawing it removes the subscription, and notices are off by default.
 - Run the consumer `commerceKingsNotificationSend` (RabbitMQ or Magento's database queue) with
   `--max-messages=1000`, and restart it after each deployment.
 - Rate-limit `POST /rest/<store>/V1/ck-notification/subscriptions` per IP in your web server, proxy or CDN, e.g. 10 a
-  minute – the first line of defence. Optional second line: [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit) (Magento 2.4.7+, limits set in
+  minute – the first line of defense. Optional second line: [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit) (Magento 2.4.7+, limits set in
   the admin).
 
 Both: [operations](docs/operations.md).
@@ -86,13 +86,23 @@ service messages and staff alerts.
 
 `Api\RecipientNormalizerInterface` – one canonical recipient form per channel (e.g. phone numbers in E.164)
 
-`Api\RecipientBlockInterface` – do not contact: the "stop these emails" link and its list
+`Api\RecipientBlockInterface` – Do not contact: the "stop these emails" link and its list
+
+`Api\CooldownInterface` – the minimum gap between notifications to one recipient
 
 `Api\SubscriptionTypeInterface` – something a shopper subscribes to
 
 `Api\SubscriptionPermissionInterface` – who may subscribe (the consent bridge replaces it)
 
 `Api\SubscriberInterface` – who the subscriber is and their unsubscribe link
+
+`Api\SubscriptionGuardInterface` – SQL condition for a feature's atomic send claim
+
+`Api\SubscriptionRepositoryInterface` – read subscriptions
+
+`Api\SubscriptionRemovalInterface` – remove subscriptions (revoked permission, unsubscribe)
+
+`Api\ContactReferenceInterface` – tell the cleanup which contacts your module still uses
 
 `Api\OptOutNoticeInterface` – a notice where shoppers subscribe (Automatic, Yes or No)
 
@@ -103,7 +113,7 @@ Details, including how to build an SMS provider: [for module authors](docs/modul
 - No rate limit in code: protect the guest endpoint in your web server, proxy or CDN; optionally also with
   [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit).
 - A failed send is not retried by Notification; the feature decides (abandoned cart queues the cart again).
-- Do-not-contact blocks, the cooldown and the "stop these emails" links are keyed with Magento's encryption key.
+- Do not contact blocks, the cooldown and the "stop these emails" links are keyed with Magento's encryption key.
   Changing the key (`encryption:key:change`) lifts every block, resets the cooldown and invalidates links already
   sent; only the hash is stored, so nothing can be re-hashed. After a key change, restart the consumers and
   PHP-FPM, then run `bin/magento notification:key-change:cleanup --dry-run` and again without `--dry-run`: it
