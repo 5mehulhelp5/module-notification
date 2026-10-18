@@ -15,7 +15,7 @@ $form = static function (string $action, string $label) use ($block, $escaper): 
 ?>
 <div class="ck-recipient-block" style="max-width: 560px; margin: 20px auto 40px; text-align: center;">
     <?php if ($state === Index::STATE_INVALID): ?>
-    <p><?= $escaper->escapeHtml(__('This link has expired, so nothing has changed.')) ?></p>
+    <p><?= $escaper->escapeHtml(__('This link is not valid, so nothing has changed.')) ?></p>
     <?php elseif ($state === Index::STATE_CONFIRM): ?>
     <p><?= $escaper->escapeHtml(__('Stop reminders and other marketing emails to this address?')) ?></p>
     <p><?= $escaper->escapeHtml(__('Emails about your orders still arrive.')) ?></p>

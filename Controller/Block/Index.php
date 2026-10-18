@@ -64,7 +64,7 @@ class Index extends Action implements HttpGetActionInterface, HttpPostActionInte
         }
         $page = $this->pageFactory->create();
         $page->getConfig()->getTitle()->set((string)match ($state) {
-            self::STATE_INVALID => __('Link expired'),
+            self::STATE_INVALID => __('Link not valid'),
             self::STATE_BLOCKED => __('Emails stopped'),
             self::STATE_UNBLOCKED => __('Emails allowed again'),
             default => __('Stop these emails?'),

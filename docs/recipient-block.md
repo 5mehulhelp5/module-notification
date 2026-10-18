@@ -64,7 +64,8 @@ Global across stores, like the cooldown.
 ## Edge cases
 
 - A scanner opening the link: nothing happens, only the POST acts.
-- A forged or altered link: "Link expired", nothing changes.
+- A forged or altered link: "Link not valid", nothing changes. Links do not expire; the block they create
+  lifts by itself after *Lifts after (days without attempts)*.
 - A logged-in customer's address can be blocked too; the account does not prove the email.
 
 ## Tests
