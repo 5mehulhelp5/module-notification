@@ -279,8 +279,8 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         $db = $this->resource->getConnection();
         $subjectKey = $this->subjectKey($type, $contactId, $customerId);
         $conditions = $this->conditions($type, $reference, $target);
-        // the row's contact before this write (for EVENT_SAVED): false when there is no row yet
-        $previous = $db->fetchOne($db->select()->from($this->resource->getTableName(self::TABLE), 'contact_id')
+        // the row's contact before this write (for EVENT_SAVED): '' when there is no row yet or it has no contact
+        $previous = (string)$db->fetchOne($db->select()->from($this->resource->getTableName(self::TABLE), 'contact_id')
             ->where('type = ?', $code)->where('reference_id = ?', $target->referenceId)
             ->where('subject_key = ?', $subjectKey));
         $statement = $db->query(sprintf(
@@ -302,7 +302,7 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         $rows = $statement->rowCount();
         if ($rows > 0) {
             return ['stored' => true, 'id' => (int)$db->fetchOne('SELECT LAST_INSERT_ID()'), 'created' => $rows === 1,
-                'previous_contact_id' => $rows === 1 || $previous === false || $previous === null ? null : (int)$previous];
+                'previous_contact_id' => $rows === 1 || $previous === '' ? null : (int)$previous];
         }
         // Zero rows: refused, or an identical retry of an acknowledged-but-lost response.
         $select = $db->select()->from($this->resource->getTableName(self::TABLE), 'subscription_id')

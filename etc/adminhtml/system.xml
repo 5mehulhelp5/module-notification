@@ -65,6 +65,24 @@
                     <depends><field id="enabled">1</field></depends>
                 </field>
             </group>
+            <group id="address_consent" translate="label comment" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Consent for an address</label>
+                <fieldset_css>commercekings-config-section</fieldset_css>
+                <comment>The checkbox next to a phone field for notifications that ask for their own consent (e.g. text message offers). Each consent is stored with this exact text, the time and a hashed IP address, for that one number.</comment>
+                <field id="wording_sms" translate="label comment" type="textarea" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Checkbox text: text messages</label>
+                    <comment>Name your store and say what you send, how often and how to stop. Changing it asks visitors who have the old text open to confirm again. Empty: no consent can be given.</comment>
+                </field>
+                <field id="wording_whatsapp" translate="label comment" type="textarea" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Checkbox text: WhatsApp</label>
+                    <comment>As above, for WhatsApp messages.</comment>
+                </field>
+                <field id="keep_withdrawn_days" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Keep withdrawn consents (days)</label>
+                    <comment>How long the record of a withdrawn consent is kept as evidence, then deleted. Active consents are kept. Default: 1825 days (5 years).</comment>
+                    <validate>required-entry validate-digits validate-greater-than-zero</validate>
+                </field>
+            </group>
         </section>
     </system>
 </config>

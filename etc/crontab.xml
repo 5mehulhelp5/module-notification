@@ -13,5 +13,8 @@
         <job name="commercekings_notification_stop_cleanup" instance="CommerceKings\Notification\Cron\CleanUpStops" method="execute">
             <schedule>20 3 * * *</schedule>
         </job>
+        <job name="commercekings_notification_address_consent_cleanup" instance="CommerceKings\Notification\Cron\CleanUpAddressConsents" method="execute">
+            <schedule>25 3 * * *</schedule>
+        </job>
     </group>
 </config>

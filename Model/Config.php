@@ -47,4 +47,18 @@ class Config
     {
         return $this->scopeConfig->isSetFlag(self::PREFIX . 'one_click_unsubscribe', ScopeInterface::SCOPE_STORE, $storeId);
     }
+
+    /** The checkbox wording for address consent on a channel in this store view; '' when none is set. */
+    public function getAddressConsentWording(int $storeId, string $channel): string
+    {
+        return trim((string)$this->scopeConfig->getValue('commercekings_notification/address_consent/wording_' . $channel,
+            ScopeInterface::SCOPE_STORE, $storeId));
+    }
+
+    /** Days the evidence of a withdrawn address consent is kept; at least 1. */
+    public function getAddressConsentKeepDays(int $storeId): int
+    {
+        return max(1, (int)$this->scopeConfig->getValue('commercekings_notification/address_consent/keep_withdrawn_days',
+            ScopeInterface::SCOPE_STORE, $storeId));
+    }
 }

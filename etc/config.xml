@@ -17,6 +17,11 @@
                 <link>1</link>
                 <lift_days>90</lift_days>
             </do_not_contact>
+            <address_consent>
+                <wording_sms>Yes, text me offers and reminders at this number. Message frequency varies; message and data rates may apply. Reply STOP to stop.</wording_sms>
+                <wording_whatsapp>Yes, send me offers and reminders on WhatsApp at this number. I can stop them at any time.</wording_whatsapp>
+                <keep_withdrawn_days>1825</keep_withdrawn_days>
+            </address_consent>
         </commercekings_notification>
     </default>
 </config>

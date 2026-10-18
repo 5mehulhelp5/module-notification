@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Address consent:** a checkbox consent for one address, built in. `Model\AddressConsent` is a type's own
+  permission (a virtual type per type code) that grants only a number with a recorded consent, per type, channel and
+  website. Recorded through `Api\AddressConsentManagementInterface` (REST `/V1/ck-notification/address-consents`,
+  `/mine`; authorized by the type) with the exact wording shown (*Notifications > Consent for an address*, per store
+  view and channel; a changed text is refused), the time, a hashed IP and the number as a keyed hash only
+  (`ck_notification_address_consent`). Unchecking or a stop withdraws it and ends the subscriptions on it; withdrawn
+  evidence is deleted after *Keep withdrawn consents (days)*, default 1825. Luma checkbox
+  (`address-consent.phtml`, `js/address-consent`) on a framework-free `js/address-consent-core` (`record()`).
 - **Messaging in Notification:** `Channel::SMS` and `Channel::WHATSAPP`, one code per channel for every provider
   (shared contacts, stop list, cooldown and quiet hours). Phone numbers of both are strict E.164 out of the box
   (`Model\PhoneNormalizer`: "+", a country code and 8–15 digits; separators left out, anything else refused); a

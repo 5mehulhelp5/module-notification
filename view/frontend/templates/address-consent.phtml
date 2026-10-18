@@ -1,0 +1,32 @@
+<?php
+/**
+ * The address consent checkbox, next to a phone field. Block arguments: view_model (ViewModel\AddressConsent),
+ * type (the notification type code), channel (e.g. sms), phone (CSS selector of the phone input); optional
+ * reference (default: the checkout's cart) and mine (default: whether the checkout customer is signed in).
+ *
+ * @var \Magento\Framework\View\Element\Template $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+/** @var \CommerceKings\Notification\ViewModel\AddressConsent $viewModel */
+$viewModel = $block->getData('view_model');
+$channel = (string)$block->getData('channel');
+$wording = $viewModel->getWording($channel);
+if ($wording === '') {
+    return;
+}
+$type = (string)$block->getData('type');
+$id = 'ck-address-consent-' . preg_replace('/[^a-z0-9_-]/i', '', $type);
+$options = [
+    'type' => $type,
+    'wordingHash' => $viewModel->getWordingHash($channel),
+    'urls' => $viewModel->getUrls(),
+    'phone' => (string)$block->getData('phone'),
+    'reference' => $block->getData('reference'),
+    'mine' => $block->getData('mine'),
+];
+?>
+<div class="field choice ck-address-consent"
+     data-mage-init="<?= $escaper->escapeHtmlAttr(json_encode(['CommerceKings_Notification/js/address-consent' => $options])) ?>">
+    <input type="checkbox" class="checkbox" id="<?= $escaper->escapeHtmlAttr($id) ?>"/>
+    <label class="label" for="<?= $escaper->escapeHtmlAttr($id) ?>"><span><?= $escaper->escapeHtml($wording) ?></span></label>
+</div>

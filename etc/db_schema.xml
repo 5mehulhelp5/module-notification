@@ -90,4 +90,34 @@
             <column name="customer_id"/>
         </index>
     </table>
+    <!-- address consent (Model\AddressConsent): a checkbox consent for one address on a channel, per type and website.
+         Evidence: the wording shown, when, from which IP (keyed hash). The address is a keyed hash only: it proves the
+         consent for a given number and finds it again (stop, check) without storing the number. -->
+    <table name="ck_notification_address_consent" resource="default" engine="innodb" comment="CK notification: address consents">
+        <column xsi:type="int" name="consent_id" unsigned="true" nullable="false" identity="true" comment="Consent ID"/>
+        <column xsi:type="varchar" name="reference" nullable="false" length="32" comment="Permission reference on subscriptions (ac:...)"/>
+        <column xsi:type="varchar" name="type" nullable="false" length="64" comment="Subscription type code"/>
+        <column xsi:type="varchar" name="channel" nullable="false" length="32" comment="Channel code"/>
+        <column xsi:type="varchar" name="recipient_key" nullable="false" length="64" comment="Keyed hash of channel and normalized address"/>
+        <column xsi:type="smallint" name="website_id" unsigned="true" nullable="false" comment="Website"/>
+        <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" comment="Store view it was given in"/>
+        <column xsi:type="varchar" name="wording_hash" nullable="false" length="64" comment="sha256 of the wording shown"/>
+        <column xsi:type="text" name="wording" nullable="false" comment="The wording shown"/>
+        <column xsi:type="varchar" name="ip_hash" nullable="false" length="64" default="" comment="Keyed hash of the IP"/>
+        <column xsi:type="timestamp" name="given_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="Given"/>
+        <column xsi:type="timestamp" name="withdrawn_at" nullable="true" on_update="false" comment="Withdrawn"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="consent_id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="CK_NOTIFICATION_ADDRESS_CONSENT_REFERENCE">
+            <column name="reference"/>
+        </constraint>
+        <index referenceId="CK_NOTIFICATION_ADDRESS_CONSENT_CHANNEL_RECIPIENT_KEY" indexType="btree">
+            <column name="channel"/>
+            <column name="recipient_key"/>
+        </index>
+        <index referenceId="CK_NOTIFICATION_ADDRESS_CONSENT_WITHDRAWN_AT" indexType="btree">
+            <column name="withdrawn_at"/>
+        </index>
+    </table>
 </schema>

@@ -27,7 +27,8 @@ class StopList implements StopListInterface
         private readonly SubscriptionPermissionInterface $permission,
         private readonly KeyedHash $keyedHash,
         private readonly SubscriptionTypePool $types,
-        private readonly ContactRepository $contacts
+        private readonly ContactRepository $contacts,
+        private readonly AddressConsentRepository $addressConsents
     ) {
     }
 
@@ -52,6 +53,11 @@ class StopList implements StopListInterface
                 $db->delete($this->resource->getTableName(self::TABLE), ['recipient_hash IN (?)' => array_slice($hashes, 1)]);
             }
             $this->removeSubscriptions($channel, $recipient);
+            // a stop also withdraws the address's checkbox consents, and ends every subscription that rested on them
+            $withdrawn = $this->addressConsents->withdraw($channel, $this->normalizers->normalize($channel, $recipient));
+            if ($withdrawn) {
+                $db->delete($this->resource->getTableName(SubscriptionManagement::TABLE), ['permission_ref IN (?)' => $withdrawn]);
+            }
             $db->commit();
         } catch (\Throwable $error) {
             $db->rollBack();

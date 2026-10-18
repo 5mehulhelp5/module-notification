@@ -74,6 +74,7 @@ limits cap how often a stranger's address can be mailed, but not how fast a scri
 | --- | --- | --- |
 | `POST /rest/<store>/V1/ck-notification/subscriptions` (anonymous) | guest | `{"type", "reference", "recipient"}` (an email address, or e.g. a phone number for an SMS type); `""` unsubscribes |
 | `POST /rest/<store>/V1/ck-notification/subscriptions/mine` (`self`) | customer: storefront AJAX session or token | `{"type", "reference"}`; non-email types add `"recipient"` (e.g. the phone number) |
+| `POST /rest/<store>/V1/ck-notification/address-consents` (anonymous), `/mine` (`self`) | guest / customer, authorized by the type | `{"type", "reference", "recipient", "wordingHash", "given"}`: a checkbox consent for one address (Address consent) |
 
 Both return `true` when stored (including an identical retry) and `false` when refused or removed. An unknown
 type or invalid email is Magento's 400 without echoing the address.

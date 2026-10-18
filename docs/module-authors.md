@@ -289,6 +289,49 @@ banner installed for other reasons does not show your switch in the opt-out setu
 </item>
 ```
 
+### Address consent
+
+A messaging type usually needs a consent for the number itself – a checkbox next to the phone field ("Yes, text me
+offers at this number"). Notification ships it; your type only declares it:
+
+1. A virtual type of `Model\AddressConsent` for your type code, injected into your type and returned by its
+   `getPermission()`:
+   ```xml
+   <virtualType name="MySmsOfferConsent" type="CommerceKings\Notification\Model\AddressConsent">
+       <arguments>
+           <argument name="typeCode" xsi:type="string">my_sms_offer</argument>
+       </arguments>
+   </virtualType>
+   <type name="Vendor\Module\Model\MySmsOfferType">
+       <arguments>
+           <argument name="permission" xsi:type="object">MySmsOfferConsent</argument>
+       </arguments>
+   </type>
+   ```
+   Use the same virtual type wherever your feature claims or rechecks (instead of `TypePermission`).
+2. The checkbox: add `CommerceKings_Notification::address-consent.phtml` next to the phone field, with
+   `view_model` (`CommerceKings\Notification\ViewModel\AddressConsent`), `type`, `channel` (e.g. `sms`) and `phone`
+   (a CSS selector of the phone input); `reference` defaults to the checkout's cart and `mine` to whether the checkout
+   customer is signed in. Checking records the consent, unchecking withdraws it, a changed number moves it. Subscribe
+   after the element triggers `ckAddressConsent:recorded`. The text is *Notifications > Consent for an address* per
+   store view and channel (empty: no checkbox). Other storefronts (Hyvä, headless) call
+   `CommerceKings_Notification/js/address-consent-core` (`record()`) or the REST routes directly.
+3. REST: `POST /V1/ck-notification/address-consents` (guest) and `/mine` (customer) with
+   `{"type", "reference", "recipient", "wordingHash", "given"}`. Your type's `authorize()` decides who may record for
+   the reference. `wordingHash` is sha256 of the text the visitor saw: the server stores the store view's configured
+   text and refuses a different hash, so the evidence holds the exact words. `given: false` withdraws the number's
+   consent for the type and website and removes the subscriptions that rested on it.
+
+What it grants: a subscription of that type, for that exact number (normalized), in that website – another number for
+the same cart gets a fresh check and is refused. Evidence per consent in `ck_notification_address_consent`: the text,
+its hash, the time, the store view, a keyed hash of the IP address, and the number only as a keyed hash
+(`Model\KeyedHash`, so it still matches after a key change) – enough to prove the consent for a given number and to
+find it on a stop, without storing the number. A stop (`StopListInterface::stop()`, e.g. a STOP reply) withdraws all
+of the number's consents. Active consents are kept; withdrawn ones for *Keep withdrawn consents (days)*, default 1825
+(5 years), then a daily cron deletes them. A checkbox can be ticked for someone else's number: send an
+[opt-in confirmation](#opt-in-confirmation) (on `commercekings_notification_subscription_saved` when
+`contact_id !== previous_contact_id`) before marketing.
+
 ## Opt-out notice
 
 A feature can tell shoppers where they subscribe (e.g. under the checkout email field). Add a config group with two

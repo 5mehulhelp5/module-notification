@@ -67,5 +67,29 @@
             "CK_NTFC_SUBSCRIPTION_CONTACT_ID_CK_NTFC_CONTACT_CONTACT_ID": true,
             "CK_NTFC_SUBSCRIPTION_CSTR_ID_CSTR_ENTT_ENTT_ID": true
         }
+    },
+    "ck_notification_address_consent": {
+        "column": {
+            "consent_id": true,
+            "reference": true,
+            "type": true,
+            "channel": true,
+            "recipient_key": true,
+            "website_id": true,
+            "store_id": true,
+            "wording_hash": true,
+            "wording": true,
+            "ip_hash": true,
+            "given_at": true,
+            "withdrawn_at": true
+        },
+        "index": {
+            "CK_NOTIFICATION_ADDRESS_CONSENT_CHANNEL_RECIPIENT_KEY": true,
+            "CK_NOTIFICATION_ADDRESS_CONSENT_WITHDRAWN_AT": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "CK_NOTIFICATION_ADDRESS_CONSENT_REFERENCE": true
+        }
     }
 }

@@ -34,7 +34,8 @@ class StopListLinkTest extends TestCase
             new RecipientNormalizerPool(), $permission, $hashes,
             new \CommerceKings\Notification\Model\SubscriptionTypePool([]),
             new \CommerceKings\Notification\Model\ContactRepository($this->createStub(ResourceConnection::class),
-                new RecipientNormalizerPool())))
+                new RecipientNormalizerPool()),
+            $this->createStub(\CommerceKings\Notification\Model\AddressConsentRepository::class)))
             ->getStopUrl(Channel::EMAIL, 'a@example.test', 1);
     }
 

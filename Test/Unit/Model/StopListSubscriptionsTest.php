@@ -22,6 +22,9 @@ use PHPUnit\Framework\TestCase;
 class StopListSubscriptionsTest extends TestCase
 {
     private array $deleted = [];
+    /** references of address consents the stop withdraws */
+    private array $withdrawn = [];
+    private array $withdrawCalls = [];
 
     private function stop(array $customers, array $types): void
     {
@@ -50,8 +53,19 @@ class StopListSubscriptionsTest extends TestCase
         (new StopList($resource, $this->createStub(EncryptorInterface::class), $this->createStub(UrlInterface::class),
             $this->createStub(Config::class), new RecipientNormalizerPool(),
             $this->createStub(SubscriptionPermissionInterface::class), $hashes, new SubscriptionTypePool($types),
-            new \CommerceKings\Notification\Model\ContactRepository($resource, new RecipientNormalizerPool())))
+            new \CommerceKings\Notification\Model\ContactRepository($resource, new RecipientNormalizerPool()),
+            $this->addressConsents()))
             ->stop(Channel::EMAIL, 'jose@example.test');
+    }
+
+    private function addressConsents(): \CommerceKings\Notification\Model\AddressConsentRepository
+    {
+        $consents = $this->createStub(\CommerceKings\Notification\Model\AddressConsentRepository::class);
+        $consents->method('withdraw')->willReturnCallback(function (...$arguments) {
+            $this->withdrawCalls[] = $arguments;
+            return $this->withdrawn;
+        });
+        return $consents;
     }
 
     private function type(bool $stoppable): SubscriptionTypeInterface
@@ -80,5 +94,15 @@ class StopListSubscriptionsTest extends TestCase
         $this->stop([], ['cart_reminder' => $this->type(true), 'order_status' => $this->type(false)]);
         $this->assertSame(['contact_id IN (SELECT contact_id)', 'type NOT IN (?)' => ['order_status']], $this->deleted[0],
             'a stop removes stoppable subscriptions only');
+    }
+
+    /** A stop withdraws every checkbox consent of the address and ends the subscriptions that rested on them. */
+    public function testAStopWithdrawsTheAddressConsents(): void
+    {
+        $this->withdrawn = ['ac:one', 'ac:two'];
+        $this->stop([], ['sms_offer' => $this->type(false)]);
+        $this->assertSame([[Channel::EMAIL, 'jose@example.test', null, null]], $this->withdrawCalls, 'all types and websites');
+        $this->assertSame(['permission_ref IN (?)' => ['ac:one', 'ac:two']], end($this->deleted),
+            'also a type the recipient cannot stop: its consent is gone');
     }
 }

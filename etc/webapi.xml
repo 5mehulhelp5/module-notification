@@ -18,4 +18,20 @@
             <parameter name="customerId" force="true">%customer_id%</parameter>
         </data>
     </route>
+    <!-- address consent (a checkbox for one address): authorized by the notification type, like the sign-up routes -->
+    <route url="/V1/ck-notification/address-consents" method="POST">
+        <service class="CommerceKings\Notification\Api\AddressConsentManagementInterface" method="recordGuest"/>
+        <resources>
+            <resource ref="anonymous"/>
+        </resources>
+    </route>
+    <route url="/V1/ck-notification/address-consents/mine" method="POST">
+        <service class="CommerceKings\Notification\Api\AddressConsentManagementInterface" method="recordCustomer"/>
+        <resources>
+            <resource ref="self"/>
+        </resources>
+        <data>
+            <parameter name="customerId" force="true">%customer_id%</parameter>
+        </data>
+    </route>
 </routes>
