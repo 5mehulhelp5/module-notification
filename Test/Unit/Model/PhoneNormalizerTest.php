@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 namespace CommerceKings\Notification\Test\Unit\Model;
 
+use CommerceKings\Notification\Api\Channel;
 use CommerceKings\Notification\Model\PhoneNormalizer;
+use CommerceKings\Notification\Model\RecipientNormalizerPool;
 use PHPUnit\Framework\TestCase;
 
 class PhoneNormalizerTest extends TestCase
@@ -34,6 +36,31 @@ class PhoneNormalizerTest extends TestCase
     public function testStrictE164(string $input, string $expected): void
     {
         $this->assertSame($expected, (new PhoneNormalizer())->normalize($input));
+    }
+
+    /** The phone channels' normalizers as etc/di.xml registers them in RecipientNormalizerPool. */
+    private static function registered(): RecipientNormalizerPool
+    {
+        $di = simplexml_load_file(__DIR__ . '/../../../etc/di.xml');
+        $items = $di->xpath('//type[@name="CommerceKings\\Notification\\Model\\RecipientNormalizerPool"]'
+            . '/arguments/argument[@name="normalizers"]/item');
+        $normalizers = [];
+        foreach ($items as $item) {
+            $class = (string)$item;
+            $normalizers[(string)$item['name']] = new $class();
+        }
+        return new RecipientNormalizerPool($normalizers);
+    }
+
+    /** One number form for every phone channel: contacts, stops and cooldown match across SMS, WhatsApp and Viber. */
+    #[\PHPUnit\Framework\Attributes\DataProvider('numbers')]
+    public function testViberAndWhatsappNormalizeLikeSms(string $input, string $expected): void
+    {
+        $pool = self::registered();
+        foreach ([Channel::SMS, Channel::WHATSAPP, Channel::VIBER] as $channel) {
+            $this->assertTrue($pool->has($channel), $channel . ' takes sign-ups');
+            $this->assertSame($expected, $pool->normalize($channel, $input), $channel);
+        }
     }
 
     public function testNormalizingTwiceChangesNothing(): void

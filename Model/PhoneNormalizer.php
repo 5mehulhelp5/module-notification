@@ -6,10 +6,10 @@ namespace CommerceKings\Notification\Model;
 use CommerceKings\Notification\Api\RecipientNormalizerInterface;
 
 /**
- * Phone numbers in strict E.164 ("+381601234567"), registered for Channel::SMS and Channel::WHATSAPP: spaces, dashes,
+ * Phone numbers in strict E.164 ("+381601234567"), registered for Channel::SMS, WHATSAPP and VIBER: spaces, dashes,
  * dots and brackets are left out; a leading "+", a country code not starting with 0 and 8-15 digits in all are
  * required, anything else is '' (refused). No national formats or "00" prefixes - which country a local number means
- * needs a phone library. It owns both channels: provider modules do not register a normalizer for them (every provider
+ * needs a phone library. It owns these channels: provider modules do not register a normalizer for them (every provider
  * of a channel must see one form, and a replacement changes the keys of stored contacts and stops); only a project
  * replaces it, on purpose (RecipientNormalizerPool).
  *

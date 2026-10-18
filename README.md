@@ -34,8 +34,8 @@ A feature (e.g. abandoned cart) says *what and when*; Notification handles *who 
   does not send twice.
 - The **sender** checks a **delivery** against Do not contact, quiet hours and the cooldown, builds its content in
   the store's language, then hands it to a provider.
-- A **channel** is where a delivery goes: email, SMS, WhatsApp, or a code a provider module brings. A **normalizer**
-  gives each channel one recipient form; SMS and WhatsApp numbers are E.164.
+- A **channel** is where a delivery goes: email, SMS, WhatsApp, Viber, or a code a provider module brings. A
+  **normalizer** gives each channel one recipient form; SMS, WhatsApp and Viber numbers are E.164.
 - A **provider** delivers on one channel, chosen in the admin when there are several. Magento email is built in.
 
 ## Installation
@@ -60,7 +60,7 @@ withdrawing it removes the subscription, and notices are off by default.
 | Delivery | Provider per channel (Magento email); Cooldown in days (7, global, 0 = off); One-click unsubscribe (No) |
 | Do not contact | "Stop these emails" link (Yes; always on in opt-out mode); Lifts after days without attempts (90) |
 | Quiet hours | Enabled (No); From – To (21:00 – 08:00, may cross midnight); Channels (all but email) |
-| Consent for an address | Checkbox text for text messages and WhatsApp, per store view; Keep withdrawn consents (1825 days) |
+| Consent for an address | Checkbox text for text messages, WhatsApp and Viber, per store view; Keep withdrawn consents (1825 days) |
 
 ## Before going live
 

@@ -37,13 +37,15 @@ register a zone provider for the channel ([`QuietHoursZoneInterface`](#quiet-hou
 
 ## Providers
 
-A provider delivers notifications on one channel: `Api\Channel::EMAIL`, `Channel::SMS`, `Channel::WHATSAPP`, or a
+A provider delivers notifications on one channel: `Api\Channel::EMAIL`, `Channel::SMS`, `Channel::WHATSAPP`,
+`Channel::VIBER`, or a
 code your module chooses. The admin selects one provider per channel (*Delivery* group); the email one is
 **Email provider**, default *Magento email*. A provider module needs:
 
 1. A class implementing `Api\ProviderInterface`: `getCode()`, `getLabel()`, `getChannel()`,
    `supportsOneClickUnsubscribe()` and `send(Delivery, DeliveryContent)`. Throw if the service did not accept the
-   notification; throw `Exception\MessageSentException` if it failed after accepting it.
+   notification; throw `Exception\MessageSentException` if it failed after accepting it, or when you cannot tell
+   (see [Build an SMS, WhatsApp or Viber provider](#build-an-sms-whatsapp-or-viber-provider)).
 2. Its item in `Model\ProviderPool` (`etc/di.xml`):
    ```xml
    <type name="CommerceKings\Notification\Model\ProviderPool">
@@ -94,29 +96,32 @@ the vendor's code. Everything below works the same for every provider of a chann
 
 ### Channels and phone numbers
 
-Use `Channel::SMS` and `Channel::WHATSAPP`, never a code of your own for them: contacts, the stop list, the cooldown
-and quiet hours are per channel, so every provider of a channel shares them. Notification normalizes both to strict
-E.164 (`Model\PhoneNormalizer`: `+`, a country code and 8–15 digits; spaces, dashes, dots and brackets are left
-out; anything else is refused with `''`). Your provider gets `$delivery->recipient` in that form; strip your service's
-own prefixes (e.g. `whatsapp:`) before you hand a number to Notification. The core normalizer owns both channels: a
-provider module does not register one for `sms` or `whatsapp` – every provider of a channel must see the same form,
-and a replacement changes the keys of stored contacts and stops. Only a project replaces it, on purpose (e.g. with a
-phone library for national formats), in `Model\RecipientNormalizerPool` (argument `normalizers`). A new channel
-(e.g. `viber`) brings its own normalizer – without one it takes no sign-ups.
+Use `Channel::SMS`, `Channel::WHATSAPP` and `Channel::VIBER`, never a code of your own for them: contacts, the stop
+list, the cooldown and quiet hours are per channel, so every provider of a channel shares them. Notification normalizes
+both to strict E.164 (`Model\PhoneNormalizer`: `+`, a country code and 8–15 digits; spaces, dashes, dots and brackets
+are left out; anything else is refused with `''`). Your provider gets `$delivery->recipient` in that form; strip your
+service's own prefixes (e.g. `whatsapp:`) before you hand a number to Notification. The core normalizer owns both
+channels: a provider module does not register one for `sms`, `whatsapp` or `viber` – every provider of a channel must
+see the same form, and a replacement changes the keys of stored contacts and stops. Only a project replaces it, on
+purpose (e.g. with a phone library for national formats), in `Model\RecipientNormalizerPool` (argument `normalizers`). A
+new channel (e.g. `telegram`) brings its own normalizer – without one it takes no sign-ups.
 
-### Build an SMS or WhatsApp provider
+### Build an SMS, WhatsApp or Viber provider
 
 1. A module that requires `commercekings/module-notification` and loads after `CommerceKings_Notification`.
-2. A provider (above) with `getChannel()` returning `Channel::SMS` or `Channel::WHATSAPP`; one module may register
-   both. `send()` posts `$delivery->recipient` and `$content->text` (or a template, below) and throws when the service
-   does not accept it. It runs in the store's environment: read your store-scoped settings (credentials with
-   Magento's `Encrypted` backend model, a sender id or messaging service) for `$delivery->storeId`.
+2. A provider (above) with `getChannel()` returning `Channel::SMS`, `Channel::WHATSAPP` or `Channel::VIBER`; one module
+   may register several. `send()` posts `$delivery->recipient` and `$content->text` (or a template, below) and throws
+   when the service does not accept it. It runs in the store's environment: read your store-scoped settings (credentials
+   with Magento's `Encrypted` backend model, a sender id or messaging service) for `$delivery->storeId`.
 3. Notification types send with `Delivery::text($storeId, Channel::SMS, $phone, fn () => new DeliveryContent([],
    text: '...'), type: 'my_type')`.
 4. Hash or sign anything you store about a recipient with `Model\KeyedHash`, so it survives `encryption:key:change`.
 5. Keep your service's own channel failover off (e.g. Viber or WhatsApp falling back to SMS): the message would
    arrive on a channel whose stop list, consent and quiet hours Notification never checked. A feature that wants a
    fallback sends a second delivery on the other channel.
+6. A timeout or lost connection after the request was sent: throw `Exception\MessageSentException`, not a plain
+   error – the service may have accepted it, and a retry could deliver it twice (a missed reminder is better than a
+   duplicate).
 
 ### Templates (e.g. WhatsApp)
 
@@ -142,9 +147,9 @@ counts a failed attempt.
   callback may be limited.
 - **STOP** and similar words (UNSUBSCRIBE, CANCEL, END, QUIT; a WhatsApp "Stop promotions" button):
   `Api\StopListInterface::stop($channel, $from, StopListInterface::REASON_REPLY)`. Stoppable deliveries to the number
-  are dropped from then on, its stoppable subscriptions and checkbox consents removed, and the stop holds until START
-  (no lift timer; the stop link's Undo cannot lift it). Service messages still go out. Texts say "Reply STOP to stop" – a stop link
-  (`getStopUrl()`) works too but is long (~200 characters).
+  are dropped from then on, in every website, its stoppable subscriptions and checkbox consents removed, and the stop
+  holds until START (no lift timer; the stop link's Undo cannot lift it). Service messages still go out. Texts say
+  "Reply STOP to stop" – a stop link (`getStopUrl()`) works too but is long (~200 characters).
 - **START** (UNSTOP): `resume($channel, $from)`. It lifts the stop only – the removed subscriptions do not come back;
   the recipient signs up again (with consent).
 - **Undeliverable numbers** (invalid, a landline, not reachable): when the service refuses at once, `send()` throws,
@@ -160,8 +165,10 @@ Some rules (e.g. US carriers for 10DLC) want a confirmation text after a sign-up
 `commercekings_notification_subscription_saved` (`SubscriptionManagementInterface::EVENT_SAVED`) for your channel and
 send one only when `first_for_address` is true – the number currently has no other subscription of any type in the
 website, so a new cart of a known number gets none (once all its subscriptions are gone, e.g. after a stop, the next
-sign-up confirms again). It is read without a lock: two sign-ups for one new number at the same moment can both see
-true. Send once with a claim on the delivery state, keyed by the contact, and send only when it changed a row:
+sign-up confirms again). The confirmation informs; it is not a double opt-in – a subscription is active once it is
+stored, and Notification does not wait for a "YES" reply. It is read without a lock: two sign-ups for one new number at
+the same moment can both see true. Send once with a claim on the delivery state, keyed by the contact, and send only
+when it changed a row:
 
 ```php
 $state->ensure('my_optin_confirmation', $contactId);
@@ -245,10 +252,11 @@ For notifications a visitor signs up for, also:
 1. Implement `Api\SubscriptionTypeInterface`:
    - `getPurpose()`: what the subscription is for (with the consent bridge: the Consent purpose your module declares);
    - `getChannel()`: the channel its subscribers are reached on – `Channel::EMAIL`, `Channel::SMS` or
-     `Channel::WHATSAPP`; a code of your own only for another channel. Guests subscribe with `recipient` (REST `{"type", "reference", "recipient"}`): an email address, or e.g.
-     a phone number; it is stored as a contact on that channel. An address the channel does not take is Magento's 400.
-     Signed-in customers (`subscribeCustomer()`, REST `/mine`) use the account email on email types; on other
-     channels they pass `recipient` too (required), stored as their contact next to the customer id;
+     `Channel::WHATSAPP`, `Channel::VIBER`; a code of your own only for another channel. Guests subscribe with
+     `recipient` (REST `{"type", "reference", "recipient"}`): an email address, or e.g. a phone number; it is stored as
+     a contact on that channel. An address the channel does not take is Magento's 400. Signed-in customers
+     (`subscribeCustomer()`, REST `/mine`) use the account email on email types; on other channels they pass `recipient`
+     too (required), stored as their contact next to the customer id;
    - `isSingle()`: one subscription per reference (a new email replaces it) or one per person;
    - `getPermission()` and `getSubscriber()`: your type's own permission and subscriber, or `null` for the shop-wide
      ones (see [Permission](#permission));
@@ -305,7 +313,7 @@ For notifications a visitor signs up for, also:
    and looks it up by the target and this recipient: a consent recorded for one number grants only that number, and
    a new number gets a fresh check. Put the number into the permission reference if the send-time check
    (`validCondition()`, `isValidFor()`) must follow it too.
-6. To react to a sign-up – e.g. an SMS opt-in confirmation ("Reply YES to confirm") – observe
+6. To react to a sign-up – e.g. an SMS opt-in confirmation – observe
    `commercekings_notification_subscription_saved` (`SubscriptionManagementInterface::EVENT_SAVED`). It is dispatched
    after the row is committed, with `subscription_id`, `type`, `channel`, `store_id`, `contact_id`, `customer_id` and
    `created` (true for a new row; false when an existing one changed, e.g. a new number or permission) and
@@ -352,16 +360,15 @@ offers at this number"). Notification ships it; your type only declares it:
    ```
    Use the same virtual type wherever your feature claims or rechecks (instead of `TypePermission`). The virtual type
    with `typeCode` and `ViewModel\AddressConsent` are `@api`: stable extension points.
-2. The checkbox: add `CommerceKings_Notification::address-consent.phtml` next to the phone field, with
-   `view_model` (`CommerceKings\Notification\ViewModel\AddressConsent`), `type`, `channel` (e.g. `sms`) and `phone`
-   (a CSS selector of the phone input); `reference` defaults to the checkout's cart and `mine` to whether the checkout
-   customer is signed in. Checking records the consent, unchecking withdraws it, a changed number moves it. Subscribe
-   after the element triggers `ckAddressConsent:recorded`. The text is *Notifications > Consent for an address* per
-   store view and channel (empty: no checkbox), read from
-   `commercekings_notification/address_consent/wording_<channel>`: `sms` and `whatsapp` have their fields; a module
-   adding a channel (e.g. `viber`) adds `wording_viber` to that group in its own `system.xml`, with a default in its
-   `config.xml`. Other storefronts (Hyvä, headless) call
-   `CommerceKings_Notification/js/address-consent-core` (`record()`) or the REST routes directly.
+2. The checkbox: add `CommerceKings_Notification::address-consent.phtml` next to the phone field, with `view_model`
+   (`CommerceKings\Notification\ViewModel\AddressConsent`), `type`, `channel` (e.g. `sms`) and `phone` (a CSS selector
+   of the phone input); `reference` defaults to the checkout's cart and `mine` to whether the checkout customer is
+   signed in. Checking records the consent, unchecking withdraws it, a changed number moves it. Subscribe after the
+   element triggers `ckAddressConsent:recorded`. The text is *Notifications > Consent for an address* per store view and
+   channel (empty: no checkbox), read from `commercekings_notification/address_consent/wording_<channel>`: `sms`,
+   `whatsapp` and `viber` have their fields; for a module's own channel (e.g. `telegram`) the provider module adds
+   `wording_<channel>` to that group in its own `system.xml`, with a default in its `config.xml`. Other storefronts
+   (Hyvä, headless) call `CommerceKings_Notification/js/address-consent-core` (`record()`) or the REST routes directly.
 3. REST: `POST /V1/ck-notification/address-consents` (guest) and `/mine` (customer) with
    `{"type", "reference", "recipient", "wordingHash", "given"}`. Your type's `authorize()` decides who may record for
    the reference. `wordingHash` is sha256 of the text the visitor saw: the server stores the store view's configured

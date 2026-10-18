@@ -23,7 +23,7 @@ or consent the next sign-up comes from.
 | `stopped_at` | when it was stopped |
 | `last_attempt_at` | the last sign-up attempt for this recipient (starts as `stopped_at`) |
 
-Global across stores, like the cooldown.
+Global, like the cooldown: a stop applies in every website and store, whichever one it came from.
 
 ## Stopping
 

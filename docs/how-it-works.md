@@ -59,22 +59,24 @@ Each module answers one question:
   replaced by an extension (e.g. an SMTP module) sends without them and logs a warning.
 - **Recipient cooldown**: minimum gap between notifications to the same recipient on a channel, across all
   notifications that use it and all stores. One number of days for all channels (global); the keys are per channel. Keyed hashes only (`ck_notification_cooldown`), never an address.
-- **Do not contact** (`Api\StopListInterface`): a signed "stop these emails" link in marketing notifications
-  opens `/cknotification/stop`; only its form-key POST stops, so mail scanners change nothing. Stopping removes
-  the recipient's subscriptions; sign-ups for a stopped recipient are answered as stored but not written and restart
-  the lift timer; the sender drops stoppable deliveries (`STOPPED`) and passes the others (`Delivery::$stoppable
-  = false`); a stoppable send without its own unsubscribe link gets the stop link as its one-click URL. Each stop has a reason: a stop link's or an
-  undeliverable number's lifts after *N* days without attempts (cron), a STOP reply's only by `resume()` (START), and
-  the link's Undo lifts only a link stop; an undeliverable number keeps its checkbox consents. Keyed hashes only
-  (`ck_notification_stop`); the link carries the recipient encrypted. Design: [stop list](stop-list.md).
+- **Do not contact** (`Api\StopListInterface`): a signed "stop these emails" link in marketing notifications opens
+  `/cknotification/stop`; only its form-key POST stops, so mail scanners change nothing. Stopping removes the
+  recipient's subscriptions; a stop applies in every website and store. Sign-ups for a stopped recipient are answered as
+  stored but not written and restart the lift timer; the sender drops stoppable deliveries (`STOPPED`) and passes the
+  others (`Delivery::$stoppable = false`); a stoppable send without its own unsubscribe link gets the stop link as its
+  one-click URL. Each stop has a reason: a stop link's or an undeliverable number's lifts after *N* days without
+  attempts (cron), a STOP reply's only by `resume()` (START), and the link's Undo lifts only a link stop; an
+  undeliverable number keeps its checkbox consents. Keyed hashes only (`ck_notification_stop`); the link carries the
+  recipient encrypted. Design: [stop list](stop-list.md).
 - **Quiet hours** (`Api\QuietHoursInterface`): a daily window (e.g. 21:00–08:00, may cross midnight) in which
   stoppable deliveries on the selected channels are held (`QUIET_HOURS`, before any cooldown claim) and sent by the
   feature after it (`nextAllowedAt()`, UTC). Service messages are never held. The default uses the store's time zone
   (*General > Locale Options*); on the day clocks go forward a time in the skipped hour means the first time after it,
   on the day they go back a time in the repeated hour means its first occurrence. Rules based on the recipient's local
   time – e.g. US state laws such as Florida's FTSA (08:00–20:00 in the recipient's time zone) – need a zone provider
-  for the channel (`Api\QuietHoursZoneInterface`, di.xml `Model\QuietHours` "zones"; an SMS provider module adds
-  one): the window is then kept in the recipient's zones, quiet while it is on in any of them. Asked without a
+  for the channel (`Api\QuietHoursZoneInterface`, di.xml `Model\QuietHours` "zones"): a provider module adds one
+  for its channel, one per channel – two SMS provider modules would replace each other's, so install one per
+  channel. The window is then kept in the recipient's zones, quiet while it is on in any of them. Asked without a
   recipient (a finder, before it knows the recipients), such a provider gives no zone – "not quiet" – and the sender
   holds each delivery on its own.
 - **Encryption key change**: stops and stop links are checked under every key in `env.php` (`Model\KeyedHash`); a
@@ -115,7 +117,7 @@ warning); that URL must accept the mail client's POST.
 (global, default 90) – see [stop list](stop-list.md).
 **Quiet hours** (store view): *Enabled* (default No), *From* / *To* (default 21:00 / 08:00, store time zone) and
 *Channels* (none selected, the default: every channel except email).
-**Consent for an address** (store view): *Checkbox text* for text messages and WhatsApp (empty: no checkbox) and
+**Consent for an address** (store view): *Checkbox text* for text messages, WhatsApp and Viber (empty: no checkbox) and
 *Keep withdrawn consents (days)*, default 1825.
 
 ## Tests

@@ -14,8 +14,8 @@ First release. Requires Magento 2.4.4 or later (`magento/framework ^103.0.4`).
 - **Providers and channels:** `ProviderInterface` per channel (`Model\ProviderPool`; *Delivery > Email provider*, and
   `provider_<channel>` selectors that provider modules add). Built in: *Magento email*, with optional RFC 8058 one-click
   unsubscribe headers (also on 2.4.4–2.4.7; a replaced mail transport sends without them and logs a warning).
-  `Channel::EMAIL`, `SMS` and `WHATSAPP`; one recipient form per channel (`RecipientNormalizerInterface`,
-  `Model\RecipientNormalizerPool`; SMS and WhatsApp numbers strict E.164 by `Model\PhoneNormalizer`).
+  `Channel::EMAIL`, `SMS`, `WHATSAPP` and `VIBER`; one recipient form per channel (`RecipientNormalizerInterface`,
+  `Model\RecipientNormalizerPool`; SMS, WhatsApp and Viber numbers strict E.164 by `Model\PhoneNormalizer`).
 - **Subscriptions:** `SubscriptionTypeInterface` (channel, single or per person, stoppable, own permission and
   subscriber, authorization, orphan condition), one REST sign-up for every type (`/V1/ck-notification/subscriptions`
   with `recipient`, `/mine` for customers – the account email on email types, a given recipient on other channels),
