@@ -37,8 +37,9 @@ Global across stores, like the cooldown.
 
 - **Subscribe** (guest or customer): not stored, with the same response as a success so the list cannot be probed;
   `last_attempt_at` is set to now, which restarts the timer.
-- **Sender:** `Delivery` gets a `marketing` flag (default `true`). Marketing deliveries to a blocked recipient are
-  dropped with the status `BLOCKED`; service messages (`marketing: false`) are always sent.
+- **Sender:** `Delivery` gets a `stoppable` flag (default `true`; the feature decides). Stoppable deliveries to a
+  blocked recipient are dropped with the status `BLOCKED`; the others (`stoppable: false`, e.g. order messages) are
+  always sent.
 
 ## Ending the block
 
@@ -62,7 +63,7 @@ Global across stores, like the cooldown.
 
 | Module | Changes |
 |---|---|
-| Notification | table, interface and model, silent subscribe in `SubscriptionManagement`, `marketing` in `Delivery` and `Sender`, a storefront route (block page with Undo), cleanup cron, settings, docs |
+| Notification | table, interface and model, silent subscribe in `SubscriptionManagement`, `stoppable` in `Delivery`, `Sender` and `SubscriptionTypeInterface`, a storefront route (block page with Undo), cleanup cron, settings, docs |
 | Abandoned cart | `block_url` in the reminder template, passed by `ReminderData` |
 | Consent, consent bridge, others | none – the block sits on top of consent and wins |
 

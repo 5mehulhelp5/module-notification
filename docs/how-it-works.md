@@ -45,8 +45,8 @@ Each module answers one question:
 - **Do not contact** (`Api\RecipientBlockInterface`): a signed "stop these emails" link in marketing notifications
   opens `/cknotification/block`; only its form-key POST blocks, so mail scanners change nothing. Blocking removes
   the recipient's subscriptions; sign-ups for a blocked recipient are answered as stored but not written and restart
-  the lift timer; the sender drops marketing deliveries (`BLOCKED`) and passes service ones (`Delivery::$marketing
-  = false`). A cron lifts blocks after *N* days without attempts. Keyed hashes only
+  the lift timer; the sender drops stoppable deliveries (`BLOCKED`) and passes the others (`Delivery::$stoppable
+  = false`); a stoppable send without its own unsubscribe link gets the stop link as its one-click URL. A cron lifts blocks after *N* days without attempts. Keyed hashes only
   (`ck_notification_recipient_block`); the link carries the recipient encrypted. Design: [recipient block](recipient-block.md).
 - **Encryption key change**: blocks and stop links are checked under every key in `env.php` (`Model\KeyedHash`); a
   block found under an older key moves to the newest one, and an older-key link can block but never undo. Nothing to

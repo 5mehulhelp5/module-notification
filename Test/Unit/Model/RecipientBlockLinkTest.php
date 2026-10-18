@@ -31,7 +31,8 @@ class RecipientBlockLinkTest extends TestCase
         $url->method('getUrl')->willReturnCallback(fn ($route, $params) => 'https://shop.test/' . $route . '?'
             . http_build_query($params['_query']));
         return (new RecipientBlock($this->createStub(ResourceConnection::class), $encryptor, $url, $config,
-            new RecipientNormalizerPool(), $permission, $hashes))
+            new RecipientNormalizerPool(), $permission, $hashes,
+            new \CommerceKings\Notification\Model\SubscriptionTypePool([])))
             ->getBlockUrl(Channel::EMAIL, 'a@example.test', 1);
     }
 

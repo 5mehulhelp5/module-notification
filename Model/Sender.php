@@ -17,7 +17,7 @@ use Magento\Store\Model\App\Emulation;
 use Psr\Log\LoggerInterface;
 
 /**
- * Sends one notification: marketing deliveries to a blocked recipient are dropped, then the optional recipient
+ * Sends one notification: stoppable deliveries to a blocked recipient are dropped, then the optional recipient
  * cooldown claim, recipient re-check, content built in the delivery's store, and the provider selected for the
  * channel. A one-click unsubscribe URL only reaches providers that support it. A notification the provider accepted
  * can't be recalled - a later failure must never cause a second one, so it surfaces as MessageSentException.
@@ -41,7 +41,7 @@ class Sender implements SenderInterface
         // other channels are kept apart by a prefix.
         $recipient = $this->normalizers->normalize($delivery->channel, $delivery->recipient);
         $delivery = $this->withRecipient($delivery, $recipient);
-        if ($delivery->marketing && $this->blocks->isBlocked($delivery->channel, $delivery->recipient)) {
+        if ($delivery->stoppable && $this->blocks->isBlocked($delivery->channel, $delivery->recipient)) {
             return self::BLOCKED;
         }
         $key = $delivery->channel === Channel::EMAIL
@@ -65,7 +65,7 @@ class Sender implements SenderInterface
             $provider = $this->providers->getSelected($delivery->storeId, $delivery->channel);
             $this->emulation->startEnvironmentEmulation($delivery->storeId, Area::AREA_FRONTEND, true);
             try {
-                $provider->send($delivery, $this->forProvider($provider, ($delivery->content)()));
+                $provider->send($delivery, $this->forProvider($provider, $this->withWayOut($delivery, ($delivery->content)())));
                 $sent = true;
             } finally {
                 $this->emulation->stopEnvironmentEmulation();
@@ -85,6 +85,20 @@ class Sender implements SenderInterface
         return self::SENT;
     }
 
+    /**
+     * A stoppable notification always has a one-click way out (when the store sends one-click headers): without an
+     * unsubscribe link of its own, the "stop these emails" link is used. Built inside the store's emulation.
+     */
+    private function withWayOut(Delivery $delivery, DeliveryContent $content): DeliveryContent
+    {
+        if (!$delivery->stoppable || $content->oneClickUnsubscribeUrl !== null
+            || !$this->config->isOneClickUnsubscribeEnabled($delivery->storeId)) {
+            return $content;
+        }
+        $url = $this->blocks->getBlockUrl($delivery->channel, $delivery->recipient, $delivery->storeId);
+        return $url === '' ? $content : new DeliveryContent($content->vars, $content->recipientName, $url, $content->text);
+    }
+
     /** A provider without one-click support never gets the URL; the notification still goes out with its own link. */
     private function forProvider(ProviderInterface $provider, DeliveryContent $content): DeliveryContent
     {
@@ -100,6 +114,6 @@ class Sender implements SenderInterface
     {
         return $recipient === $delivery->recipient ? $delivery : new Delivery($delivery->storeId, $delivery->templateId,
             $delivery->sender, $recipient, $delivery->content, $delivery->useCooldown, $delivery->isRecipientCurrent,
-            $delivery->channel, $delivery->marketing);
+            $delivery->channel, $delivery->stoppable);
     }
 }

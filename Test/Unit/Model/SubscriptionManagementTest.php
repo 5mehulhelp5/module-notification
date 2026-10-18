@@ -164,6 +164,8 @@ class SubscriptionManagementTest extends TestCase
         $this->assertCount(1, $this->deletes, 'the guest\'s previous subscription of this cart is removed');
         $this->assertSame('ck_notification_subscription', $this->deletes[0]['table']);
         $this->assertContains('customer_id IS NULL', self::conditions($this->deletes[0]['where']), 'only the guest row');
+        $this->assertContains(['email_key = ?', \CommerceKings\Notification\Model\ContactRepository::key('guest@example.test')],
+            $this->selectWhere, 'the contact read a stored sign-up does too, so the answer is not measurably faster');
         $this->assertSame([['email', 'guest@example.test'], ['email', 'customer@test.com']], $touched,
             'each attempt restarts the lift timer');
     }

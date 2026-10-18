@@ -13,11 +13,11 @@ interface SenderInterface
     public const COOLDOWN = 'recipient cooldown';
     /** Delivery::$isRecipientCurrent said no after the cooldown claim; nothing was sent. */
     public const RECIPIENT_CHANGED = 'recipient changed';
-    /** A marketing delivery to a recipient on the do-not-contact list; nothing was sent. */
+    /** A stoppable delivery to a recipient on the do-not-contact list; nothing was sent. */
     public const BLOCKED = 'recipient blocked';
 
     /**
-     * Drops marketing deliveries to recipients on the do-not-contact list, claims the recipient cooldown (if the
+     * Drops stoppable deliveries to recipients on the do-not-contact list, claims the recipient cooldown (if the
      * delivery uses it and it is on), re-checks the recipient, builds the
      * content in the delivery's store and hands it to the provider selected for the channel. A failure before
      * the provider accepted it releases the cooldown claim and is rethrown; a failure after it is rethrown as

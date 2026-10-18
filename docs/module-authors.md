@@ -19,8 +19,9 @@ Building a notification type on `commercekings/module-notification`. Start with 
 3. Queue work with `Api\QueueInterface::publish('my_notification', $reference)`.
 
 `Delivery::$useCooldown = false` for notifications the recipient asked for (e.g. back in stock): they are always
-sent and do not start the cooldown. `Delivery::$marketing = false` for service messages (orders, payments): they
-ignore the Do not contact list. Marketing templates show the stop link with
+sent and do not start the cooldown. `Delivery::$stoppable = false` for messages the recipient cannot stop with Do not
+contact (orders, payments); a feature's marketing is stoppable (the default). A stoppable send without an
+unsubscribe link of its own gets the stop link as its one-click URL. Marketing templates show the stop link with
 `{{depend block_url}}…{{var block_url}}…{{/depend}}`, the URL from
 `Api\RecipientBlockInterface::getBlockUrl(Channel::EMAIL, $email, $storeId)` ('' when the shop turned it off).
 `SenderInterface::send()` returns `SENT`, `COOLDOWN`, `RECIPIENT_CHANGED` or `BLOCKED`; on anything but `SENT`,
@@ -97,6 +98,9 @@ For notifications a visitor signs up for, also:
 1. Implement `Api\SubscriptionTypeInterface`:
    - `getPurpose()`: what the subscription is for (with the consent bridge: the Consent purpose your module declares);
    - `isSingle()`: one subscription per reference (a new email replaces it) or one per person;
+   - `isStoppable()`: can the recipient stop it with Do not contact? true for marketing (a block removes the
+     subscription; pass the same value as `Delivery::$stoppable`), false for a service they asked for (a block leaves
+     it);
    - `authorize($reference, $customerId)`: `null` when the visitor may not touch it, else a `Data\Target`
      with your id, the store, whether it accepts subscriptions now, and an optional trusted SQL condition
      repeated in the write (e.g. "the cart is still active in this store");

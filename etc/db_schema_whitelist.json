@@ -5,11 +5,24 @@
             "sent_at": true,
             "claim_token": true
         },
-        "constraint": {
-            "PRIMARY": true
-        },
         "index": {
             "CK_NOTIFICATION_COOLDOWN_SENT_AT": true
+        },
+        "constraint": {
+            "PRIMARY": true
+        }
+    },
+    "ck_notification_recipient_block": {
+        "column": {
+            "recipient_hash": true,
+            "blocked_at": true,
+            "last_attempt_at": true
+        },
+        "index": {
+            "CK_NOTIFICATION_RECIPIENT_BLOCK_LAST_ATTEMPT_AT": true
+        },
+        "constraint": {
+            "PRIMARY": true
         }
     },
     "ck_notification_contact": {
@@ -17,17 +30,16 @@
             "contact_id": true,
             "website_id": true,
             "email": true,
-            "created_at": true,
-            "email_key": true
-        },
-        "constraint": {
-            "PRIMARY": true,
-            "CK_NOTIFICATION_CONTACT_WEBSITE_ID_EMAIL": true,
-            "CK_NOTIFICATION_CONTACT_WEBSITE_ID_STORE_WEBSITE_WEBSITE_ID": true,
-            "CK_NOTIFICATION_CONTACT_WEBSITE_ID_EMAIL_KEY": true
+            "email_key": true,
+            "created_at": true
         },
         "index": {
             "CK_NOTIFICATION_CONTACT_CREATED_AT": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "CK_NOTIFICATION_CONTACT_WEBSITE_ID_EMAIL_KEY": true,
+            "CK_NOTIFICATION_CONTACT_WEBSITE_ID_STORE_WEBSITE_WEBSITE_ID": true
         }
     },
     "ck_notification_subscription": {
@@ -39,13 +51,10 @@
             "subject_key": true,
             "contact_id": true,
             "customer_id": true,
-            "consent_id": true,
             "permission_ref": true,
-            "browser_hash": true,
             "captured_at": true
         },
         "index": {
-            "CK_NOTIFICATION_SUBSCRIPTION_CONSENT_ID": true,
             "CK_NOTIFICATION_SUBSCRIPTION_PERMISSION_REF": true,
             "CK_NOTIFICATION_SUBSCRIPTION_CONTACT_ID": true,
             "CK_NOTIFICATION_SUBSCRIPTION_CUSTOMER_ID": true
@@ -56,19 +65,6 @@
             "CK_NOTIFICATION_SUBSCRIPTION_STORE_ID_STORE_STORE_ID": true,
             "CK_NTFC_SUBSCRIPTION_CONTACT_ID_CK_NTFC_CONTACT_CONTACT_ID": true,
             "CK_NTFC_SUBSCRIPTION_CSTR_ID_CSTR_ENTT_ENTT_ID": true
-        }
-    },
-    "ck_notification_recipient_block": {
-        "column": {
-            "recipient_hash": true,
-            "blocked_at": true,
-            "last_attempt_at": true
-        },
-        "constraint": {
-            "PRIMARY": true
-        },
-        "index": {
-            "CK_NOTIFICATION_RECIPIENT_BLOCK_LAST_ATTEMPT_AT": true
         }
     }
 }

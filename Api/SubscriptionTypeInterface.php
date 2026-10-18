@@ -25,6 +25,13 @@ interface SubscriptionTypeInterface
     public function isSingle(): bool;
 
     /**
+     * Can the recipient stop it with Do not contact? The feature decides: true e.g. for a cart reminder – a block
+     * removes the subscription and drops its deliveries; false for a service the recipient asked for, which a block
+     * leaves alone. Its deliveries pass the same value as Delivery::$stoppable.
+     */
+    public function isStoppable(): bool;
+
+    /**
      * May this visitor subscribe to $reference? Runs before the permission is read or anything is written.
      * @param string $reference as sent by the storefront (e.g. a masked cart id)
      * @param int $customerId logged-in customer, 0 for a guest

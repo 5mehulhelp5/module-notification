@@ -41,6 +41,8 @@ class SenderTest extends TestCase
     private ProviderPool $pool;
     /** "channel:recipient" on the do-not-contact list */
     private array $blocked = [];
+    private bool $oneClick = false;
+    private string $blockUrl = '';
 
     /** @param object|null $mailMessage the transport's message; null: Magento 2.4.8+ (Symfony) */
     /** @param ProviderInterface[] $extra more providers; $selected the stored provider code */
@@ -85,11 +87,13 @@ class SenderTest extends TestCase
         $config = $this->createStub(Config::class);
         $config->method('getCooldownDays')->willReturn($cooldownDays);
         $config->method('getProviderCode')->willReturn($selected);
+        $config->method('isOneClickUnsubscribeEnabled')->willReturnCallback(fn () => $this->oneClick);
         $logger = $this->createStub(\Psr\Log\LoggerInterface::class);
         $logger->method('warning')->willReturnCallback(function ($text) { $this->warnings[] = $text; });
         $this->pool = new ProviderPool($config, [new MagentoEmail($builder, new OneClickHeaders(), $logger), ...$extra]);
         $blocks = $this->createStub(\CommerceKings\Notification\Api\RecipientBlockInterface::class);
         $blocks->method('isBlocked')->willReturnCallback(fn ($channel, $recipient) => in_array($channel . ':' . $recipient, $this->blocked, true));
+        $blocks->method('getBlockUrl')->willReturnCallback(fn () => $this->blockUrl);
         return new Sender($this->pool, $emulation, $cooldown, $config, $logger, new RecipientNormalizerPool($normalizers), $blocks);
     }
 
@@ -325,5 +329,29 @@ class SenderTest extends TestCase
         $this->sender(extra: [$this->textProvider()]);
         $this->assertSame([['value' => 'magento_email', 'label' => 'Magento email']], (new ProviderSource($this->pool))->toOptionArray());
         $this->assertSame([['value' => 'test_text', 'label' => 'Test text']], (new ProviderSource($this->pool, 'text'))->toOptionArray());
+    }
+
+    /** A stoppable notification without an unsubscribe link of its own gets the stop link as its one-click URL. */
+    public function testAStoppableNotificationAlwaysHasAOneClickWayOut(): void
+    {
+        $this->oneClick = true;
+        $this->blockUrl = 'https://shop.example.test/cknotification/block/?r=enc&s=sig';
+        $header = fn () => $this->native->getHeaders()->has('List-Unsubscribe')
+            ? $this->native->getHeaders()->getHeaderBody('List-Unsubscribe') : null;
+
+        $this->sender()->send(new Delivery(3, 'tpl', 'general', 'a@test.com', fn () => new DeliveryContent([], 'Jane')));
+        $this->assertSame('<' . $this->blockUrl . '>', $header(), 'no link of its own: the stop link');
+
+        $own = 'https://shop.example.test/acme/unsubscribe?id=1';
+        $this->sender()->send(new Delivery(3, 'tpl', 'general', 'a@test.com', fn () => new DeliveryContent([], 'Jane', $own)));
+        $this->assertSame('<' . $own . '>', $header(), 'its own link wins');
+
+        $this->sender()->send(new Delivery(3, 'tpl', 'general', 'a@test.com', fn () => new DeliveryContent([], 'Jane'),
+            stoppable: false));
+        $this->assertNull($header(), 'not stoppable (e.g. an order message): the stop link would not stop it');
+
+        $this->oneClick = false;
+        $this->sender()->send(new Delivery(3, 'tpl', 'general', 'a@test.com', fn () => new DeliveryContent([], 'Jane')));
+        $this->assertNull($header(), 'one-click headers turned off for the store');
     }
 }

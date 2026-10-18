@@ -62,6 +62,7 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         if ($this->blocks->touch(Channel::EMAIL, $email)) {
             // a changed address must not leave the previous recipient's subscription behind; the answer stays the same
             $this->unsubscribeGuest($type, $subscriptionType, $target);
+            $this->lookUpContact($this->websiteId($target), $email);
             return true;
         }
         $db = $this->resource->getConnection();
@@ -96,6 +97,14 @@ class SubscriptionManagement implements SubscriptionManagementInterface
             return true;
         }
         return $this->store($type, $subscriptionType, $target, (string)$permission->reference, null, $customerId);
+    }
+
+    /** The contact read a stored sign-up does, so a blocked address does not answer measurably faster. */
+    private function lookUpContact(int $websiteId, string $email): void
+    {
+        $db = $this->resource->getConnection();
+        $db->fetchOne($db->select()->from($this->resource->getTableName(ContactRepository::TABLE), 'contact_id')
+            ->where('website_id = ?', $websiteId)->where('email_key = ?', ContactRepository::key($email)));
     }
 
     /** A customer that no longer exists has no address to check: the guarded write refuses it as before. */

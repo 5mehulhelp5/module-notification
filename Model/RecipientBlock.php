@@ -25,7 +25,8 @@ class RecipientBlock implements RecipientBlockInterface
         private readonly Config $config,
         private readonly RecipientNormalizerPool $normalizers,
         private readonly SubscriptionPermissionInterface $permission,
-        private readonly KeyedHash $keyedHash
+        private readonly KeyedHash $keyedHash,
+        private readonly SubscriptionTypePool $types
     ) {
     }
 
@@ -165,15 +166,25 @@ class RecipientBlock implements RecipientBlockInterface
         return $this->keyedHash->current('commercekings_notification_block_link|' . $encrypted);
     }
 
-    /** The address's guest contacts and customer accounts, on every website: no subscription survives the block. */
+    /**
+     * The address's stoppable subscriptions, as guest contact or customer account, on every website. Customers match
+     * like contacts (ContactRepository::key()): the email column's collation would also match other letter cases and
+     * accents. Subscriptions of a registered type that is not stoppable stay.
+     */
     private function removeSubscriptions(string $email): void
     {
         $db = $this->resource->getConnection();
+        $key = ContactRepository::key($email);
         $contacts = $db->select()->from($this->resource->getTableName(ContactRepository::TABLE), 'contact_id')
-            ->where('email_key = ?', ContactRepository::key($email));
-        $customers = $db->select()->from($this->resource->getTableName('customer_entity'), 'entity_id')
-            ->where('email = ?', trim($email));
+            ->where('email_key = ?', $key);
+        $candidates = $db->fetchPairs($db->select()->from($this->resource->getTableName('customer_entity'),
+            ['entity_id', 'email'])->where('email = ?', trim($email)));
+        $customers = array_keys(array_filter($candidates, fn ($candidate) => ContactRepository::key((string)$candidate) === $key));
+        $where = $customers
+            ? $db->quoteInto('(contact_id IN (' . $contacts . ') OR customer_id IN (?))', $customers)
+            : 'contact_id IN (' . $contacts . ')';
+        $kept = array_keys(array_filter($this->types->getAll(), fn ($type) => !$type->isStoppable()));
         $db->delete($this->resource->getTableName(SubscriptionManagement::TABLE),
-            'contact_id IN (' . $contacts . ') OR customer_id IN (' . $customers . ')');
+            $kept ? [$where, 'type NOT IN (?)' => $kept] : [$where]);
     }
 }
