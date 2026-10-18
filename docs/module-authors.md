@@ -149,8 +149,20 @@ counts a failed attempt.
 
 Some rules (e.g. US carriers for 10DLC) want a confirmation text after a sign-up. Observe
 `commercekings_notification_subscription_saved` (`SubscriptionManagementInterface::EVENT_SAVED`) for your channel and
-send one only when `first_for_address` is true – no subscription of any type had that number in the website
-before, so a new cart of a known number gets none. Queue it rather than sending
+send one only when `first_for_address` is true – the number currently has no other subscription of any type in the
+website, so a new cart of a known number gets none (once all its subscriptions are gone, e.g. after a stop, the next
+sign-up confirms again). It is read without a lock: two sign-ups for one new number at the same moment can both see
+true. Send once with a claim on the delivery state, keyed by the contact, and send only when it changed a row:
+
+```php
+$state->ensure('my_optin_confirmation', $contactId);
+$first = $db->update($state->getTableName(), ['sent_at' => new \Zend_Db_Expr('NOW()')],
+    $state->keyCondition('my_optin_confirmation', $contactId) + ['sent_at IS NULL']) === 1;
+```
+
+The claim holds until you delete the row: delete it when the number should be confirmed again (e.g. after a stop).
+Notification's daily cleanup removes delivery state only for subscription types, so remove these rows yourself (e.g.
+a cron deleting rows whose contact no longer exists). Queue it rather than sending
 from the request: a `NotificationTypeInterface` of your own in `Model\TypePool`, published with
 `Api\QueueInterface::publish('my_optin_confirmation', (string)$subscriptionId)`; its `process()` reads the
 subscription (`SubscriptionRepositoryInterface::get()`, `getRecipient()`) and sends with `useCooldown: false` (the
@@ -275,7 +287,8 @@ For notifications a visitor signs up for, also:
    what "due" means (once, again after N days, a retry backoff, an hourly cap) is yours; filter by your `type` in
    statements of your own (the table is shared). Rows go with their reference (your `orphanCondition()`, daily); a
    person's rows also go `DeliveryStateInterface::RETENTION_DAYS` (90) after their last change once no subscription
-   has their key.
+   has their key. That cleanup covers subscription types only: state you keep for another type (e.g. an opt-in
+   confirmation keyed by contact id) is yours to remove.
 5. **Own consent per address:** `SubscriptionPermissionInterface::check($type, $target, $recipient)` gets the
    address the subscription will be stored with, in the sender's form (normalized; email trimmed) – the guest's
    address, the customer's account email on email types, the number a customer gave on other channels. A type's own
@@ -288,7 +301,8 @@ For notifications a visitor signs up for, also:
    after the row is committed, with `subscription_id`, `type`, `channel`, `store_id`, `contact_id`, `customer_id` and
    `created` (true for a new row; false when an existing one changed, e.g. a new number or permission) and
    `previous_contact_id` (the changed row's contact before; differs from `contact_id` for a new address) and
-   `first_for_address` (no subscription of any type had this address in the website before); not for a
+   `first_for_address` (the address currently has no other subscription of any type in the website; read without a
+   lock, so concurrent sign-ups can both see true – dedupe as in [Opt-in confirmation](#opt-in-confirmation)); not for a
    refusal, a stopped recipient or an identical retry. Read the address with
    `SubscriptionRepositoryInterface::get()` and `getRecipient()`. Your observer's error is logged (its class only)
    and never fails the sign-up – send or queue from it, but do not rely on it to block one.

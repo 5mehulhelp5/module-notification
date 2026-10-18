@@ -21,7 +21,9 @@ namespace CommerceKings\Notification\Api;
  * undo a newer one) and updated_at. All times UTC, like the database session's NOW(). No row means never queued.
  *
  * Rows go when their reference does (the type's SubscriptionTypeInterface::orphanCondition(), daily); rows of a
- * person (subject_key not '') also go RETENTION_DAYS after their last change once no subscription has that key.
+ * person (subject_key not '') also go RETENTION_DAYS after their last change once no subscription has that key. The
+ * cleanup covers subscription types only: a module that keeps state for another type (e.g. an opt-in confirmation
+ * keyed by contact id) removes its rows itself.
  *
  * @api
  */
