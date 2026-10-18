@@ -175,46 +175,123 @@ class RecipientBlockTest extends TestCase
         }
     }
 
-    public function testKeyChangeRemovesOldRowsKeepsCurrentAndUnmarkedOnesAndNotifiesOnce(): void
+    /** A cleanup that treats 'earlier-key-id' as an older key still in env.php. */
+    private function cleanup(): KeyChangeCleanup
+    {
+        $fingerprint = $this->createStub(KeyFingerprint::class);
+        $fingerprint->method('current')->willReturn($this->om->get(KeyFingerprint::class)->current());
+        $fingerprint->method('earlier')->willReturn(['earlier-key-id']);
+        return $this->om->create(KeyChangeCleanup::class, ['fingerprint' => $fingerprint]);
+    }
+
+    /** @return array{0: string[], 1: string, 2: string, 3: string} earlier-key, unknown-key and unmarked blocks, an earlier-key cooldown */
+    private function keyChangeFixture(): array
+    {
+        $db = $this->resource->getConnection();
+        $blocks = $this->resource->getTableName(RecipientBlock::TABLE);
+        $this->blocks->block(Channel::EMAIL, $this->email('a'));                 // current key
+        $earlier = ['ck_old_' . $this->run . '_1', 'ck_old_' . $this->run . '_2'];
+        foreach ($earlier as $hash) {
+            $db->insert($blocks, ['recipient_hash' => $hash, 'key_id' => 'earlier-key-id']);
+        }
+        $unknown = 'ck_gone_' . $this->run;                                       // a key no longer in env.php
+        $db->insert($blocks, ['recipient_hash' => $unknown, 'key_id' => 'gone-key-id']);
+        $unmarked = 'ck_nokey_' . $this->run;                                     // written by older code
+        $db->insert($blocks, ['recipient_hash' => $unmarked, 'key_id' => null]);
+        $cooldown = 'ck_old_' . $this->run . '_c';
+        $db->insert($this->resource->getTableName(Cooldown::TABLE), ['recipient_hash' => $cooldown, 'key_id' => 'earlier-key-id']);
+        return [$earlier, $unknown, $unmarked, $cooldown];
+    }
+
+    private function removeKeyChangeFixture(array $fixture): void
+    {
+        [$earlier, $unknown, $unmarked, $cooldown] = $fixture;
+        $db = $this->resource->getConnection();
+        $db->delete($this->resource->getTableName(RecipientBlock::TABLE), ['recipient_hash IN (?)' => [...$earlier, $unknown, $unmarked]]);
+        $db->delete($this->resource->getTableName(Cooldown::TABLE), ['recipient_hash = ?' => $cooldown]);
+    }
+
+    private function blockExists(string $hash): bool
+    {
+        $db = $this->resource->getConnection();
+        return (bool)$db->fetchOne($db->select()->from($this->resource->getTableName(RecipientBlock::TABLE), 'recipient_hash')
+            ->where('recipient_hash = ?', $hash));
+    }
+
+    public function testKeyChangeRemovesEarlierKeysThenUnknownOnlyOnRequestAndNeverCurrentOrUnmarked(): void
+    {
+        $fixture = $this->keyChangeFixture();
+        [$earlier, $unknown, $unmarked, $cooldown] = $fixture;
+        $inbox = $this->resource->getTableName('adminnotification_inbox');
+        $db = $this->resource->getConnection();
+        $lastNotice = (int)$db->fetchOne("SELECT IFNULL(MAX(notification_id), 0) FROM {$inbox}");
+        try {
+            $counts = $this->cleanup()->count();
+            $this->assertGreaterThanOrEqual(2, $counts['blocks']['earlier']);
+            $this->assertGreaterThanOrEqual(1, $counts['blocks']['unknown']);
+            $this->assertGreaterThanOrEqual(1, $counts['blocks']['unmarked']);
+            $this->assertGreaterThanOrEqual(1, $counts['blocks']['current']);
+            $this->assertGreaterThanOrEqual(1, $counts['cooldowns']['earlier']);
+            $this->assertTrue($this->blockExists($earlier[0]), 'counting removes nothing');
+
+            $removed = $this->cleanup()->execute();
+            $this->assertGreaterThanOrEqual(2, $removed['blocks']);
+            $this->assertFalse($this->blockExists($earlier[0]) || $this->blockExists($earlier[1]), 'earlier-key blocks removed');
+            $this->assertSame(0, (int)$db->fetchOne($db->select()->from($this->resource->getTableName(Cooldown::TABLE), 'COUNT(*)')
+                ->where('recipient_hash = ?', $cooldown)), 'earlier-key cooldown removed');
+            $this->assertTrue($this->blockExists($unknown), 'an unknown key stays without --force');
+            $this->assertTrue($this->blockExists($unmarked));
+            $this->assertTrue($this->blocks->isBlocked(Channel::EMAIL, $this->email('a')), 'the current block stays');
+
+            $this->cleanup()->execute(true);
+            $this->assertFalse($this->blockExists($unknown), '--force removes the unknown key');
+            $this->assertTrue($this->blockExists($unmarked), 'a row without a fingerprint is never removed');
+            $this->assertTrue($this->blocks->isBlocked(Channel::EMAIL, $this->email('a')));
+        } finally {
+            $this->removeKeyChangeFixture($fixture);
+            $db->delete($inbox, ['notification_id > ?' => $lastNotice, 'title LIKE ?' => '%encryption key was changed%']);
+        }
+    }
+
+    public function testKeyChangeNotifiesTheAdminOnce(): void
     {
         if (!$this->om->get(\Magento\Framework\Module\Manager::class)->isEnabled('Magento_AdminNotification')) {
             $this->markTestSkipped('Magento_AdminNotification is disabled: the notice has no inbox to check.');
         }
+        $fixture = $this->keyChangeFixture();
         $db = $this->resource->getConnection();
-        $blocks = $this->resource->getTableName(RecipientBlock::TABLE);
-        $cooldowns = $this->resource->getTableName('ck_notification_cooldown');
         $inbox = $this->resource->getTableName('adminnotification_inbox');
-        $this->blocks->block(Channel::EMAIL, $this->email('a'));                 // current key
-        $old = ['ck_old_' . $this->run . '_1', 'ck_old_' . $this->run . '_2'];   // an earlier key
-        foreach ($old as $hash) {
-            $db->insert($blocks, ['recipient_hash' => $hash, 'key_id' => 'earlier-key-id']);
-        }
-        $unmarked = 'ck_nokey_' . $this->run;                                     // written by older code mid-deploy
-        $db->insert($blocks, ['recipient_hash' => $unmarked, 'key_id' => null]);
-        $db->insert($cooldowns, ['recipient_hash' => 'ck_old_' . $this->run . '_c', 'key_id' => 'earlier-key-id']);
-        $lastNotice = (int)$db->fetchOne("SELECT MAX(notification_id) FROM {$inbox}");
+        $lastNotice = (int)$db->fetchOne("SELECT IFNULL(MAX(notification_id), 0) FROM {$inbox}");
+        $notices = fn () => $db->fetchAll($db->select()->from($inbox)->where('notification_id > ?', $lastNotice)
+            ->where('title LIKE ?', '%encryption key was changed%'));
         try {
-            $removed = $this->om->get(KeyChangeCleanup::class)->execute();
-            $this->assertGreaterThanOrEqual(2, $removed['blocks']);
-            $this->assertGreaterThanOrEqual(1, $removed['cooldowns']);
-            $this->assertSame(0, (int)$db->fetchOne($db->select()->from($blocks, 'COUNT(*)')->where('recipient_hash IN (?)', $old)),
-                'old-key blocks removed');
-            $this->assertSame(1, (int)$db->fetchOne($db->select()->from($blocks, 'COUNT(*)')->where('recipient_hash = ?', $unmarked)),
-                'a row without a fingerprint is never treated as an old key');
-            $this->assertTrue($this->blocks->isBlocked(Channel::EMAIL, $this->email('a')), 'the current block stays');
-            $notices = $db->fetchAll($db->select()->from($inbox)->where('notification_id > ?', $lastNotice)
-                ->where('title LIKE ?', '%encryption key was changed%'));
-            $this->assertCount(1, $notices, 'one admin notification');
-            $this->assertStringContainsString('do-not-contact block(s) were lifted', $notices[0]['description']);
-            $this->om->get(KeyChangeCleanup::class)->execute();
-            $this->assertSame(array_column($notices, 'notification_id'), $db->fetchCol($db->select()
-                ->from($inbox, 'notification_id')->where('notification_id > ?', $lastNotice)
-                ->where('title LIKE ?', '%encryption key was changed%')), 'nothing old left: no second notification');
+            $this->assertTrue($this->cleanup()->execute()['notified']);
+            $this->assertCount(1, $notices(), 'one admin notification');
+            $this->assertStringContainsString('do-not-contact block(s) were lifted', $notices()[0]['description']);
+            $this->assertFalse($this->cleanup()->execute()['notified'], 'nothing earlier left');
+            $this->assertCount(1, $notices(), 'no second notification');
         } finally {
-            $db->delete($blocks, ['recipient_hash IN (?)' => [...$old, $unmarked]]);
-            $db->delete($cooldowns, ['recipient_hash = ?' => 'ck_old_' . $this->run . '_c']);
+            $this->removeKeyChangeFixture($fixture);
             $db->delete($inbox, ['notification_id > ?' => $lastNotice, 'title LIKE ?' => '%encryption key was changed%']);
         }
+    }
+
+    public function testEarlierKeysAreReadFromTheRealKeyFormat(): void
+    {
+        $real = (string)$this->om->get(\Magento\Framework\App\DeploymentConfig::class)->get('crypt/key');
+        $config = $this->createStub(\Magento\Framework\App\DeploymentConfig::class);
+        $config->method('get')->willReturn(str_repeat('o', 32) . "\n" . $real);
+        $fingerprint = new KeyFingerprint($this->om->get(\Magento\Framework\Encryption\EncryptorInterface::class), $config);
+        $this->assertCount(1, $fingerprint->earlier(), 'computing the newest key like the Encryptor is confirmed');
+        $this->assertSame([], $this->om->get(KeyFingerprint::class)->earlier(), 'this install has one key');
+    }
+
+    public function testTheCommandIsRegistered(): void
+    {
+        $commands = $this->om->get(\Magento\Framework\Console\CommandListInterface::class)->getCommands();
+        $command = $commands['notification_key_change_cleanup'] ?? null;
+        $this->assertInstanceOf(\CommerceKings\Notification\Console\Command\KeyChangeCleanup::class, $command);
+        $this->assertSame('notification:key-change:cleanup', $command->getName());
     }
 
     private function hashOf(string $email): string

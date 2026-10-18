@@ -65,7 +65,7 @@
             </argument>
         </arguments>
     </type>
-    <!-- run by hand after encryption:key:change; the proxy keeps bin/magento from opening the database at start -->
+    <!-- run by hand after encryption:key:change; the proxy avoids building the cleanup on every bin/magento run -->
     <type name="CommerceKings\Notification\Console\Command\KeyChangeCleanup">
         <arguments>
             <argument name="cleanup" xsi:type="object">CommerceKings\Notification\Model\KeyChangeCleanup\Proxy</argument>

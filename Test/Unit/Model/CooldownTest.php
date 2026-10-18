@@ -7,6 +7,7 @@ use CommerceKings\Notification\Model\Config;
 use CommerceKings\Notification\Model\Cooldown;
 use CommerceKings\Notification\Model\KeyFingerprint;
 use CommerceKings\Notification\Test\Unit\DbTestTrait;
+use Magento\Framework\App\DeploymentConfig;
 use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\Math\Random;
 use PHPUnit\Framework\TestCase;
@@ -29,7 +30,8 @@ class CooldownTest extends TestCase
         $random->method('getRandomString')->willReturn(str_repeat('b', 32));
         $config = $this->createStub(Config::class);
         $config->method('getCooldownDays')->willReturn($days);
-        return new Cooldown($this->resource(), $encryptor, $random, $config, new KeyFingerprint($encryptor));
+        return new Cooldown($this->resource(), $encryptor, $random, $config, new KeyFingerprint($encryptor,
+            $this->createStub(DeploymentConfig::class)));
     }
 
     public function testNormalizationUsesTheNativeKeyedHash(): void
@@ -47,7 +49,7 @@ class CooldownTest extends TestCase
             return md5($input);
         });
         $cooldown = new Cooldown($this->resource(), $encryptor, $this->createStub(Random::class), $this->createStub(Config::class),
-            new KeyFingerprint($encryptor));
+            new KeyFingerprint($encryptor, $this->createStub(DeploymentConfig::class)));
         $composed = "Jos\u{00E9}@Example.Test";      // é as one code point
         $decomposed = " jose\u{0301}@example.test ";  // e + combining acute
         $this->assertSame($cooldown->hash($composed), $cooldown->hash($decomposed));

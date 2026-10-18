@@ -5,9 +5,10 @@
 First release. Features:
 
 - **Encryption key change:** blocks and cooldown rows store a fingerprint of the key that made them;
-  `bin/magento notification:key-change:cleanup` (`--dry-run` to count first) removes rows of an earlier key and,
-  when blocks were lifted, posts an admin notification (needs Magento_AdminNotification, which is suggested, not
-  required). It runs only by hand, never on a schedule. Upgrading: run `setup:upgrade` before the new code
+  `bin/magento notification:key-change:cleanup` (`--dry-run` counts rows per key) removes rows of earlier keys
+  still listed in `env.php` (`--force` also those of keys no longer listed) and, when blocks were lifted, posts an
+  admin notification (needs Magento_AdminNotification, which is suggested, not required). It runs only by hand,
+  never on a schedule. Upgrading: run `setup:upgrade` before the new code
   serves requests – it adds the `key_id` columns the new code writes.
 - **Do not contact:** a signed "stop these emails" link in marketing notifications (`RecipientBlockInterface`,
   `/cknotification/block` with a confirmation and Undo) stops all marketing notifications to that address. Blocked

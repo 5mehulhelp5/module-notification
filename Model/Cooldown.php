@@ -11,7 +11,7 @@ use Magento\Framework\Math\Random;
 /** Short-lived recipient cooldown, independent of any feature's data and of consent identity. */
 class Cooldown implements CooldownInterface
 {
-    private const TABLE = 'ck_notification_cooldown';
+    public const TABLE = 'ck_notification_cooldown';
 
     public function __construct(
         private readonly ResourceConnection $resource,

@@ -79,23 +79,31 @@ The hashes and links are keyed with Magento's encryption key, and only hashes ar
 be re-hashed: every block lifts and links already sent expire. Each row stores a fingerprint of its key (`key_id`).
 Subscriptions, contacts and consent records are not affected.
 
-After `bin/magento encryption:key:change`, on a server with the shop's `env.php`:
+After `bin/magento encryption:key:change`:
+
+1. Restart the queue consumers and PHP-FPM (or reset opcache), so no running process keeps using the old key.
+2. On a server with the shop's `env.php`, count, then clean up:
 
 ```sh
-bin/magento notification:key-change:cleanup --dry-run   # counts the rows of an earlier key, removes nothing
-bin/magento notification:key-change:cleanup             # removes them
+bin/magento notification:key-change:cleanup --dry-run   # rows per key; removes nothing
+bin/magento notification:key-change:cleanup             # removes the rows of earlier keys
 ```
 
-The cleanup logs the counts and, when blocks were lifted, posts one admin notification with their number, so the
-shop owner knows that recipients who had stopped emails may get them again. It never runs automatically: a server
-with a different key (a build box, a wrong `env.php`) cannot remove anything on its own. Skipping it is harmless –
-the old rows only take space until the normal cleanups remove them.
+The dry run shows, per table, the rows of the **current** key, of an **earlier** key still listed in `env.php`
+(Magento keeps old keys there after a change), of an **unknown** key and **unmarked** rows. The cleanup removes only
+the earlier-key rows, so a server with the wrong `env.php`, which knows none of the shop's keys, removes nothing.
+Unknown-key rows are removed only with `--force` – use it only if you deleted old keys from `env.php` yourself.
+Many unknown and no earlier rows usually mean the wrong `env.php`. Unmarked rows are never removed; they age out
+through the normal cleanups.
 
-- Rows without a fingerprint (written by code from before it, e.g. a consumer not restarted after a deploy) are
-  never treated as old; they age out through the normal cleanups.
-- Every write stores the current fingerprint; `setup:upgrade` only adds the column and never changes rows.
-- Run the command where the shop's `env.php` is: on a server with another key every row looks old (the dry run
-  shows it – a count close to all rows means the wrong key).
+The cleanup logs the counts and, when blocks were lifted, posts one admin notification with their number, so the
+shop owner knows that recipients who had stopped emails may get them again (the command says when no notice
+could be posted). Run it only once you are sure the new key stays: removed blocks cannot be restored. It can be
+run again, e.g. if a process kept the old key a little longer. It never runs automatically, and skipping it is
+harmless – the old rows only take space until the normal cleanups remove them.
+
+- Blocking and cooldown claims store the current fingerprint; `setup:upgrade` only adds the column and never
+  changes rows.
 
 ## Later
 

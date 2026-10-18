@@ -11,34 +11,51 @@ use Symfony\Component\Console\Tester\CommandTester;
 
 class KeyChangeCleanupTest extends TestCase
 {
-    public function testDryRunOnlyCounts(): void
+    public function testDryRunShowsEveryKindAndRemovesNothing(): void
     {
         $cleanup = $this->createMock(Cleanup::class);
-        $cleanup->expects($this->once())->method('count')->willReturn(['blocks' => 3, 'cooldowns' => 8]);
+        $cleanup->expects($this->once())->method('count')->willReturn([
+            'blocks' => ['current' => 1, 'earlier' => 3, 'unknown' => 2, 'unmarked' => 4],
+            'cooldowns' => ['current' => 5, 'earlier' => 8, 'unknown' => 0, 'unmarked' => 0],
+        ]);
         $cleanup->expects($this->never())->method('execute');
         $tester = new CommandTester(new KeyChangeCleanup($cleanup));
         $this->assertSame(Command::SUCCESS, $tester->execute(['--dry-run' => true]));
-        $this->assertSame('Rows of an earlier key: 3 do-not-contact block(s), 8 cooldown row(s). Nothing removed.'
-            . PHP_EOL, $tester->getDisplay());
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('Do-not-contact blocks: 1 current key, 3 earlier key in env.php, 2 unknown key, 4 unmarked.', $display);
+        $this->assertStringContainsString('Cooldown rows: 5 current key, 8 earlier key in env.php, 0 unknown key, 0 unmarked.', $display);
+        $this->assertStringContainsString('Nothing removed.', $display);
     }
 
-    public function testRemovesAndReportsTheNotice(): void
+    public function testRemovesEarlierKeysOnlyByDefault(): void
     {
         $cleanup = $this->createMock(Cleanup::class);
-        $cleanup->expects($this->never())->method('count');
-        $cleanup->expects($this->once())->method('execute')->willReturn(['blocks' => 3, 'cooldowns' => 8]);
+        $cleanup->expects($this->once())->method('execute')->with(false)
+            ->willReturn(['blocks' => 3, 'cooldowns' => 8, 'notified' => true]);
         $tester = new CommandTester(new KeyChangeCleanup($cleanup));
         $this->assertSame(Command::SUCCESS, $tester->execute([]));
-        $this->assertStringContainsString('Removed 3 do-not-contact block(s) and 8 cooldown row(s)', $tester->getDisplay());
-        $this->assertStringContainsString('admin notification', $tester->getDisplay());
+        $this->assertStringContainsString('Removed 3 do-not-contact block(s) and 8 cooldown row(s) of earlier keys.', $tester->getDisplay());
+        $this->assertStringContainsString('An admin notification tells the shop owner.', $tester->getDisplay());
     }
 
-    public function testNothingOldMentionsNoNotice(): void
+    public function testForceAlsoRemovesUnknownKeys(): void
+    {
+        $cleanup = $this->createMock(Cleanup::class);
+        $cleanup->expects($this->once())->method('execute')->with(true)
+            ->willReturn(['blocks' => 0, 'cooldowns' => 2, 'notified' => false]);
+        $tester = new CommandTester(new KeyChangeCleanup($cleanup));
+        $tester->execute(['--force' => true]);
+        $this->assertStringContainsString('of earlier and unknown keys.', $tester->getDisplay());
+        $this->assertStringNotContainsString('admin notification', $tester->getDisplay(), 'no blocks: nothing to tell');
+    }
+
+    public function testSaysSoWhenNoNoticeWasPosted(): void
     {
         $cleanup = $this->createStub(Cleanup::class);
-        $cleanup->method('execute')->willReturn(['blocks' => 0, 'cooldowns' => 0]);
+        $cleanup->method('execute')->willReturn(['blocks' => 3, 'cooldowns' => 0, 'notified' => false]);
         $tester = new CommandTester(new KeyChangeCleanup($cleanup));
         $tester->execute([]);
-        $this->assertStringNotContainsString('admin notification', $tester->getDisplay());
+        $this->assertStringContainsString('No admin notification was posted', $tester->getDisplay());
+        $this->assertStringNotContainsString('An admin notification tells', $tester->getDisplay());
     }
 }

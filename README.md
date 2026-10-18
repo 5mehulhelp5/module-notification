@@ -18,6 +18,24 @@ Works with Magento 2.4.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQ
 
 A feature (e.g. abandoned cart) says *what and when*; Notification handles *who and how*.
 
+## The model
+
+- A **notification type** is one kind of message, registered by a feature. It decides when to send and builds
+  the content.
+- A **subscription** is a shopper's sign-up for a type, e.g. reminders for one cart. Marketing types need one;
+  service messages don't. A guest is stored as a **contact** (one per website and address); a customer by account.
+- A **permission** decides who may subscribe: everyone (opt-out), or only with consent (opt-in, with the privacy
+  bundle). Withdrawing the consent removes the subscription. The **subscriber** provides the unsubscribe link.
+- The **queue** carries `<type>|<reference>`. One consumer sends every type, so nothing is sent during a page view.
+- The **sender** checks a **delivery** against the cooldown and Do not contact, builds its content in the
+  store's language, then hands it to a provider.
+- A **channel** is where a delivery goes: email, or a code a provider module brings (e.g. `sms`). A **normalizer**
+  gives each channel one recipient form, such as phone numbers in E.164.
+- A **provider** delivers on one channel; the email provider is chosen in the admin. Magento email is built in, with
+  optional one-click unsubscribe; SMS, WhatsApp or an email service come as provider modules.
+- The **cooldown** keeps a minimum gap between notifications to one recipient. **Do not contact** stops all
+  marketing to a recipient. Both store keyed hashes, never addresses.
+
 ## Installation
 
 Usually a feature brings it. On its own:
@@ -84,10 +102,12 @@ Details, including how to build an SMS provider: [for module authors](docs/modul
 - A failed send is not retried by Notification; the feature decides (abandoned cart queues the cart again).
 - Do-not-contact blocks, the cooldown and the "stop these emails" links are keyed with Magento's encryption key.
   Changing the key (`encryption:key:change`) lifts every block, resets the cooldown and invalidates links already
-  sent; only the hash is stored, so nothing can be re-hashed. After a key change, run
-  `bin/magento notification:key-change:cleanup --dry-run`, then without `--dry-run`: it removes the old rows and,
-  when blocks were lifted, posts an admin notification with their number (with Magento_AdminNotification; otherwise
-  only the log records it). Nothing is removed automatically. Subscriptions, contacts and consent records are not
+  sent; only the hash is stored, so nothing can be re-hashed. After a key change, restart the consumers and
+  PHP-FPM, then run `bin/magento notification:key-change:cleanup --dry-run` and again without `--dry-run`: it
+  removes the rows of earlier keys still listed in `env.php` and, when blocks were lifted, posts an admin
+  notification with their number (with Magento_AdminNotification; otherwise only the log records it). Removed
+  blocks cannot be restored; nothing is removed automatically
+  ([details](docs/recipient-block.md#encryption-key-change)). Subscriptions, contacts and consent records are not
   affected; consent withdrawal and cart restore links are (see those modules).
 
 ## More
