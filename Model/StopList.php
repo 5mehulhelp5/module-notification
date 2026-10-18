@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace CommerceKings\Notification\Model;
 
 use CommerceKings\Notification\Api\Channel;
-use CommerceKings\Notification\Api\RecipientBlockInterface;
+use CommerceKings\Notification\Api\StopListInterface;
 use CommerceKings\Notification\Api\SubscriptionPermissionInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Encryption\EncryptorInterface;
@@ -12,11 +12,11 @@ use Magento\Framework\UrlInterface;
 
 /**
  * Do not contact, keyed hashes only. A link carries the recipient encrypted with the deployment key plus a keyed
- * signature, so blocking can find the recipient's subscriptions without storing the address anywhere.
+ * signature, so stopping can find the recipient's subscriptions without storing the address anywhere.
  */
-class RecipientBlock implements RecipientBlockInterface
+class StopList implements StopListInterface
 {
-    public const TABLE = 'ck_notification_recipient_block';
+    public const TABLE = 'ck_notification_stop';
 
     public function __construct(
         private readonly ResourceConnection $resource,
@@ -26,16 +26,17 @@ class RecipientBlock implements RecipientBlockInterface
         private readonly RecipientNormalizerPool $normalizers,
         private readonly SubscriptionPermissionInterface $permission,
         private readonly KeyedHash $keyedHash,
-        private readonly SubscriptionTypePool $types
+        private readonly SubscriptionTypePool $types,
+        private readonly ContactRepository $contacts
     ) {
     }
 
-    public function isBlocked(string $channel, string $recipient): bool
+    public function isStopped(string $channel, string $recipient): bool
     {
         return $this->find($this->hashes($channel, $recipient)) !== null;
     }
 
-    public function block(string $channel, string $recipient): void
+    public function stop(string $channel, string $recipient): void
     {
         $db = $this->resource->getConnection();
         $db->beginTransaction();
@@ -43,16 +44,14 @@ class RecipientBlock implements RecipientBlockInterface
             $hashes = $this->hashes($channel, $recipient);
             $db->insertOnDuplicate($this->resource->getTableName(self::TABLE), [
                 'recipient_hash' => $hashes[0],
-                'blocked_at' => new \Zend_Db_Expr('NOW()'),
+                'stopped_at' => new \Zend_Db_Expr('NOW()'),
                 'last_attempt_at' => new \Zend_Db_Expr('NOW()'),
             ], ['last_attempt_at']);
             if (count($hashes) > 1) {
-                // the same recipient blocked under an older key: one row, under the newest key
+                // the same recipient stopped under an older key: one row, under the newest key
                 $db->delete($this->resource->getTableName(self::TABLE), ['recipient_hash IN (?)' => array_slice($hashes, 1)]);
             }
-            if ($channel === Channel::EMAIL) {
-                $this->removeSubscriptions($recipient);
-            }
+            $this->removeSubscriptions($channel, $recipient);
             $db->commit();
         } catch (\Throwable $error) {
             $db->rollBack();
@@ -60,7 +59,7 @@ class RecipientBlock implements RecipientBlockInterface
         }
     }
 
-    public function unblock(string $channel, string $recipient): void
+    public function resume(string $channel, string $recipient): void
     {
         $this->resource->getConnection()->delete($this->resource->getTableName(self::TABLE),
             ['recipient_hash IN (?)' => $this->hashes($channel, $recipient)]);
@@ -77,15 +76,15 @@ class RecipientBlock implements RecipientBlockInterface
         return true;
     }
 
-    public function getBlockUrl(string $channel, string $recipient, int $storeId): string
+    public function getStopUrl(string $channel, string $recipient, int $storeId): string
     {
         // in opt-out mode the link is the only way to stop the emails: it is always offered there
-        if (!$this->config->isBlockLinkEnabled($storeId) && !$this->permission->isOptOut()) {
+        if (!$this->config->isStopLinkEnabled($storeId) && !$this->permission->isOptOut()) {
             return '';
         }
         $cipher = base64_encode($this->encryptor->encrypt($channel . '|' . $recipient));
         $encrypted = rtrim(strtr($cipher, '+/', '-_'), '=');
-        return $this->url->getUrl('cknotification/block', [
+        return $this->url->getUrl('cknotification/stop', [
             '_scope' => $storeId,
             '_query' => ['r' => $encrypted, 's' => $this->sign($encrypted)],
             '_nosid' => true,
@@ -99,7 +98,7 @@ class RecipientBlock implements RecipientBlockInterface
         }
         // links in emails sent before encryption:key:change still verify with an older key listed in env.php
         $current = null;
-        foreach ($this->keyedHash->all('commercekings_notification_block_link|' . $recipient) as $index => $expected) {
+        foreach ($this->keyedHash->all('commercekings_notification_stop_link|' . $recipient) as $index => $expected) {
             if (hash_equals($expected, $signature)) {
                 $current = $index === 0;
                 break;
@@ -114,11 +113,11 @@ class RecipientBlock implements RecipientBlockInterface
             ? ['channel' => $parts[0], 'recipient' => $parts[1], 'current' => $current] : null;
     }
 
-    /** Lifts blocks without a sign-up attempt for the configured days. */
+    /** Lifts stops without a sign-up attempt for the configured days. */
     public function cleanUp(): int
     {
         return $this->resource->getConnection()->delete($this->resource->getTableName(self::TABLE),
-            ['last_attempt_at < NOW() - INTERVAL ? DAY' => $this->config->getBlockLiftDays()]);
+            ['last_attempt_at < NOW() - INTERVAL ? DAY' => $this->config->getStopLiftDays()]);
     }
 
     /**
@@ -133,11 +132,11 @@ class RecipientBlock implements RecipientBlockInterface
         if ($channel === Channel::EMAIL) {
             $recipient = ContactRepository::normalize($recipient);
         }
-        return $this->keyedHash->all('commercekings_notification_block|' . $channel . '|' . $recipient);
+        return $this->keyedHash->all('commercekings_notification_stop|' . $channel . '|' . $recipient);
     }
 
     /**
-     * The stored hash of a block under any listed key. A block stored under an older key is moved to the newest key
+     * The stored hash of a stop under any listed key. A stop stored under an older key is moved to the newest key
      * when found, so it keeps working after the older key leaves env.php.
      *
      * @param string[] $hashes newest key first
@@ -151,8 +150,8 @@ class RecipientBlock implements RecipientBlockInterface
             return null;
         }
         if (!in_array($hashes[0], $found, true)) {
-            $db->query("INSERT IGNORE INTO {$table} (recipient_hash, blocked_at, last_attempt_at)"
-                . " SELECT ?, blocked_at, last_attempt_at FROM {$table} WHERE recipient_hash = ?", [$hashes[0], $found[0]]);
+            $db->query("INSERT IGNORE INTO {$table} (recipient_hash, stopped_at, last_attempt_at)"
+                . " SELECT ?, stopped_at, last_attempt_at FROM {$table} WHERE recipient_hash = ?", [$hashes[0], $found[0]]);
         }
         $older = array_values(array_diff($found, [$hashes[0]]));
         if ($older) {
@@ -163,23 +162,27 @@ class RecipientBlock implements RecipientBlockInterface
 
     private function sign(string $encrypted): string
     {
-        return $this->keyedHash->current('commercekings_notification_block_link|' . $encrypted);
+        return $this->keyedHash->current('commercekings_notification_stop_link|' . $encrypted);
     }
 
     /**
-     * The address's stoppable subscriptions, as guest contact or customer account, on every website. Customers match
-     * like contacts (ContactRepository::key()): the email column's collation would also match other letter cases and
-     * accents. Subscriptions of a registered type that is not stoppable stay.
+     * The recipient's stoppable subscriptions on this channel, as guest contact (any channel) or customer account
+     * (email), on every website. Contacts and customers match exactly (ContactRepository::keyFor()): the email column's
+     * collation would also match other letter cases and accents. Subscriptions of a registered type that is not
+     * stoppable stay.
      */
-    private function removeSubscriptions(string $email): void
+    private function removeSubscriptions(string $channel, string $recipient): void
     {
         $db = $this->resource->getConnection();
-        $key = ContactRepository::key($email);
+        $key = $this->contacts->keyFor($channel, $recipient);
         $contacts = $db->select()->from($this->resource->getTableName(ContactRepository::TABLE), 'contact_id')
-            ->where('email_key = ?', $key);
-        $candidates = $db->fetchPairs($db->select()->from($this->resource->getTableName('customer_entity'),
-            ['entity_id', 'email'])->where('email = ?', trim($email)));
-        $customers = array_keys(array_filter($candidates, fn ($candidate) => ContactRepository::key((string)$candidate) === $key));
+            ->where('channel = ?', $channel)->where('recipient_key = ?', $key);
+        $customers = [];
+        if ($channel === Channel::EMAIL) {
+            $candidates = $db->fetchPairs($db->select()->from($this->resource->getTableName('customer_entity'),
+                ['entity_id', 'email'])->where('email = ?', trim($recipient)));
+            $customers = array_keys(array_filter($candidates, fn ($candidate) => ContactRepository::key((string)$candidate) === $key));
+        }
         $where = $customers
             ? $db->quoteInto('(contact_id IN (' . $contacts . ') OR customer_id IN (?))', $customers)
             : 'contact_id IN (' . $contacts . ')';

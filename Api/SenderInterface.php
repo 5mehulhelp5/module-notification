@@ -14,7 +14,7 @@ interface SenderInterface
     /** Delivery::$isRecipientCurrent said no after the cooldown claim; nothing was sent. */
     public const RECIPIENT_CHANGED = 'recipient changed';
     /** A stoppable delivery to a recipient on the do-not-contact list; nothing was sent. */
-    public const BLOCKED = 'recipient blocked';
+    public const STOPPED = 'recipient stopped';
 
     /**
      * Drops stoppable deliveries to recipients on the do-not-contact list, claims the recipient cooldown (if the
@@ -23,7 +23,7 @@ interface SenderInterface
      * the provider accepted it releases the cooldown claim and is rethrown; a failure after it is rethrown as
      * \CommerceKings\Notification\Exception\MessageSentException - it is out, never send it again.
      *
-     * @return string self::SENT, self::COOLDOWN, self::RECIPIENT_CHANGED or self::BLOCKED
+     * @return string self::SENT, self::COOLDOWN, self::RECIPIENT_CHANGED or self::STOPPED
      */
     public function send(Delivery $delivery): string;
 }

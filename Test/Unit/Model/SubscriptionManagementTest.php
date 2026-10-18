@@ -22,7 +22,7 @@ use PHPUnit\Framework\TestCase;
 
 class SubscriptionManagementTest extends TestCase
 {
-    private ?\CommerceKings\Notification\Api\RecipientBlockInterface $blocks = null;
+    private ?\CommerceKings\Notification\Api\StopListInterface $stopList = null;
 
     use DbTestTrait;
 
@@ -35,6 +35,10 @@ class SubscriptionManagementTest extends TestCase
     private array $consentReads = [];
     private array $contacts = [];
     private ?\Throwable $contactFailure = null;
+    private string $channel = 'email';
+    private array $found = [];
+    /** the type's own permission (getPermission()); null = the shop-wide one */
+    private ?SubscriptionPermissionInterface $ownPermission = null;
 
     protected function setUp(): void
     {
@@ -46,7 +50,9 @@ class SubscriptionManagementTest extends TestCase
     {
         $type = $this->createStub(SubscriptionTypeInterface::class);
         $type->method('getPurpose')->willReturn('test_purpose');
+        $type->method('getChannel')->willReturnCallback(fn () => $this->channel);
         $type->method('isSingle')->willReturnCallback(fn () => $this->single);
+        $type->method('getPermission')->willReturnCallback(fn () => $this->ownPermission);
         $type->method('authorize')->willReturnCallback(function ($reference, $customerId) {
             $this->authorized[] = [$reference, $customerId];
             return $this->target;
@@ -58,8 +64,12 @@ class SubscriptionManagementTest extends TestCase
         });
         $permission->method('validCondition')->willReturnCallback(fn ($column) => 'VALID(' . $column . ')');
         $contacts = $this->createStub(ContactRepositoryInterface::class);
-        $contacts->method('save')->willReturnCallback(function ($website, $email) {
-            $this->contacts[] = [$website, $email];
+        $contacts->method('find')->willReturnCallback(function ($website, $recipient, $channel) {
+            $this->found[] = [$website, $recipient, $channel];
+            return null;
+        });
+        $contacts->method('save')->willReturnCallback(function ($website, $email, $channel = 'email') {
+            $this->contacts[] = $channel === 'email' ? [$website, $email] : [$website, $email, $channel];
             if ($this->contactFailure !== null) {
                 throw $this->contactFailure;
             }
@@ -71,10 +81,18 @@ class SubscriptionManagementTest extends TestCase
         $stores->method('getStore')->willReturn($store);
         $filters = $this->createStub(FilterManager::class);
         $filters->method('get')->willReturn(new StringTrim());
-        return new SubscriptionManagement($this->resource(), new SubscriptionTypePool(['test_type' => $type]),
-            $permission, $contacts, $stores,
-            new EmailAddress(), new StringLength(['max' => 255]), $filters, $this->blocks ?? $this->createStub(\CommerceKings\Notification\Api\RecipientBlockInterface::class),
-            $this->customerRepository());
+        $types = new SubscriptionTypePool(['test_type' => $type]);
+        return new SubscriptionManagement($this->resource(), $types,
+            new \CommerceKings\Notification\Model\PermissionResolver($permission, $types), $contacts, $stores,
+            new EmailAddress(), new StringLength(['max' => 255]), $filters, $this->stopList ?? $this->createStub(\CommerceKings\Notification\Api\StopListInterface::class),
+            $this->customerRepository(), new \CommerceKings\Notification\Model\RecipientNormalizerPool(['sms' => new class
+                implements \CommerceKings\Notification\Api\RecipientNormalizerInterface {
+                public function normalize(string $recipient): string
+                {
+                    $digits = preg_replace('/\D/', '', $recipient);
+                    return strlen($digits) >= 8 ? '+' . $digits : '';
+                }
+            }]));
     }
 
     private function assertNothingWritten(): void
@@ -148,11 +166,25 @@ class SubscriptionManagementTest extends TestCase
         $this->assertSame(['beginTransaction', 'commit'], $this->transactionEvents);
     }
 
-    public function testBlockedRecipientIsAnsweredLikeAStoredSubscriptionButNothingIsWritten(): void
+    /** A type with its own permission (e.g. an SMS checkbox) is checked and guarded by it, not the shop-wide one. */
+    public function testATypeWithItsOwnPermissionIsCheckedAndGuardedByIt(): void
+    {
+        $this->current = Permission::refused();
+        $this->ownPermission = $this->createStub(SubscriptionPermissionInterface::class);
+        $this->ownPermission->method('check')->willReturn(Permission::granted('sms-checkbox'));
+        $this->ownPermission->method('validCondition')->willReturnCallback(fn ($column) => 'OWN(' . $column . ')');
+        $this->assertTrue($this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test'));
+        $this->assertSame([], $this->consentReads, 'the shop-wide permission is not asked');
+        [$sql, $bind] = $this->queries[0];
+        $this->assertStringContainsString("WHERE OWN('sms-checkbox') AND (STILL_YOURS)", $sql);
+        $this->assertSame('sms-checkbox', $bind[6]);
+    }
+
+    public function testStoppedRecipientIsAnsweredLikeAStoredSubscriptionButNothingIsWritten(): void
     {
         $touched = [];
-        $this->blocks = $this->createStub(\CommerceKings\Notification\Api\RecipientBlockInterface::class);
-        $this->blocks->method('touch')->willReturnCallback(function ($channel, $recipient) use (&$touched) {
+        $this->stopList = $this->createStub(\CommerceKings\Notification\Api\StopListInterface::class);
+        $this->stopList->method('touch')->willReturnCallback(function ($channel, $recipient) use (&$touched) {
             $touched[] = [$channel, $recipient];
             return true;
         });
@@ -164,8 +196,8 @@ class SubscriptionManagementTest extends TestCase
         $this->assertCount(1, $this->deletes, 'the guest\'s previous subscription of this cart is removed');
         $this->assertSame('ck_notification_subscription', $this->deletes[0]['table']);
         $this->assertContains('customer_id IS NULL', self::conditions($this->deletes[0]['where']), 'only the guest row');
-        $this->assertContains(['email_key = ?', \CommerceKings\Notification\Model\ContactRepository::key('guest@example.test')],
-            $this->selectWhere, 'the contact read a stored sign-up does too, so the answer is not measurably faster');
+        $this->assertSame([[1, 'guest@example.test', 'email']], $this->found,
+            'the contact read a stored sign-up does too, so the answer is not measurably faster');
         $this->assertSame([['email', 'guest@example.test'], ['email', 'customer@test.com']], $touched,
             'each attempt restarts the lift timer');
     }
@@ -318,5 +350,51 @@ class SubscriptionManagementTest extends TestCase
         $customers = $this->createStub(\Magento\Customer\Api\CustomerRepositoryInterface::class);
         $customers->method('getById')->willReturn($customer);
         return $customers;
+    }
+
+    /** A type on another channel: its own contact, its own stop list. */
+    public function testAnSmsTypeSubscribesAPhoneNumber(): void
+    {
+        $this->channel = 'sms';
+        $touched = [];
+        $this->stopList = $this->createStub(\CommerceKings\Notification\Api\StopListInterface::class);
+        $this->stopList->method('touch')->willReturnCallback(function ($channel, $recipient) use (&$touched) {
+            $touched[] = [$channel, $recipient];
+            return false;
+        });
+        $this->fetchOneResult = '7';
+        $this->assertTrue($this->management()->subscribeGuest('test_type', 'masked', recipient: ' +381 60 123 4567 '));
+        $this->assertSame([[1, '+381 60 123 4567', 'sms']], $this->contacts, 'a phone contact on the sms channel');
+        $this->assertSame([['sms', '+381 60 123 4567']], $touched, 'checked against the sms stop list');
+    }
+
+    public function testAnSmsTypeRefusesEmailsAndInvalidNumbersWithoutWriting(): void
+    {
+        $this->channel = 'sms';
+        foreach (['guest@example.test', 'abc', ['+381601234567']] as $recipient) {
+            try {
+                $this->management()->subscribeGuest('test_type', 'masked', $recipient);
+                $this->fail('Expected Magento\'s 400');
+            } catch (\Magento\Framework\Exception\InputException $error) {
+                $this->assertStringNotContainsString('example.test', $error->getMessage(), 'never echoes the input');
+            }
+        }
+        $this->assertSame([], $this->contacts);
+        $this->assertSame([], $this->queries);
+    }
+
+    public function testAChannelWithoutANormalizerTakesNoSignUps(): void
+    {
+        $this->channel = 'carrier_pigeon';
+        $this->expectException(\Magento\Framework\Exception\InputException::class);
+        $this->management()->subscribeGuest('test_type', 'masked', recipient: 'loft 7');
+    }
+
+    public function testAnEmptyRecipientUnsubscribesOnAnyChannel(): void
+    {
+        $this->channel = 'sms';
+        $this->assertFalse($this->management()->subscribeGuest('test_type', 'masked', recipient: '  '));
+        $this->assertCount(1, $this->deletes);
+        $this->assertSame([], $this->contacts);
     }
 }

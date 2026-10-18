@@ -40,9 +40,9 @@ class SenderTest extends TestCase
     private \Symfony\Component\Mime\Email $native;
     private ProviderPool $pool;
     /** "channel:recipient" on the do-not-contact list */
-    private array $blocked = [];
+    private array $stopped = [];
     private bool $oneClick = false;
-    private string $blockUrl = '';
+    private string $stopUrl = '';
 
     /** @param object|null $mailMessage the transport's message; null: Magento 2.4.8+ (Symfony) */
     /** @param ProviderInterface[] $extra more providers; $selected the stored provider code */
@@ -91,10 +91,10 @@ class SenderTest extends TestCase
         $logger = $this->createStub(\Psr\Log\LoggerInterface::class);
         $logger->method('warning')->willReturnCallback(function ($text) { $this->warnings[] = $text; });
         $this->pool = new ProviderPool($config, [new MagentoEmail($builder, new OneClickHeaders(), $logger), ...$extra]);
-        $blocks = $this->createStub(\CommerceKings\Notification\Api\RecipientBlockInterface::class);
-        $blocks->method('isBlocked')->willReturnCallback(fn ($channel, $recipient) => in_array($channel . ':' . $recipient, $this->blocked, true));
-        $blocks->method('getBlockUrl')->willReturnCallback(fn () => $this->blockUrl);
-        return new Sender($this->pool, $emulation, $cooldown, $config, $logger, new RecipientNormalizerPool($normalizers), $blocks);
+        $stopList = $this->createStub(\CommerceKings\Notification\Api\StopListInterface::class);
+        $stopList->method('isStopped')->willReturnCallback(fn ($channel, $recipient) => in_array($channel . ':' . $recipient, $this->stopped, true));
+        $stopList->method('getStopUrl')->willReturnCallback(fn () => $this->stopUrl);
+        return new Sender($this->pool, $emulation, $cooldown, $config, $logger, new RecipientNormalizerPool($normalizers), $stopList);
     }
 
     private function message(bool $useCooldown = true, ?\Closure $current = null, ?string $oneClick = null,
@@ -269,26 +269,26 @@ class SenderTest extends TestCase
         $this->assertSame(['a@test.com'], $this->claims, 'without a normalizer the recipient is trimmed');
     }
 
-    public function testMarketingToABlockedRecipientIsDroppedAndServiceMessagesStillGo(): void
+    public function testAStoppableSendToAStoppedRecipientIsDroppedAndOthersStillGo(): void
     {
-        $this->blocked = ['email:a@test.com'];
-        $this->assertSame(SenderInterface::BLOCKED, $this->sender()->send($this->message()));
+        $this->stopped = ['email:a@test.com'];
+        $this->assertSame(SenderInterface::STOPPED, $this->sender()->send($this->message()));
         $this->assertSame([0, [], []], [$this->sent, $this->claims, $this->emulated], 'nothing claimed, built or sent');
         $service = new Delivery(3, 'tpl', 'general', 'a@test.com', fn () => new DeliveryContent([], 'Jane'),
             false, null, Channel::EMAIL, false);
-        $this->assertSame(SenderInterface::SENT, $this->sender()->send($service), 'an order email ignores the block');
+        $this->assertSame(SenderInterface::SENT, $this->sender()->send($service), 'an order email ignores the stop');
         $this->assertSame(1, $this->sent);
     }
 
     public function testServiceMessageKeepsGoingWhenItsRecipientIsNormalized(): void
     {
-        $this->blocked = ['email:a@test.com'];
+        $this->stopped = ['email:a@test.com'];
         $service = new Delivery(3, 'tpl', 'general', '  a@test.com ', fn () => new DeliveryContent([], 'Jane'),
             false, null, Channel::EMAIL, false);
         $this->assertSame(SenderInterface::SENT, $this->sender()->send($service), 'trimming must not turn it into marketing');
         $this->assertSame(['a@test.com', 'Jane'], $this->mail['addTo']);
         $marketing = new Delivery(3, 'tpl', 'general', '  a@test.com ', fn () => new DeliveryContent([], 'Jane'));
-        $this->assertSame(SenderInterface::BLOCKED, $this->sender()->send($marketing), 'the normalized address is blocked');
+        $this->assertSame(SenderInterface::STOPPED, $this->sender()->send($marketing), 'the normalized address is stopped');
     }
 
     public function testProviderReportingSentKeepsTheClaim(): void
@@ -335,12 +335,12 @@ class SenderTest extends TestCase
     public function testAStoppableNotificationAlwaysHasAOneClickWayOut(): void
     {
         $this->oneClick = true;
-        $this->blockUrl = 'https://shop.example.test/cknotification/block/?r=enc&s=sig';
+        $this->stopUrl = 'https://shop.example.test/cknotification/stop/?r=enc&s=sig';
         $header = fn () => $this->native->getHeaders()->has('List-Unsubscribe')
             ? $this->native->getHeaders()->getHeaderBody('List-Unsubscribe') : null;
 
         $this->sender()->send(new Delivery(3, 'tpl', 'general', 'a@test.com', fn () => new DeliveryContent([], 'Jane')));
-        $this->assertSame('<' . $this->blockUrl . '>', $header(), 'no link of its own: the stop link');
+        $this->assertSame('<' . $this->stopUrl . '>', $header(), 'no link of its own: the stop link');
 
         $own = 'https://shop.example.test/acme/unsubscribe?id=1';
         $this->sender()->send(new Delivery(3, 'tpl', 'general', 'a@test.com', fn () => new DeliveryContent([], 'Jane', $own)));
@@ -353,5 +353,17 @@ class SenderTest extends TestCase
         $this->oneClick = false;
         $this->sender()->send(new Delivery(3, 'tpl', 'general', 'a@test.com', fn () => new DeliveryContent([], 'Jane')));
         $this->assertNull($header(), 'one-click headers turned off for the store');
+    }
+
+    /** A provider without one-click (e.g. SMS) is not given the stop link as one, so nothing is dropped or logged. */
+    public function testTheStopLinkIsNoOneClickUrlForProvidersWithoutIt(): void
+    {
+        $this->oneClick = true;
+        $this->stopUrl = 'https://shop.example.test/cknotification/stop/?r=enc&s=sig';
+        $sender = $this->sender(extra: [$this->textProvider()]);
+        $this->assertSame(SenderInterface::SENT, $sender->send(Delivery::text(3, 'text', '+381601234567',
+            fn () => new DeliveryContent([], text: 'Your cart is waiting'))));
+        $this->assertNull($this->mail['text_one_click']);
+        $this->assertSame([], $this->warnings, 'no warning for a link the sender added itself');
     }
 }

@@ -23,7 +23,7 @@ A feature (e.g. abandoned cart) says *what and when*; Notification handles *who 
 - A **notification type** is one kind of message, registered by a feature. It decides when to send and builds
   the content.
 - A **subscription** is a shopper's sign-up for a type, e.g. reminders for one cart. Marketing types need one;
-  service messages don't. A guest is stored as a **contact** (one per website and address); a customer by account.
+  service messages don't. A guest is stored as a **contact** (one per website, channel and address); a customer by account.
 - A **permission** decides who may subscribe: everyone (opt-out), or only with consent (opt-in, with the privacy
   bundle). Withdrawing the consent removes the subscription. The **subscriber** provides the unsubscribe link.
 - The **queue** carries `<type>|<reference>`. One consumer sends every type, so nothing is sent during a page view.
@@ -86,7 +86,7 @@ service messages and staff alerts.
 
 `Api\RecipientNormalizerInterface` – one canonical recipient form per channel (e.g. phone numbers in E.164)
 
-`Api\RecipientBlockInterface` – Do not contact: the "stop these emails" link and its list
+`Api\StopListInterface` – Do not contact: the "stop these emails" link and its list
 
 `Api\CooldownInterface` – the minimum gap between notifications to one recipient
 
@@ -113,12 +113,12 @@ Details, including how to build an SMS provider: [for module authors](docs/modul
 - No rate limit in code: protect the guest endpoint in your web server, proxy or CDN; optionally also with
   [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit).
 - A failed send is not retried by Notification; the feature decides (abandoned cart queues the cart again).
-- Do not contact blocks, the "stop these emails" links and the cooldown are keyed with Magento's encryption key.
-  After `encryption:key:change` nothing needs to be run: blocks and stop links keep working while the old key stays
-  in `env.php` (Magento keeps it) – a block found under an older key moves to the newest one, and an old stop link
+- Do not contact stops, the "stop these emails" links and the cooldown are keyed with Magento's encryption key.
+  After `encryption:key:change` nothing needs to be run: stops and stop links keep working while the old key stays
+  in `env.php` (Magento keeps it) – a stop found under an older key moves to the newest one, and an old stop link
   can still stop the emails (one-click too) but not turn them back on. The cooldown restarts. Don't remove an old key
-  from `env.php` while blocks may still use it: those not yet moved would lift
-  ([details](docs/recipient-block.md#encryption-key-change)). Subscriptions, contacts and consent records are not
+  from `env.php` while stops may still use it: those not yet moved would lift
+  ([details](docs/stop-list.md#encryption-key-change)). Subscriptions, contacts and consent records are not
   affected, and consent withdrawal links keep working the same way; cart restore links expire (see those modules).
 
 ## More

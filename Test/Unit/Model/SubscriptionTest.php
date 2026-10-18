@@ -29,7 +29,8 @@ class SubscriptionTest extends TestCase
     {
         $permission = $this->createStub(SubscriptionPermissionInterface::class);
         $permission->method('validCondition')->willReturnCallback(fn ($column) => 'VALID(' . $column . ')');
-        return new SubscriptionGuard($this->resource(), $permission);
+        return new SubscriptionGuard($this->resource(),
+            new \CommerceKings\Notification\Model\PermissionResolver($permission, new \CommerceKings\Notification\Model\SubscriptionTypePool([])));
     }
 
     public function testGuardConditionNeedsTheRowAndAValidConsent(): void
@@ -124,6 +125,23 @@ class SubscriptionTest extends TestCase
         $this->assertSame('account@example.test', $repository->getEmail($subscription(null, 9)));
         $this->assertNull($repository->getEmail($subscription(null, 10)), 'deleted customer');
         $this->assertNull($repository->getEmail($subscription(null, null)));
+    }
+
+    public function testRecipientIsTheContactsChannelAndAddressOrTheCustomersEmail(): void
+    {
+        $contacts = $this->createStub(ContactRepositoryInterface::class);
+        $contacts->method('getRecipient')->willReturn(['channel' => 'sms', 'recipient' => '+381601234567']);
+        $customer = $this->createStub(CustomerInterface::class);
+        $customer->method('getEmail')->willReturn('account@example.test');
+        $customers = $this->createStub(CustomerRepositoryInterface::class);
+        $customers->method('getById')->willReturn($customer);
+        $repository = new SubscriptionRepository($this->resource(), $contacts, $customers);
+        $subscription = fn (?int $contact, ?int $customer) => new Subscription(1, 'test_type', 42, 1, $contact, $customer,
+            'consent', '2026-01-01 00:00:00');
+        $this->assertSame(['channel' => 'sms', 'recipient' => '+381601234567'], $repository->getRecipient($subscription(5, null)));
+        $this->assertSame(['channel' => 'email', 'recipient' => 'account@example.test'],
+            $repository->getRecipient($subscription(null, 9)));
+        $this->assertNull($repository->getRecipient($subscription(null, null)));
     }
 
     public function testGetMapsTheRow(): void

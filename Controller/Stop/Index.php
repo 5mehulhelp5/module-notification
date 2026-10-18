@@ -1,9 +1,10 @@
 <?php
 declare(strict_types=1);
 
-namespace CommerceKings\Notification\Controller\Block;
+namespace CommerceKings\Notification\Controller\Stop;
 
-use CommerceKings\Notification\Api\RecipientBlockInterface;
+use CommerceKings\Notification\Api\Channel;
+use CommerceKings\Notification\Api\StopListInterface;
 use Magento\Framework\App\Action\Action;
 use Magento\Framework\App\Action\Context;
 use Magento\Framework\App\Action\HttpGetActionInterface;
@@ -18,9 +19,9 @@ use Magento\Framework\Data\Form\FormKey\Validator;
 use Magento\Framework\View\Result\PageFactory;
 
 /**
- * GET shows the do-not-contact confirmation for a signed link; only the form-key POST blocks or undoes, so mail
+ * GET shows the do-not-contact confirmation for a signed link; only the form-key POST stops or undoes, so mail
  * scanners that open links change nothing. An RFC 8058 one-click POST (body exactly List-Unsubscribe=One-Click) on the
- * signed URL blocks without browser state – it can never undo. A link signed before encryption:key:change still blocks
+ * signed URL stops without browser state – it can never undo. A link signed before encryption:key:change still stops
  * (its key stays in env.php) but cannot undo. Extends Action so Magento sets the store and currency
  * context.
  */
@@ -28,13 +29,13 @@ class Index extends Action implements HttpGetActionInterface, HttpPostActionInte
 {
     public const STATE_INVALID = 'invalid';
     public const STATE_CONFIRM = 'confirm';
-    public const STATE_BLOCKED = 'blocked';
-    public const STATE_UNBLOCKED = 'unblocked';
+    public const STATE_STOPPED = 'stopped';
+    public const STATE_RESUMED = 'resumed';
 
     public function __construct(
         Context $context,
         private readonly Http $request,
-        private readonly RecipientBlockInterface $blocks,
+        private readonly StopListInterface $stopList,
         private readonly PageFactory $pageFactory,
         private readonly Validator $formKeyValidator,
         private readonly RawFactory $rawFactory
@@ -54,7 +55,7 @@ class Index extends Action implements HttpGetActionInterface, HttpPostActionInte
         $recipient = $this->request->getParam('r');
         $signature = $this->request->getParam('s');
         $link = is_string($recipient) && is_string($signature)
-            ? $this->blocks->fromLink($recipient, $signature) : null;
+            ? $this->stopList->fromLink($recipient, $signature) : null;
         $state = $link === null ? self::STATE_INVALID : self::STATE_CONFIRM;
         if ($link !== null && $this->request->getMethod() === 'POST') {
             if (!is_string($this->request->getParam('form_key')) || !$this->formKeyValidator->validate($this->request)) {
@@ -63,30 +64,33 @@ class Index extends Action implements HttpGetActionInterface, HttpPostActionInte
             if ($this->request->getParam('do') === 'undo') {
                 // only a newest-key link may turn emails back on; an older one changes nothing
                 if ($link['current']) {
-                    $this->blocks->unblock($link['channel'], $link['recipient']);
-                    $state = self::STATE_UNBLOCKED;
-                } elseif ($this->blocks->isBlocked($link['channel'], $link['recipient'])) {
-                    $state = self::STATE_BLOCKED;
+                    $this->stopList->resume($link['channel'], $link['recipient']);
+                    $state = self::STATE_RESUMED;
+                } elseif ($this->stopList->isStopped($link['channel'], $link['recipient'])) {
+                    $state = self::STATE_STOPPED;
                 }
             } else {
-                $this->blocks->block($link['channel'], $link['recipient']);
-                $state = self::STATE_BLOCKED;
+                $this->stopList->stop($link['channel'], $link['recipient']);
+                $state = self::STATE_STOPPED;
             }
-        } elseif ($link !== null && $this->blocks->isBlocked($link['channel'], $link['recipient'])) {
-            $state = self::STATE_BLOCKED;
+        } elseif ($link !== null && $this->stopList->isStopped($link['channel'], $link['recipient'])) {
+            $state = self::STATE_STOPPED;
         }
+        // email says "emails" and "address"; any other channel (SMS, WhatsApp, ...) says "messages" and "number"
+        $email = $link === null || $link['channel'] === Channel::EMAIL;
         $page = $this->pageFactory->create();
         $page->getConfig()->getTitle()->set((string)match ($state) {
             self::STATE_INVALID => __('Link not valid'),
-            self::STATE_BLOCKED => __('Emails stopped'),
-            self::STATE_UNBLOCKED => __('Emails allowed again'),
-            default => __('Stop these emails?'),
+            self::STATE_STOPPED => $email ? __('Emails stopped') : __('Messages stopped'),
+            self::STATE_RESUMED => $email ? __('Emails allowed again') : __('Messages allowed again'),
+            default => $email ? __('Stop these emails?') : __('Stop these messages?'),
         });
         $page->getConfig()->setRobots('NOINDEX,NOFOLLOW');
         $page->setHeader('Referrer-Policy', 'no-referrer', true);
-        $block = $page->getLayout()->getBlock('ck.notification.recipient_block');
+        $block = $page->getLayout()->getBlock('ck.notification.stop');
         if ($block instanceof \Magento\Framework\View\Element\AbstractBlock) {
             $block->setData('state', $state);
+            $block->setData('is_email', $email);
             $block->setData('link_recipient', $link !== null ? $recipient : '');
             $block->setData('link_signature', $link !== null ? $signature : '');
             // undo turns emails back on: only with a link signed by the newest key
@@ -104,9 +108,9 @@ class Index extends Action implements HttpGetActionInterface, HttpPostActionInte
         $link = in_array($type, ['application/x-www-form-urlencoded', 'multipart/form-data'], true)
             && $this->request->getPostValue() === ['List-Unsubscribe' => 'One-Click']
             && is_string($recipient) && is_string($signature)
-            ? $this->blocks->fromLink($recipient, $signature) : null;
+            ? $this->stopList->fromLink($recipient, $signature) : null;
         if ($link !== null) {
-            $this->blocks->block($link['channel'], $link['recipient']);
+            $this->stopList->stop($link['channel'], $link['recipient']);
         }
         return $this->rawFactory->create()->setHttpResponseCode($link !== null ? 200 : 400)
             ->setHeader('Content-Type', 'text/plain; charset=UTF-8', true)

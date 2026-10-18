@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:App/etc/routes.xsd">
     <router id="standard">
-        <!-- /cknotification/block: the do-not-contact page behind the "stop these emails" link -->
+        <!-- /cknotification/stop: the do-not-contact page behind the "stop these emails" link -->
         <route id="cknotification" frontName="cknotification">
             <module name="CommerceKings_Notification"/>
         </route>

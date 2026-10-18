@@ -8,7 +8,7 @@ use CommerceKings\Notification\Api\SubscriptionPermissionInterface;
 use CommerceKings\Notification\Api\SubscriptionTypeInterface;
 use CommerceKings\Notification\Model\Config;
 use CommerceKings\Notification\Model\KeyedHash;
-use CommerceKings\Notification\Model\RecipientBlock;
+use CommerceKings\Notification\Model\StopList;
 use CommerceKings\Notification\Model\RecipientNormalizerPool;
 use CommerceKings\Notification\Model\SubscriptionTypePool;
 use Magento\Framework\App\ResourceConnection;
@@ -18,12 +18,12 @@ use Magento\Framework\Encryption\EncryptorInterface;
 use Magento\Framework\UrlInterface;
 use PHPUnit\Framework\TestCase;
 
-/** What a block removes: the address's stoppable subscriptions, matched exactly like contacts. */
-class RecipientBlockSubscriptionsTest extends TestCase
+/** What a stop removes: the address's stoppable subscriptions, matched exactly like contacts. */
+class StopListSubscriptionsTest extends TestCase
 {
     private array $deleted = [];
 
-    private function block(array $customers, array $types): void
+    private function stop(array $customers, array $types): void
     {
         $select = $this->createStub(Select::class);
         foreach (['from', 'where'] as $method) {
@@ -47,10 +47,11 @@ class RecipientBlockSubscriptionsTest extends TestCase
         $resource->method('getTableName')->willReturnArgument(0);
         $hashes = $this->createStub(KeyedHash::class);
         $hashes->method('all')->willReturn([str_repeat('h', 64)]);
-        (new RecipientBlock($resource, $this->createStub(EncryptorInterface::class), $this->createStub(UrlInterface::class),
+        (new StopList($resource, $this->createStub(EncryptorInterface::class), $this->createStub(UrlInterface::class),
             $this->createStub(Config::class), new RecipientNormalizerPool(),
-            $this->createStub(SubscriptionPermissionInterface::class), $hashes, new SubscriptionTypePool($types)))
-            ->block(Channel::EMAIL, 'jose@example.test');
+            $this->createStub(SubscriptionPermissionInterface::class), $hashes, new SubscriptionTypePool($types),
+            new \CommerceKings\Notification\Model\ContactRepository($resource, new RecipientNormalizerPool())))
+            ->stop(Channel::EMAIL, 'jose@example.test');
     }
 
     private function type(bool $stoppable): SubscriptionTypeInterface
@@ -63,20 +64,20 @@ class RecipientBlockSubscriptionsTest extends TestCase
     public function testCustomersMatchLikeContactsNotByTheCollation(): void
     {
         // the email column's collation also returns other accents; letter case and spaces are the same address
-        $this->block([5 => ' JOSE@Example.test ', 6 => 'josé@example.test'], ['cart_reminder' => $this->type(true)]);
+        $this->stop([5 => ' JOSE@Example.test ', 6 => 'josé@example.test'], ['cart_reminder' => $this->type(true)]);
         $this->assertSame(['(contact_id IN (SELECT contact_id) OR customer_id IN (5))'], $this->deleted[0]);
     }
 
     public function testWithoutAMatchingCustomerOnlyContactsCount(): void
     {
-        $this->block([6 => 'josé@example.test'], []);
+        $this->stop([6 => 'josé@example.test'], []);
         $this->assertSame(['contact_id IN (SELECT contact_id)'], $this->deleted[0]);
     }
 
     public function testServiceSubscriptionsStay(): void
     {
-        $this->block([], ['cart_reminder' => $this->type(true), 'order_status' => $this->type(false)]);
+        $this->stop([], ['cart_reminder' => $this->type(true), 'order_status' => $this->type(false)]);
         $this->assertSame(['contact_id IN (SELECT contact_id)', 'type NOT IN (?)' => ['order_status']], $this->deleted[0],
-            'a block removes stoppable subscriptions only');
+            'a stop removes stoppable subscriptions only');
     }
 }

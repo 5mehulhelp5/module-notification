@@ -21,12 +21,22 @@ interface SubscriptionTypeInterface
     /** What the subscription is for, e.g. "cart_reminder" (with the consent bridge: the Consent purpose). */
     public function getPurpose(): string;
 
+    /**
+     * Who may subscribe to this type, when it is not the shop-wide rule – e.g. an SMS type whose consent is a checkbox
+     * next to the phone number. null: the shop-wide permission (opt-out, or the cookie banner with the consent bridge).
+     * Notification does not care how the permission is collected.
+     */
+    public function getPermission(): ?SubscriptionPermissionInterface;
+
+    /** The channel its subscribers are reached on (Channel::EMAIL or a provider module's code, e.g. "sms"). */
+    public function getChannel(): string;
+
     /** true: one subscription per reference (a new email replaces it); false: one per person. */
     public function isSingle(): bool;
 
     /**
-     * Can the recipient stop it with Do not contact? The feature decides: true e.g. for a cart reminder – a block
-     * removes the subscription and drops its deliveries; false for a service the recipient asked for, which a block
+     * Can the recipient stop it with Do not contact? The feature decides: true e.g. for a cart reminder – a stop
+     * removes the subscription and drops its deliveries; false for a service the recipient asked for, which a stop
      * leaves alone. Its deliveries pass the same value as Delivery::$stoppable.
      */
     public function isStoppable(): bool;

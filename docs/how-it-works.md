@@ -19,10 +19,11 @@ Each module answers one question:
   `authorize()` → the permission for the type's purpose and website → contact → one INSERT that repeats the
   permission check and the type's condition, so a withdrawal or a changed reference at the same moment wins.
 - **Withdrawal**: one handler removes the subscriptions of withdrawn permissions for every type.
-- **Contacts**: guest email addresses, one per website and address (`ck_notification_contact`). Identity is
-  `email_key`, a hash of the trimmed, Unicode-normalized, lower-cased address: letter case is ignored, an
-  accent or any other character makes another address (the `email` column's collation would merge them).
-  Customers use their account email. Cron `commercekings_notification_contact_cleanup` (daily 03:15) removes
+- **Contacts**: guest recipients – an email address, a phone number, … – one per website, channel and address
+  (`ck_notification_contact`: `channel`, `recipient`). Identity is `recipient_key`, a hash of the normalized
+  address: for email trimmed, Unicode-normalized and lower-cased (letter case is ignored, an accent or any other
+  character makes another address – the `recipient` column's collation would merge them); for other channels the
+  channel's `RecipientNormalizerInterface`. Customers use their account email. Cron `commercekings_notification_contact_cleanup` (daily 03:15) removes
   contacts nothing uses after a 24-hour grace period; modules that store contact ids themselves register an
   `Api\ContactReferenceInterface` (`Model\ContactReferencePool` "references").
   Guest capture acquires the contact and creates its subscription in one short transaction, so cleanup
@@ -42,14 +43,14 @@ Each module answers one question:
   replaced by an extension (e.g. an SMTP module) sends without them and logs a warning.
 - **Recipient cooldown**: minimum gap between notifications to the same recipient on a channel, across all
   notifications that use it and all stores. Keyed hashes only (`ck_notification_cooldown`), never an address.
-- **Do not contact** (`Api\RecipientBlockInterface`): a signed "stop these emails" link in marketing notifications
-  opens `/cknotification/block`; only its form-key POST blocks, so mail scanners change nothing. Blocking removes
-  the recipient's subscriptions; sign-ups for a blocked recipient are answered as stored but not written and restart
-  the lift timer; the sender drops stoppable deliveries (`BLOCKED`) and passes the others (`Delivery::$stoppable
-  = false`); a stoppable send without its own unsubscribe link gets the stop link as its one-click URL. A cron lifts blocks after *N* days without attempts. Keyed hashes only
-  (`ck_notification_recipient_block`); the link carries the recipient encrypted. Design: [recipient block](recipient-block.md).
-- **Encryption key change**: blocks and stop links are checked under every key in `env.php` (`Model\KeyedHash`); a
-  block found under an older key moves to the newest one, and an older-key link can block but never undo. Nothing to
+- **Do not contact** (`Api\StopListInterface`): a signed "stop these emails" link in marketing notifications
+  opens `/cknotification/stop`; only its form-key POST stops, so mail scanners change nothing. Stopping removes
+  the recipient's subscriptions; sign-ups for a stopped recipient are answered as stored but not written and restart
+  the lift timer; the sender drops stoppable deliveries (`STOPPED`) and passes the others (`Delivery::$stoppable
+  = false`); a stoppable send without its own unsubscribe link gets the stop link as its one-click URL. A cron lifts stops after *N* days without attempts. Keyed hashes only
+  (`ck_notification_stop`); the link carries the recipient encrypted. Design: [stop list](stop-list.md).
+- **Encryption key change**: stops and stop links are checked under every key in `env.php` (`Model\KeyedHash`); a
+  stop found under an older key moves to the newest one, and an older-key link can stop but never undo. Nothing to
   run: leftover rows go with the normal cleanups (cooldown period, lift days).
 
 ## Subscribe
@@ -61,7 +62,7 @@ limits cap how often a stranger's address can be mailed, but not how fast a scri
 
 | Endpoint | Who | Body |
 | --- | --- | --- |
-| `POST /rest/<store>/V1/ck-notification/subscriptions` (anonymous) | guest | `{"type", "reference", "email"}`; `""` unsubscribes |
+| `POST /rest/<store>/V1/ck-notification/subscriptions` (anonymous) | guest | `{"type", "reference", "recipient"}` (an email address, or e.g. a phone number for an SMS type); `""` unsubscribes |
 | `POST /rest/<store>/V1/ck-notification/subscriptions/mine` (`self`) | customer: storefront AJAX session or token | `{"type", "reference"}` |
 
 Both return `true` when stored (including an identical retry) and `false` when refused or removed. An unknown
@@ -80,7 +81,7 @@ type or invalid email is Magento's 400 without echoing the address.
 notification whose content passes an HTTPS unsubscribe URL (an http URL sends the email without them and logs a
 warning); that URL must accept the mail client's POST.
 **Do not contact**: *"Stop these emails" link* (store view, default Yes) and *Lifts after (days without attempts)*
-(global, default 90) – see [recipient block](recipient-block.md).
+(global, default 90) – see [stop list](stop-list.md).
 
 ## Tests
 

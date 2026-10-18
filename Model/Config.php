@@ -30,14 +30,14 @@ class Config
     }
 
     /** The "stop these emails" link in marketing notifications of this store. */
-    public function isBlockLinkEnabled(int $storeId): bool
+    public function isStopLinkEnabled(int $storeId): bool
     {
         return $this->scopeConfig->isSetFlag('commercekings_notification/do_not_contact/link', ScopeInterface::SCOPE_STORE,
             $storeId);
     }
 
-    /** Days without a sign-up attempt after which a block lifts; at least 1. */
-    public function getBlockLiftDays(): int
+    /** Days without a sign-up attempt after which a stop lifts; at least 1. */
+    public function getStopLiftDays(): int
     {
         return max(1, (int)$this->scopeConfig->getValue('commercekings_notification/do_not_contact/lift_days'));
     }

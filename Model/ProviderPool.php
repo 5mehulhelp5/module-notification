@@ -8,7 +8,11 @@ use CommerceKings\Notification\Api\ProviderInterface;
 use CommerceKings\Notification\Api\ProviderPoolInterface;
 use Magento\Framework\Exception\LocalizedException;
 
-/** Provider modules add theirs in di.xml (argument "providers": code => ProviderInterface). */
+/**
+ * Provider modules add theirs in di.xml (argument "providers": code => ProviderInterface).
+ *
+ * @api the "providers" di.xml argument is a stable extension point
+ */
 class ProviderPool implements ProviderPoolInterface
 {
     /** The channel's provider when the admin selected none or one that is no longer installed. */

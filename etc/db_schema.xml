@@ -14,31 +14,35 @@
         </index>
     </table>
     <!-- do not contact: recipients who stopped marketing notifications; keyed hashes only, never an address -->
-    <table name="ck_notification_recipient_block" resource="default" engine="innodb" comment="CK notification: do not contact">
+    <table name="ck_notification_stop" resource="default" engine="innodb" comment="CK notification: do not contact">
         <column xsi:type="varchar" name="recipient_hash" nullable="false" length="64" comment="Keyed hash of channel and normalized recipient"/>
-        <column xsi:type="timestamp" name="blocked_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="Blocked at"/>
+        <column xsi:type="timestamp" name="stopped_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="Stopped at"/>
         <column xsi:type="timestamp" name="last_attempt_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="Last sign-up attempt (restarts the lift timer)"/>
         <constraint xsi:type="primary" referenceId="PRIMARY">
             <column name="recipient_hash"/>
         </constraint>
-        <index referenceId="CK_NOTIFICATION_RECIPIENT_BLOCK_LAST_ATTEMPT_AT" indexType="btree">
+        <index referenceId="CK_NOTIFICATION_STOP_LAST_ATTEMPT_AT" indexType="btree">
             <column name="last_attempt_at"/>
         </index>
     </table>
-    <!-- guest email addresses, one row per website and address; features point to contact_id -->
+    <!-- guest contacts, one row per website, channel and recipient; features point to contact_id -->
     <table name="ck_notification_contact" resource="default" engine="innodb" comment="CK notification: guest contacts">
         <column xsi:type="int" name="contact_id" unsigned="true" nullable="false" identity="true" comment="Contact ID"/>
         <column xsi:type="smallint" name="website_id" unsigned="true" nullable="false" comment="Website"/>
-        <column xsi:type="varchar" name="email" nullable="false" length="255" comment="Email address, as first entered"/>
-        <!-- the identity (ContactRepository::key()): the email column's collation ignores case and accents -->
-        <column xsi:type="varchar" name="email_key" nullable="false" length="64" comment="sha256 of the normalized address"/>
+        <column xsi:type="varchar" name="channel" nullable="false" length="32" default="email" comment="Channel code (email, sms, ...)"/>
+        <column xsi:type="varchar" name="recipient" nullable="false" length="255"
+                comment="Address on the channel, as first entered"/>
+        <!-- the identity (ContactRepository::keyFor()): the recipient column's collation ignores case and accents -->
+        <column xsi:type="varchar" name="recipient_key" nullable="false" length="64"
+                comment="sha256 of the normalized recipient"/>
         <column xsi:type="timestamp" name="created_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="First seen"/>
         <constraint xsi:type="primary" referenceId="PRIMARY">
             <column name="contact_id"/>
         </constraint>
-        <constraint xsi:type="unique" referenceId="CK_NOTIFICATION_CONTACT_WEBSITE_ID_EMAIL_KEY">
+        <constraint xsi:type="unique" referenceId="CK_NOTIFICATION_CONTACT_WEBSITE_ID_CHANNEL_RECIPIENT_KEY">
             <column name="website_id"/>
-            <column name="email_key"/>
+            <column name="channel"/>
+            <column name="recipient_key"/>
         </constraint>
         <constraint xsi:type="foreign" referenceId="CK_NOTIFICATION_CONTACT_WEBSITE_ID_STORE_WEBSITE_WEBSITE_ID"
                     table="ck_notification_contact" column="website_id" referenceTable="store_website"

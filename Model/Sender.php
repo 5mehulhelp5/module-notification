@@ -9,7 +9,7 @@ use CommerceKings\Notification\Api\Data\Delivery;
 use CommerceKings\Notification\Api\Data\DeliveryContent;
 use CommerceKings\Notification\Api\ProviderInterface;
 use CommerceKings\Notification\Api\ProviderPoolInterface;
-use CommerceKings\Notification\Api\RecipientBlockInterface;
+use CommerceKings\Notification\Api\StopListInterface;
 use CommerceKings\Notification\Api\SenderInterface;
 use CommerceKings\Notification\Exception\MessageSentException;
 use Magento\Framework\App\Area;
@@ -17,7 +17,7 @@ use Magento\Store\Model\App\Emulation;
 use Psr\Log\LoggerInterface;
 
 /**
- * Sends one notification: stoppable deliveries to a blocked recipient are dropped, then the optional recipient
+ * Sends one notification: stoppable deliveries to a stopped recipient are dropped, then the optional recipient
  * cooldown claim, recipient re-check, content built in the delivery's store, and the provider selected for the
  * channel. A one-click unsubscribe URL only reaches providers that support it. A notification the provider accepted
  * can't be recalled - a later failure must never cause a second one, so it surfaces as MessageSentException.
@@ -31,7 +31,7 @@ class Sender implements SenderInterface
         private readonly Config $config,
         private readonly LoggerInterface $logger,
         private readonly RecipientNormalizerPool $normalizers,
-        private readonly RecipientBlockInterface $blocks
+        private readonly StopListInterface $stopList
     ) {
     }
 
@@ -41,8 +41,8 @@ class Sender implements SenderInterface
         // other channels are kept apart by a prefix.
         $recipient = $this->normalizers->normalize($delivery->channel, $delivery->recipient);
         $delivery = $this->withRecipient($delivery, $recipient);
-        if ($delivery->stoppable && $this->blocks->isBlocked($delivery->channel, $delivery->recipient)) {
-            return self::BLOCKED;
+        if ($delivery->stoppable && $this->stopList->isStopped($delivery->channel, $delivery->recipient)) {
+            return self::STOPPED;
         }
         $key = $delivery->channel === Channel::EMAIL
             ? $delivery->recipient : $delivery->channel . ':' . $delivery->recipient;
@@ -65,7 +65,7 @@ class Sender implements SenderInterface
             $provider = $this->providers->getSelected($delivery->storeId, $delivery->channel);
             $this->emulation->startEnvironmentEmulation($delivery->storeId, Area::AREA_FRONTEND, true);
             try {
-                $provider->send($delivery, $this->forProvider($provider, $this->withWayOut($delivery, ($delivery->content)())));
+                $provider->send($delivery, $this->forProvider($provider, $this->withWayOut($delivery, ($delivery->content)(), $provider)));
                 $sent = true;
             } finally {
                 $this->emulation->stopEnvironmentEmulation();
@@ -86,16 +86,17 @@ class Sender implements SenderInterface
     }
 
     /**
-     * A stoppable notification always has a one-click way out (when the store sends one-click headers): without an
-     * unsubscribe link of its own, the "stop these emails" link is used. Built inside the store's emulation.
+     * A stoppable notification always has a one-click way out (when the store sends one-click headers and the provider
+     * can carry them): without an unsubscribe link of its own, the stop link is used. A provider without one-click
+     * (e.g. SMS) gets none, so nothing is dropped or logged. Built inside the store's emulation.
      */
-    private function withWayOut(Delivery $delivery, DeliveryContent $content): DeliveryContent
+    private function withWayOut(Delivery $delivery, DeliveryContent $content, ProviderInterface $provider): DeliveryContent
     {
-        if (!$delivery->stoppable || $content->oneClickUnsubscribeUrl !== null
+        if (!$delivery->stoppable || $content->oneClickUnsubscribeUrl !== null || !$provider->supportsOneClickUnsubscribe()
             || !$this->config->isOneClickUnsubscribeEnabled($delivery->storeId)) {
             return $content;
         }
-        $url = $this->blocks->getBlockUrl($delivery->channel, $delivery->recipient, $delivery->storeId);
+        $url = $this->stopList->getStopUrl($delivery->channel, $delivery->recipient, $delivery->storeId);
         return $url === '' ? $content : new DeliveryContent($content->vars, $content->recipientName, $url, $content->text);
     }
 

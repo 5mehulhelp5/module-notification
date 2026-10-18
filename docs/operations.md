@@ -57,7 +57,7 @@ type's own job (e.g. abandoned cart releases its claim so the next finder run qu
 - Cron `commercekings_notification_subscription_cleanup` (daily 03:10) removes subscriptions whose item is gone
   (each type's `orphanCondition()`); subscriptions of a type that is no longer registered are left alone.
 - Cron `commercekings_notification_contact_cleanup` (daily 03:15) then removes contacts nothing uses.
-- Cron `commercekings_notification_recipient_block_cleanup` (daily 03:20) lifts Do not contact blocks after
+- Cron `commercekings_notification_stop_cleanup` (daily 03:20) lifts Do not contact stops after
   *Lifts after (days without attempts)*.
 
 ## Rate limiting

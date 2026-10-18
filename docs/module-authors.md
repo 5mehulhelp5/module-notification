@@ -22,9 +22,9 @@ Building a notification type on `commercekings/module-notification`. Start with 
 sent and do not start the cooldown. `Delivery::$stoppable = false` for messages the recipient cannot stop with Do not
 contact (orders, payments); a feature's marketing is stoppable (the default). A stoppable send without an
 unsubscribe link of its own gets the stop link as its one-click URL. Marketing templates show the stop link with
-`{{depend block_url}}…{{var block_url}}…{{/depend}}`, the URL from
-`Api\RecipientBlockInterface::getBlockUrl(Channel::EMAIL, $email, $storeId)` ('' when the shop turned it off).
-`SenderInterface::send()` returns `SENT`, `COOLDOWN`, `RECIPIENT_CHANGED` or `BLOCKED`; on anything but `SENT`,
+`{{depend stop_url}}…{{var stop_url}}…{{/depend}}`, the URL from
+`Api\StopListInterface::getStopUrl(Channel::EMAIL, $email, $storeId)` ('' when the shop turned it off).
+`SenderInterface::send()` returns `SENT`, `COOLDOWN`, `RECIPIENT_CHANGED` or `STOPPED`; on anything but `SENT`,
 undo your own claim. Replace the cooldown with a
 `CooldownInterface` preference.
 
@@ -48,9 +48,9 @@ the admin selects the email provider (**Email provider**, default *Magento email
    ```
 3. Its own settings group in `etc/adminhtml/system.xml`, in the `commercekings_notification` section.
 
-The sender keeps the cooldown, recipient re-check and store environment for every provider. A non-email channel
-also needs its recipients (e.g. phone numbers), its own consent and content (`DeliveryContent::$text`) – not part
-of Notification yet.
+The sender keeps the cooldown, recipient re-check, stop list and store environment for every provider. A non-email
+channel brings its normalizer (below), its subscription types (with their own permission if the channel needs a
+separate opt-in, see [Permission](#permission)) and its content (`DeliveryContent::$text`).
 
 ### Build an SMS provider
 
@@ -59,10 +59,15 @@ of Notification yet.
    `$delivery->recipient` and `$content->text` to your service and throws when it is not accepted.
 3. Its item in `Model\ProviderPool` (`etc/di.xml`, as above) and its settings (credentials with Magento's
    `Encrypted` backend model) in its own `system.xml` group.
-4. Optionally a `Api\RecipientNormalizerInterface` for the channel in `Model\RecipientNormalizerPool`
-   (argument `normalizers`, item `sms`), e.g. to E.164 (`+381601234567`): the cooldown and your provider then see
-   one form of each number. Without one the number is only trimmed.
+4. A `Api\RecipientNormalizerInterface` for the channel in `Model\RecipientNormalizerPool` (argument `normalizers`,
+   item `sms`), e.g. to E.164 (`+381601234567`), returning `''` for something that is not a number: contacts, the
+   cooldown, the stop list and your provider then see one form of each number. It is required for sign-ups on the
+   channel; without one the channel takes no sign-ups and sends only trim the number.
 5. Notification types send with `Delivery::text($storeId, 'sms', $phone, fn () => new DeliveryContent([], text: '...'))`.
+6. **Stop replies:** when someone replies STOP, your inbound webhook calls
+   `Api\StopListInterface::stop('sms', $from)`. Stoppable sends to that number are dropped from then on, and its
+   stoppable subscriptions are removed. A stop link for texts is `getStopUrl('sms', $phone, $storeId)` – long
+   (~200 characters), so most SMS use "Reply STOP to stop" instead.
 
 With one SMS provider installed it is used automatically; to choose between several, set
 `commercekings_notification/general/provider_sms` to the provider's code (your module may add the field).
@@ -91,15 +96,23 @@ In the storefront, ask `CommerceKings_Notification/js/permission` (`hasPermissio
 valid consent for the type's purpose, withdrawing that consent removes it, the subscriber is the browser the consent
 was given in, and the unsubscribe link is Consent's signed withdrawal page.
 
+That shop-wide permission applies to every type, unless a type brings its own: `getPermission()` on the type (below)
+returns its own `SubscriptionPermissionInterface` – e.g. an SMS offer with its own "text me offers" checkbox – and
+that one alone decides for its subscriptions, at sign-up and at send time. `null` keeps the shop-wide one.
+
 ## Subscription types
 
 For notifications a visitor signs up for, also:
 
 1. Implement `Api\SubscriptionTypeInterface`:
    - `getPurpose()`: what the subscription is for (with the consent bridge: the Consent purpose your module declares);
+   - `getChannel()`: the channel its subscribers are reached on – `Channel::EMAIL`, or your provider's code (e.g.
+     `sms`). Guests subscribe with `recipient` (REST `{"type", "reference", "recipient"}`): an email address, or e.g.
+     a phone number; it is stored as a contact on that channel. An address the channel does not take is Magento's 400;
    - `isSingle()`: one subscription per reference (a new email replaces it) or one per person;
-   - `isStoppable()`: can the recipient stop it with Do not contact? true for marketing (a block removes the
-     subscription; pass the same value as `Delivery::$stoppable`), false for a service they asked for (a block leaves
+   - `getPermission()`: your type's own permission, or `null` for the shop-wide one (see [Permission](#permission));
+   - `isStoppable()`: can the recipient stop it with Do not contact? true for marketing (a stop removes the
+     subscription; pass the same value as `Delivery::$stoppable`), false for a service they asked for (a stop leaves
      it);
    - `authorize($reference, $customerId)`: `null` when the visitor may not touch it, else a `Data\Target`
      with your id, the store, whether it accepts subscriptions now, and an optional trusted SQL condition
@@ -119,11 +132,19 @@ For notifications a visitor signs up for, also:
    ```
    With the consent bridge, withdrawing your purpose's consent removes the subscriptions; nothing else to register.
 3. Queue the **subscription id**; read it with `Api\SubscriptionRepositoryInterface` (`getEmail()` gives the
-   contact's address or the customer's current one). Repeat the check inside your atomic claim: without the
+   contact's address or the customer's current one; `getRecipient()` the channel and address for guests on any channel). Repeat the check inside your atomic claim: without the
    subscription table in the UPDATE, add `Api\SubscriptionGuardInterface::validCondition('<subscription id>')`;
    with it joined (e.g. `… JOIN ck_notification_subscription AS s`), check the same row (`s.subscription_id = ?`)
    and `Api\SubscriptionPermissionInterface::validCondition('s.permission_ref')` instead – MySQL does
-   not allow a subquery on a table the UPDATE itself joins (error 1093).
+   not allow a subquery on a table the UPDATE itself joins (error 1093). Inject that permission as your type's,
+   so it follows `getPermission()`:
+   ```xml
+   <virtualType name="MyNotificationPermission" type="CommerceKings\Notification\Model\TypePermission">
+       <arguments>
+           <argument name="typeCode" xsi:type="string">my_notification</argument>
+       </arguments>
+   </virtualType>
+   ```
 4. Keep your send history keyed by what "once" means for you (e.g. the cart), never by the subscription id:
    a withdrawal deletes the subscription, and subscribing again creates a new one.
 

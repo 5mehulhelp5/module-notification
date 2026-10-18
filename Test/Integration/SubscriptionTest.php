@@ -77,7 +77,7 @@ class SubscriptionTest extends TestCase
             ->where('type = ?', $this->type)->where('contact_id IS NOT NULL'));
         $db->delete($this->table(SubscriptionManagement::TABLE), ['type = ?' => $this->type]);
         $contacts = array_merge($contacts, $db->fetchCol($db->select()->from($this->table(ContactRepository::TABLE), 'contact_id')
-            ->where('email LIKE ?', '%.' . $this->type . '@example.test')));
+            ->where('recipient LIKE ?', '%.' . $this->type . '@example.test')));
         if ($contacts) {
             $db->delete($this->table(ContactRepository::TABLE), ['contact_id IN (?)' => $contacts]);
         }
@@ -109,27 +109,35 @@ class SubscriptionTest extends TestCase
     {
         $type = $this->createStub(SubscriptionTypeInterface::class);
         $type->method('getPurpose')->willReturn('test_purpose');
+        $type->method('getChannel')->willReturn('email');
         $type->method('isSingle')->willReturnCallback(fn () => $this->single);
         $type->method('authorize')->willReturnCallback(fn () => new Target($this->reference, $this->storeId, true, $this->condition));
         $type->method('orphanCondition')->willReturnCallback(fn ($column) => $column . ' = ' . $this->orphan);
         $filters = $this->om->create(FilterManager::class);
-        return new SubscriptionManagement($this->resource, new SubscriptionTypePool([$this->type => $type]),
-            $this->permission(), $contacts ?? $this->om->get(ContactRepositoryInterface::class), $this->stores,
+        $types = new SubscriptionTypePool([$this->type => $type]);
+        return new SubscriptionManagement($this->resource, $types,
+            new \CommerceKings\Notification\Model\PermissionResolver($this->permission(), $types), $contacts ?? $this->om->get(ContactRepositoryInterface::class), $this->stores,
             new EmailAddress(), new StringLength(['max' => 255]), $filters,
-            $this->om->get(\CommerceKings\Notification\Api\RecipientBlockInterface::class), $this->om->get(\Magento\Customer\Api\CustomerRepositoryInterface::class));
+            $this->om->get(\CommerceKings\Notification\Api\StopListInterface::class), $this->om->get(\Magento\Customer\Api\CustomerRepositoryInterface::class),
+            $this->om->get(\CommerceKings\Notification\Model\RecipientNormalizerPool::class));
     }
 
     private function afterContactSave(\Closure $afterSave): ContactRepositoryInterface
     {
         return new class($this->om->get(ContactRepositoryInterface::class), $afterSave) implements ContactRepositoryInterface {
             public function __construct(private ContactRepositoryInterface $actual, private \Closure $afterSave) {}
-            public function save(int $websiteId, string $email): int
+            public function save(int $websiteId, string $recipient, string $channel = 'email'): int
             {
-                $id = $this->actual->save($websiteId, $email);
+                $id = $this->actual->save($websiteId, $recipient, $channel);
                 ($this->afterSave)();
                 return $id;
             }
+            public function find(int $websiteId, string $recipient, string $channel = 'email'): ?int
+            {
+                return $this->actual->find($websiteId, $recipient, $channel);
+            }
             public function getEmail(int $contactId): ?string { return $this->actual->getEmail($contactId); }
+            public function getRecipient(int $contactId): ?array { return $this->actual->getRecipient($contactId); }
         };
     }
 
@@ -147,7 +155,7 @@ class SubscriptionTest extends TestCase
     {
         $db = $this->resource->getConnection();
         return $db->fetchAll($db->select()->from(['s' => $this->table(SubscriptionManagement::TABLE)])
-            ->joinLeft(['n' => $this->table(ContactRepository::TABLE)], 'n.contact_id = s.contact_id', ['email'])
+            ->joinLeft(['n' => $this->table(ContactRepository::TABLE)], 'n.contact_id = s.contact_id', ['email' => 'recipient'])
             ->where('s.type = ?', $this->type)->order('s.subscription_id'));
     }
 
@@ -230,7 +238,8 @@ class SubscriptionTest extends TestCase
         $management = $this->management();
         $this->assertTrue($management->subscribeGuest($this->type, 'ref', $this->email('guest')));
         $id = (int)$this->rows()[0]['subscription_id'];
-        $guard = new SubscriptionGuard($this->resource, $this->permission());
+        $guard = new SubscriptionGuard($this->resource, new \CommerceKings\Notification\Model\PermissionResolver($this->permission(),
+            $this->om->get(\CommerceKings\Notification\Model\SubscriptionTypePool::class)));
         $this->assertTrue($guard->isValid($id, $this->type));
         $this->assertFalse($guard->isValid($id, 'other_type'));
 
@@ -297,10 +306,10 @@ class SubscriptionTest extends TestCase
         $db = $this->resource->getConnection();
         $this->condition = sprintf('EXISTS (SELECT 1 FROM %s AS target_marker WHERE target_marker.contact_id = %d AND %s)',
             $db->quoteIdentifier($this->table(ContactRepository::TABLE)), $markerId,
-            $db->quoteInto('target_marker.email = ?', $markerEmail));
+            $db->quoteInto('target_marker.recipient = ?', $markerEmail));
         $peer = $this->om->create(ResourceConnection::class)->getConnection();
         $changeTarget = fn () => $peer->update($this->table(ContactRepository::TABLE),
-            ['email' => $this->email('target-closed')], ['contact_id = ?' => $markerId]);
+            ['recipient' => $this->email('target-closed')], ['contact_id = ?' => $markerId]);
         $contacts = $this->afterContactSave($changeTarget);
         try {
             $this->assertFalse($this->management($contacts)->subscribeGuest($this->type, 'ref', $this->email('guest')));

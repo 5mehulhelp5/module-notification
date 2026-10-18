@@ -9,7 +9,7 @@ namespace CommerceKings\Notification\Api;
  *
  * @api
  */
-final class Channel
+class Channel
 {
     public const EMAIL = 'email';
 

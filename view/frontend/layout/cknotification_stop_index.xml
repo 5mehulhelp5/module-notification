@@ -3,8 +3,8 @@
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <body>
         <referenceContainer name="content">
-            <block class="Magento\Framework\View\Element\Template" name="ck.notification.recipient_block"
-                   template="CommerceKings_Notification::recipient-block.phtml" cacheable="false"/>
+            <block class="Magento\Framework\View\Element\Template" name="ck.notification.stop"
+                   template="CommerceKings_Notification::stop.phtml" cacheable="false"/>
         </referenceContainer>
     </body>
 </page>

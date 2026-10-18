@@ -3,7 +3,7 @@
     <preference for="CommerceKings\Notification\Api\SenderInterface" type="CommerceKings\Notification\Model\Sender"/>
     <preference for="CommerceKings\Notification\Api\ProviderPoolInterface" type="CommerceKings\Notification\Model\ProviderPool"/>
     <preference for="CommerceKings\Notification\Api\CooldownInterface" type="CommerceKings\Notification\Model\Cooldown"/>
-    <preference for="CommerceKings\Notification\Api\RecipientBlockInterface" type="CommerceKings\Notification\Model\RecipientBlock"/>
+    <preference for="CommerceKings\Notification\Api\StopListInterface" type="CommerceKings\Notification\Model\StopList"/>
     <preference for="CommerceKings\Notification\Api\QueueInterface" type="CommerceKings\Notification\Model\Queue"/>
     <preference for="CommerceKings\Notification\Api\ContactRepositoryInterface" type="CommerceKings\Notification\Model\ContactRepository"/>
     <preference for="CommerceKings\Notification\Api\SubscriptionManagementInterface" type="CommerceKings\Notification\Model\SubscriptionManagement"/>

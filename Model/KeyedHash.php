@@ -30,7 +30,7 @@ class KeyedHash
     {
         $current = $this->current($data);
         $keys = array_values(array_filter(preg_split('/\s+/', trim((string)$this->deploymentConfig->get('crypt/key'))) ?: [],
-            'strlen'));
+            fn (string $key): bool => $key !== ''));
         $hashes = array_map(fn (string $key) => hash_hmac('sha256', $data, $this->decode($key)), $keys);
         if (array_pop($hashes) !== $current) {
             return [$current];

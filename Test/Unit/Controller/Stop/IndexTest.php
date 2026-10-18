@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
-namespace CommerceKings\Notification\Test\Unit\Controller\Block;
+namespace CommerceKings\Notification\Test\Unit\Controller\Stop;
 
-use CommerceKings\Notification\Api\RecipientBlockInterface;
-use CommerceKings\Notification\Controller\Block\Index;
+use CommerceKings\Notification\Api\StopListInterface;
+use CommerceKings\Notification\Controller\Stop\Index;
 use Magento\Framework\App\Action\Context;
 use Magento\Framework\App\Request\Http;
 use Magento\Framework\Controller\Result\Redirect;
@@ -18,17 +18,19 @@ use Magento\Framework\View\Result\Page;
 use Magento\Framework\View\Result\PageFactory;
 use PHPUnit\Framework\TestCase;
 
-/** The stop page: GET and HEAD change nothing, only a form-key POST blocks or undoes. */
+/** The stop page: GET and HEAD change nothing, only a form-key POST stops or undoes. */
 class IndexTest extends TestCase
 {
     private array $calls = [];
     private array $blockData = [];
     private ?Redirect $redirect = null;
     private bool $validKey = true;
-    private bool $alreadyBlocked = false;
+    private bool $alreadyStopped = false;
     private ?int $status = null;
     private array $post = [];
     private string $contentType = 'application/x-www-form-urlencoded';
+    private string $linkChannel = 'email';
+    private string $title = '';
 
     private function controller(string $method, array $params): Index
     {
@@ -39,15 +41,15 @@ class IndexTest extends TestCase
         $request->method('getPost')->willReturnCallback(fn ($name) => $this->post[$name] ?? null);
         $request->method('getPostValue')->willReturnCallback(fn () => $this->post);
         $request->method('getHeader')->willReturnCallback(fn () => $this->contentType);
-        $blocks = $this->createStub(RecipientBlockInterface::class);
-        $blocks->method('fromLink')->willReturnCallback(function ($r, $s) {
+        $stopList = $this->createStub(StopListInterface::class);
+        $stopList->method('fromLink')->willReturnCallback(function ($r, $s) {
             $this->calls[] = ['fromLink', $r, $s];
             return $r === 'enc' && in_array($s, ['sig', 'oldsig'], true)
-                ? ['channel' => 'email', 'recipient' => 'a@example.test', 'current' => $s === 'sig'] : null;
+                ? ['channel' => $this->linkChannel, 'recipient' => 'a@example.test', 'current' => $s === 'sig'] : null;
         });
-        $blocks->method('isBlocked')->willReturnCallback(fn () => $this->alreadyBlocked);
-        $blocks->method('block')->willReturnCallback(function ($c, $r) { $this->calls[] = ['block', $c, $r]; });
-        $blocks->method('unblock')->willReturnCallback(function ($c, $r) { $this->calls[] = ['unblock', $c, $r]; });
+        $stopList->method('isStopped')->willReturnCallback(fn () => $this->alreadyStopped);
+        $stopList->method('stop')->willReturnCallback(function ($c, $r) { $this->calls[] = ['stop', $c, $r]; });
+        $stopList->method('resume')->willReturnCallback(function ($c, $r) { $this->calls[] = ['resume', $c, $r]; });
         $this->redirect = $this->createStub(Redirect::class);
         $this->redirect->method('setPath')->willReturnSelf();
         $redirects = $this->createStub(RedirectFactory::class);
@@ -62,7 +64,9 @@ class IndexTest extends TestCase
         $layout = $this->createStub(LayoutInterface::class);
         $layout->method('getBlock')->willReturn($template);
         $config = $this->createStub(Config::class);
-        $config->method('getTitle')->willReturn($this->createStub(Title::class));
+        $title = $this->createStub(Title::class);
+        $title->method('set')->willReturnCallback(function ($text) { $this->title = (string)$text; });
+        $config->method('getTitle')->willReturn($title);
         $page = $this->createStub(Page::class);
         $page->method('getConfig')->willReturn($config);
         $page->method('getLayout')->willReturn($layout);
@@ -79,7 +83,7 @@ class IndexTest extends TestCase
         $raw->method('setContents')->willReturnSelf();
         $rawFactory = $this->createStub(\Magento\Framework\Controller\Result\RawFactory::class);
         $rawFactory->method('create')->willReturn($raw);
-        return new Index($context, $request, $blocks, $pages, $validator, $rawFactory);
+        return new Index($context, $request, $stopList, $pages, $validator, $rawFactory);
     }
 
     private function changes(): array
@@ -91,16 +95,16 @@ class IndexTest extends TestCase
     {
         $result = $this->controller('GET', ['r' => 'enc', 's' => 'sig'])->execute();
         $this->assertNotSame($this->redirect, $result);
-        $this->assertSame([], $this->changes(), 'a mail scanner opening the link blocks nothing');
+        $this->assertSame([], $this->changes(), 'a mail scanner opening the link stops nothing');
         $this->assertSame(Index::STATE_CONFIRM, $this->blockData['state']);
         $this->assertSame(['enc', 'sig'], [$this->blockData['link_recipient'], $this->blockData['link_signature']]);
     }
 
-    public function testGetOfABlockedRecipientOffersUndo(): void
+    public function testGetOfAStoppedRecipientOffersUndo(): void
     {
-        $this->alreadyBlocked = true;
+        $this->alreadyStopped = true;
         $this->controller('GET', ['r' => 'enc', 's' => 'sig'])->execute();
-        $this->assertSame(Index::STATE_BLOCKED, $this->blockData['state']);
+        $this->assertSame(Index::STATE_STOPPED, $this->blockData['state']);
         $this->assertSame([], $this->changes());
     }
 
@@ -125,28 +129,40 @@ class IndexTest extends TestCase
     public function testPostWithAFormKeyBlocks(): void
     {
         $this->controller('POST', ['r' => 'enc', 's' => 'sig', 'form_key' => 'ok'])->execute();
-        $this->assertSame([['block', 'email', 'a@example.test']], $this->changes());
-        $this->assertSame(Index::STATE_BLOCKED, $this->blockData['state']);
+        $this->assertSame([['stop', 'email', 'a@example.test']], $this->changes());
+        $this->assertSame(Index::STATE_STOPPED, $this->blockData['state']);
     }
 
-    public function testUndoUnblocks(): void
+    /** Email says "emails"; any other channel (SMS, WhatsApp, ...) says "messages" and "number". */
+    public function testTheWordingFollowsTheLinksChannel(): void
+    {
+        $this->controller('GET', ['r' => 'enc', 's' => 'sig'])->execute();
+        $this->assertSame(['Stop these emails?', true], [$this->title, $this->blockData['is_email']]);
+        $this->linkChannel = 'sms';
+        $this->controller('GET', ['r' => 'enc', 's' => 'sig'])->execute();
+        $this->assertSame(['Stop these messages?', false], [$this->title, $this->blockData['is_email']]);
+        $this->controller('POST', ['r' => 'enc', 's' => 'sig', 'form_key' => 'ok'])->execute();
+        $this->assertSame('Messages stopped', $this->title);
+    }
+
+    public function testUndoResumes(): void
     {
         $this->controller('POST', ['r' => 'enc', 's' => 'sig', 'form_key' => 'ok', 'do' => 'undo'])->execute();
-        $this->assertSame([['unblock', 'email', 'a@example.test']], $this->changes());
-        $this->assertSame(Index::STATE_UNBLOCKED, $this->blockData['state']);
+        $this->assertSame([['resume', 'email', 'a@example.test']], $this->changes());
+        $this->assertSame(Index::STATE_RESUMED, $this->blockData['state']);
     }
 
     /** A link from an email sent before encryption:key:change: it still stops the emails, but cannot turn them on. */
     public function testALinkSignedWithAnOlderKeyBlocksButCannotUndo(): void
     {
         $this->controller('POST', ['r' => 'enc', 's' => 'oldsig', 'form_key' => 'ok'])->execute();
-        $this->assertSame([['block', 'email', 'a@example.test']], $this->changes());
+        $this->assertSame([['stop', 'email', 'a@example.test']], $this->changes());
         $this->assertFalse($this->blockData['can_undo'], 'no Undo button for an old-key link');
         $this->calls = [];
-        $this->alreadyBlocked = true;
+        $this->alreadyStopped = true;
         $this->controller('POST', ['r' => 'enc', 's' => 'oldsig', 'form_key' => 'ok', 'do' => 'undo'])->execute();
         $this->assertSame([], $this->changes(), 'a forged undo with a leaked old key turns nothing back on');
-        $this->assertSame(Index::STATE_BLOCKED, $this->blockData['state']);
+        $this->assertSame(Index::STATE_STOPPED, $this->blockData['state']);
         $this->post = ['List-Unsubscribe' => 'One-Click'];
         $this->controller('POST', ['r' => 'enc', 's' => 'oldsig'])->execute();
         $this->assertSame(200, $this->status, 'one-click from the old email still works');
@@ -174,7 +190,7 @@ class IndexTest extends TestCase
         $this->post = ['List-Unsubscribe' => 'One-Click'];
         $this->controller('POST', ['r' => 'enc', 's' => 'sig'])->execute();
         $this->assertSame(200, $this->status);
-        $this->assertSame([['block', 'email', 'a@example.test']], $this->changes());
+        $this->assertSame([['stop', 'email', 'a@example.test']], $this->changes());
         $this->assertSame([], $this->blockData, 'no page is rendered');
     }
 
@@ -182,7 +198,7 @@ class IndexTest extends TestCase
     {
         $this->post = ['List-Unsubscribe' => 'One-Click'];
         $this->controller('POST', ['r' => 'enc', 's' => 'sig', 'do' => 'undo'])->execute();
-        $this->assertSame([['block', 'email', 'a@example.test']], $this->changes(), 'a one-click POST only blocks');
+        $this->assertSame([['stop', 'email', 'a@example.test']], $this->changes(), 'a one-click POST only stops');
     }
 
     /** @dataProvider badOneClicks */

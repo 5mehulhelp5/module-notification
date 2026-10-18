@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace CommerceKings\Notification\Model;
 
+use CommerceKings\Notification\Api\Channel;
 use CommerceKings\Notification\Api\ContactRepositoryInterface;
 use CommerceKings\Notification\Api\Data\Subscription;
 use CommerceKings\Notification\Api\SubscriptionRepositoryInterface;
@@ -34,6 +35,15 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface
         $rows = $db->fetchAll($db->select()->from($this->resource->getTableName(SubscriptionManagement::TABLE))
             ->where('type = ?', $type)->where('reference_id = ?', $referenceId)->order('subscription_id'));
         return array_map(fn (array $row) => $this->toData($row), $rows);
+    }
+
+    public function getRecipient(Subscription $subscription): ?array
+    {
+        if ($subscription->contactId !== null) {
+            return $this->contacts->getRecipient($subscription->contactId);
+        }
+        $email = $this->getEmail($subscription);
+        return $email === null ? null : ['channel' => Channel::EMAIL, 'recipient' => $email];
     }
 
     public function getEmail(Subscription $subscription): ?string
