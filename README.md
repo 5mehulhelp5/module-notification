@@ -29,8 +29,8 @@ A feature (e.g. abandoned cart) says *what and when*; Notification handles *who 
 - The **queue** carries `<type>|<reference>`. One consumer sends every type, so nothing is sent during a page view.
 - The **sender** checks a **delivery** against the cooldown and Do not contact, builds its content in the
   store's language, then hands it to a provider.
-- A **channel** is where a delivery goes: email, or a code a provider module brings (e.g. `sms`). A **normalizer**
-  gives each channel one recipient form, such as phone numbers in E.164.
+- A **channel** is where a delivery goes: email, SMS, WhatsApp, or a code a provider module brings. A **normalizer**
+  gives each channel one recipient form; SMS and WhatsApp numbers are E.164 out of the box.
 - A **provider** delivers on one channel; the email provider is chosen in the admin. Magento email is built in, with
   optional one-click unsubscribe; SMS, WhatsApp or an email service come as provider modules.
 - The **cooldown** keeps a minimum gap between notifications to one recipient. **Do not contact** stops all
@@ -106,7 +106,7 @@ service messages and staff alerts.
 
 `Api\OptOutNoticeInterface` – a notice where shoppers subscribe (Automatic, Yes or No)
 
-Details, including how to build an SMS provider: [for module authors](docs/module-authors.md).
+Details, including messaging (SMS, WhatsApp) for provider modules: [for module authors](docs/module-authors.md).
 
 ## Limitations
 

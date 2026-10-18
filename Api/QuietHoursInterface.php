@@ -4,9 +4,10 @@ declare(strict_types=1);
 namespace CommerceKings\Notification\Api;
 
 /**
- * Quiet hours: when stoppable deliveries on a channel are held. The default reads the store's settings in the store's
- * time zone and ignores the recipient; replace it with a di.xml preference for another rule (e.g. the recipient's
- * time zone, as US state laws such as Florida's FTSA require).
+ * Quiet hours: when stoppable deliveries on a channel are held. The default reads the store's settings and keeps them
+ * in the store's time zone, or in the zones a channel's QuietHoursZoneInterface gives (e.g. the recipient's, as US
+ * state laws such as Florida's FTSA require) - register a zone provider for that, not a preference for this
+ * interface. Replace it only for a rule that is not a daily window.
  *
  * $recipient is the delivery's address on the channel (Delivery::$recipient): the sender passes it normalized
  * (RecipientNormalizerInterface), a feature passes the address it delivered to - an implementation that relies on its

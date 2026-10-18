@@ -10,7 +10,10 @@ use Magento\Framework\Encryption\EncryptorInterface;
  * Magento's keyed hash under every key in env.php, newest first. New data is always hashed with the newest key
  * (EncryptorInterface::hash()); the older keys – Magento keeps them after encryption:key:change – only let data
  * stored or links signed before a key change still match. They are used only when computing the newest key's hash
- * here reproduces the encryptor's own (otherwise only the newest key counts).
+ * here reproduces the encryptor's own (otherwise only the newest key counts). Provider modules use it for anything
+ * they store or sign about a recipient (e.g. a hashed phone number), so it survives a key change like Notification's.
+ *
+ * @api
  */
 class KeyedHash
 {

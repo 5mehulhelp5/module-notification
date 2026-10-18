@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Messaging in Notification:** `Channel::SMS` and `Channel::WHATSAPP`, one code per channel for every provider
+  (shared contacts, stop list, cooldown and quiet hours). Phone numbers of both are strict E.164 out of the box
+  (`Model\PhoneNormalizer`: "+", a country code and 8–15 digits; separators left out, anything else refused); a
+  provider module with a phone library may replace it per channel. Module authors: a *Messaging* chapter (webhooks
+  and their signature, STOP/START, undeliverable numbers, templates, opt-in confirmation, recipient time zones).
+- **Quiet hours zones:** `Api\QuietHoursZoneInterface` per channel (di.xml `Model\QuietHours` "zones"): the window is
+  kept in the zones it gives (e.g. the recipient's), quiet while it is on in any of them, until the latest end; none
+  given means not quiet. Notification keeps the settings, the window and clock changes – register a zone provider,
+  do not replace `QuietHoursInterface`.
+- `Model\KeyedHash` is `@api` (hashes and signatures that survive an encryption key change).
+- The admin group *Email delivery* is now *Delivery*: provider modules add their channel's selector
+  (`provider_<channel>`, `Model\Config\Source\Provider` with a `channel` argument) there.
 - **Notification type in deliveries:** `Delivery::$type` (and `Delivery::text(..., type:)`), the type code or `''`;
   a provider with templates of its own (e.g. WhatsApp) maps type and locale to one. `Delivery::$templateId` is the
   channel's template (an email template id, or e.g. a WhatsApp/Twilio content id).

@@ -7,7 +7,7 @@ use CommerceKings\Notification\Api\Channel;
 use CommerceKings\Notification\Api\ProviderPoolInterface;
 use Magento\Framework\Data\OptionSourceInterface;
 
-/** The installed email providers. */
+/** The installed providers of one channel: email, or another through a virtualType (argument "channel"). */
 class Provider implements OptionSourceInterface
 {
     public function __construct(

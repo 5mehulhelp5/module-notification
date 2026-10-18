@@ -51,10 +51,21 @@
         </arguments>
     </type>
     <!-- recipient normalizers per channel (argument "normalizers": channel code => RecipientNormalizerInterface);
-         without one the recipient is trimmed. Email needs none: the cooldown normalizes addresses itself. -->
+         without one the recipient is trimmed. Email needs none: the cooldown normalizes addresses itself. Phone
+         channels use strict E.164; a provider module with a phone library may replace an item. -->
     <type name="CommerceKings\Notification\Model\RecipientNormalizerPool">
         <arguments>
-            <argument name="normalizers" xsi:type="array"/>
+            <argument name="normalizers" xsi:type="array">
+                <item name="sms" xsi:type="object">CommerceKings\Notification\Model\PhoneNormalizer</item>
+                <item name="whatsapp" xsi:type="object">CommerceKings\Notification\Model\PhoneNormalizer</item>
+            </argument>
+        </arguments>
+    </type>
+    <!-- quiet hours zones per channel (argument "zones": channel code => QuietHoursZoneInterface), e.g. the
+         recipient's time zone for a phone channel; a channel without one uses the store's time zone -->
+    <type name="CommerceKings\Notification\Model\QuietHours">
+        <arguments>
+            <argument name="zones" xsi:type="array"/>
         </arguments>
     </type>
     <!-- delivery providers (argument "providers": code => ProviderInterface); the admin selects one per channel.

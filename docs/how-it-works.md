@@ -54,9 +54,11 @@ Each module answers one question:
   feature after it (`nextAllowedAt()`, UTC). Service messages are never held. The default uses the store's time zone
   (*General > Locale Options*); on the day clocks go forward a time in the skipped hour means the first time after it,
   on the day they go back a time in the repeated hour means its first occurrence. Rules based on the recipient's local
-  time – e.g. US state laws such as Florida's FTSA (08:00–20:00 in the recipient's time zone) – need a
-  `QuietHoursInterface` preference that knows it (a planned SMS provider module adds one): the sender asks with the
-  recipient; asked without one (a finder, before it knows the recipients), such a rule answers "not quiet".
+  time – e.g. US state laws such as Florida's FTSA (08:00–20:00 in the recipient's time zone) – need a zone provider
+  for the channel (`Api\QuietHoursZoneInterface`, di.xml `Model\QuietHours` "zones"; a planned SMS provider module
+  adds one): the window is then kept in the recipient's zones, quiet while it is on in any of them. Asked without a
+  recipient (a finder, before it knows the recipients), such a provider gives no zone – "not quiet" – and the sender
+  holds each delivery on its own.
 - **Encryption key change**: stops and stop links are checked under every key in `env.php` (`Model\KeyedHash`); a
   stop found under an older key moves to the newest one, and an older-key link can stop but never undo. Nothing to
   run: leftover rows go with the normal cleanups (cooldown period, lift days).
@@ -84,7 +86,8 @@ type or invalid email is Magento's 400 without echoing the address.
 
 ## Admin
 
-**Stores > Configuration > CommerceKings > Notifications**: *Email provider*, default *Magento email* (per website);
+**Stores > Configuration > CommerceKings > Notifications**, *Delivery*: *Email provider*, default *Magento email*
+(per website; a provider module for another channel adds its selector here);
 *Cooldown (days)*, per channel, default 7, **0 turns it off** (global); *One-click unsubscribe*, default No (per website) – RFC 8058 headers on every
 notification whose content passes an HTTPS unsubscribe URL (an http URL sends the email without them and logs a
 warning); that URL must accept the mail client's POST.

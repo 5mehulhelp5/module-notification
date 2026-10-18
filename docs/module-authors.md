@@ -36,8 +36,9 @@ preference (e.g. one that uses the recipient's time zone: answer for the recipie
 
 ## Providers
 
-A provider delivers notifications on one channel: `Api\Channel::EMAIL`, or a code your module chooses (e.g. `sms`);
-the admin selects the email provider (**Email provider**, default *Magento email*). A provider module needs three things:
+A provider delivers notifications on one channel: `Api\Channel::EMAIL`, `Channel::SMS`, `Channel::WHATSAPP`, or a
+code your module chooses. The admin selects one provider per channel (*Delivery* group); the email one is
+**Email provider**, default *Magento email*. A provider module needs:
 
 1. A class implementing `Api\ProviderInterface`: `getCode()`, `getLabel()`, `getChannel()`,
    `supportsOneClickUnsubscribe()` and `send(Delivery, DeliveryContent)`. Throw if the service did not accept the
@@ -54,40 +55,128 @@ the admin selects the email provider (**Email provider**, default *Magento email
    ```
 3. Its own settings group in `etc/adminhtml/system.xml`, in the `commercekings_notification` section.
 
-The sender keeps the cooldown, recipient re-check, stop list and store environment for every provider. A non-email
-channel brings its normalizer (below), its subscription types (with their own permission if the channel needs a
-separate opt-in, see [Permission](#permission)) and its content (`DeliveryContent::$text`).
+The sender keeps the cooldown, recipient re-check, stop list, quiet hours and store environment for every provider.
 
-### Build an SMS provider
+### The provider selector
+
+With one provider installed for a channel it is used automatically. To choose between several, the stored code is
+`commercekings_notification/general/provider_<channel>` (read per store view, e.g. set per website). The first module
+for a channel adds the field to the *Delivery* group, with `Model\Config\Source\Provider` for its channel:
+
+```xml
+<!-- etc/di.xml -->
+<virtualType name="VendorSmsProviderSource" type="CommerceKings\Notification\Model\Config\Source\Provider">
+    <arguments>
+        <argument name="channel" xsi:type="const">CommerceKings\Notification\Api\Channel::SMS</argument>
+    </arguments>
+</virtualType>
+```
+
+```xml
+<!-- etc/adminhtml/system.xml, in section commercekings_notification -->
+<group id="general">
+    <field id="provider_sms" translate="label" type="select" sortOrder="6"
+           showInDefault="1" showInWebsite="1" showInStore="0">
+        <label>SMS provider</label>
+        <source_model>VendorSmsProviderSource</source_model>
+    </field>
+</group>
+```
+
+Several modules may declare the same field: Magento merges them into one.
+
+## Messaging
+
+SMS, WhatsApp and similar channels are part of Notification: a provider module (Twilio, Infobip, Meta, …) only adds
+the vendor's code. Everything below works the same for every provider of a channel.
+
+### Channels and phone numbers
+
+Use `Channel::SMS` and `Channel::WHATSAPP`, never a code of your own for them: contacts, the stop list, the cooldown
+and quiet hours are per channel, so every provider of a channel shares them. Notification normalizes both to strict
+E.164 (`Model\PhoneNormalizer`: `+`, a country code and 8–15 digits; spaces, dashes, dots and brackets are left
+out; anything else is refused with `''`). Your provider gets `$delivery->recipient` in that form; strip your service's
+own prefixes (e.g. `whatsapp:`) before you hand a number to Notification. A module with a phone library (national
+formats, a default region) may replace the item for a channel in `Model\RecipientNormalizerPool` (argument
+`normalizers`). A new channel brings its own normalizer – without one it takes no sign-ups.
+
+### Build an SMS or WhatsApp provider
 
 1. A module that requires `commercekings/module-notification` and loads after `CommerceKings_Notification`.
-2. A class implementing `Api\ProviderInterface` with `getChannel()` returning your channel code, e.g. `'sms'`; `send()` posts
-   `$delivery->recipient` and `$content->text` to your service and throws when it is not accepted.
-3. Its item in `Model\ProviderPool` (`etc/di.xml`, as above) and its settings (credentials with Magento's
-   `Encrypted` backend model) in its own `system.xml` group.
-4. A `Api\RecipientNormalizerInterface` for the channel in `Model\RecipientNormalizerPool` (argument `normalizers`,
-   item `sms`), e.g. to E.164 (`+381601234567`), returning `''` for something that is not a number: contacts, the
-   cooldown, the stop list and your provider then see one form of each number. It is required for sign-ups on the
-   channel; without one the channel takes no sign-ups and sends only trim the number.
-5. Notification types send with `Delivery::text($storeId, 'sms', $phone, fn () => new DeliveryContent([], text: '...'))`.
-6. **Stop replies:** when someone replies STOP, your inbound webhook calls
-   `Api\StopListInterface::stop('sms', $from)`. Stoppable sends to that number are dropped from then on, and its
-   stoppable subscriptions are removed. A stop link for texts is `getStopUrl('sms', $phone, $storeId)` – long
-   (~200 characters), so most SMS use "Reply STOP to stop" instead.
+2. A provider (above) with `getChannel()` returning `Channel::SMS` or `Channel::WHATSAPP`; one module may register
+   both. `send()` posts `$delivery->recipient` and `$content->text` (or a template, below) and throws when the service
+   does not accept it. It runs in the store's environment: read your store-scoped settings (credentials with
+   Magento's `Encrypted` backend model, a sender id or messaging service) for `$delivery->storeId`.
+3. Notification types send with `Delivery::text($storeId, Channel::SMS, $phone, fn () => new DeliveryContent([],
+   text: '...'), type: 'my_type')`.
+4. Hash or sign anything you store about a recipient with `Model\KeyedHash`, so it survives `encryption:key:change`.
 
-With one SMS provider installed it is used automatically; to choose between several, set
-`commercekings_notification/general/provider_sms` to the provider's code (your module may add the field).
-Any other channel works the same way: pick a code (e.g. `whatsapp`) and use it in both places.
-
-### Template-based channels (e.g. WhatsApp)
+### Templates (e.g. WhatsApp)
 
 A channel that only sends approved templates (a WhatsApp template, a Twilio Content SID) keeps the mapping in the
 provider module, not in the feature: a setting per notification type and locale – `$delivery->type` and the store's
-locale (`send()` runs in the store's environment, so read `general/locale/code` for `$delivery->storeId`) – gives
-the template, and the template's placeholders name the variables to fill from `DeliveryContent::$vars` (plain text
-only, e.g. `customer_name`, `restore_url`; leave out HTML such as `items_html`). `Delivery::$templateId` is the
-channel's template when the feature sets one. A delivery of an unknown type (`''`) or without a mapping cannot be
-sent: throw, so the sender releases the cooldown claim and the feature counts a failed attempt.
+locale (`general/locale/code` for `$delivery->storeId`) – gives the template, and its placeholders name the variables
+to fill from `DeliveryContent::$vars` (plain text only, e.g. `customer_name`, `restore_url`; leave out HTML such as
+`items_html`). `Delivery::$templateId` is the channel's template when the feature sets one. A delivery of an unknown
+type (`''`) or without a mapping cannot be sent: throw, so the sender releases the cooldown claim and the feature
+counts a failed attempt.
+
+### Webhooks: replies and delivery status
+
+- **Verify the signature first** (e.g. Twilio's `X-Twilio-Signature`) against the store's configured public URL, not
+  the request's (a proxy changes it), and answer 403 without doing anything else when it fails. The controller
+  implements `CsrfAwareActionInterface`; the service posts without a store, so check against each configured account.
+- **Do not register an inbound (reply) webhook in module-rate-limit:** a limited request is answered 429 and the
+  service does not send it again – a STOP would be lost. The signature check is its protection. A delivery status
+  callback may be limited.
+- **STOP** and similar words (UNSUBSCRIBE, CANCEL, END, QUIT; a WhatsApp "Stop promotions" button):
+  `Api\StopListInterface::stop($channel, $from)`. Stoppable deliveries to the number are dropped from then on and its
+  stoppable subscriptions removed. Service messages still go out. Texts say "Reply STOP to stop" – a stop link
+  (`getStopUrl()`) works too but is long (~200 characters).
+- **START** (UNSTOP): `resume($channel, $from)`. It lifts the stop only – the removed subscriptions do not come back;
+  the recipient signs up again (with consent). A stop also lifts by itself after the configured days without sign-up
+  attempts, but a stop at the carrier (e.g. Twilio's own STOP handling) stays until the recipient sends START.
+- **Undeliverable numbers** (invalid, a landline, not reachable): `send()` throws, so the feature counts a failed
+  attempt and gives up after its retries. A number that stopped at the carrier (e.g. Twilio error 21610) is an opt-out:
+  call `stop()` too. Delivery status callbacks are for your own log; keep personal data out of it.
+
+### Opt-in confirmation
+
+Some rules (e.g. US carriers for 10DLC) want a confirmation text after a sign-up. Observe
+`commercekings_notification_subscription_saved` (`SubscriptionManagementInterface::EVENT_SAVED`) for your channel and
+send one for a new number only: `created`, or a changed contact (`previous_contact_id`). Queue it rather than sending
+from the request: a `NotificationTypeInterface` of your own in `Model\TypePool`, published with
+`Api\QueueInterface::publish('my_optin_confirmation', (string)$subscriptionId)`; its `process()` reads the
+subscription (`SubscriptionRepositoryInterface::get()`, `getRecipient()`) and sends with `useCooldown: false` (the
+confirmation must not hold back the first real message) and `stoppable: false` (a service message the recipient asked
+for: never held or stopped). Limit how many confirmations one number gets – a sign-up form that texts any number is a
+target for SMS pumping.
+
+### Quiet hours in the recipient's time zone
+
+The store's quiet hours (*Quiet hours*: from – to, channels) are kept in the store's time zone. US state laws such as
+Florida's FTSA go by the recipient's local time: register a zone provider for your channel instead of replacing
+`QuietHoursInterface` – Notification keeps the settings, the window and clock changes:
+
+```xml
+<type name="CommerceKings\Notification\Model\QuietHours">
+    <arguments>
+        <argument name="zones" xsi:type="array">
+            <item name="sms" xsi:type="object">Vendor\Module\Model\NumberZones</item>
+        </argument>
+    </arguments>
+</type>
+```
+
+`Api\QuietHoursZoneInterface::getZones($storeId, $channel, $recipient)` returns the zones the number may be in (e.g.
+from its country and area code): quiet while the window is on in any of them, until the latest end. Return `[]` when
+you cannot tell and for a `null` recipient (the whole store, asked by a finder before it knows the recipients) – the
+sender then holds each delivery on its own. Fall back to the store's zone yourself if you prefer that for unknown
+numbers.
+
+### Consent for an address
+
+A messaging type usually needs its own consent for the number (a checkbox): see [Address consent](#address-consent).
 
 ## Permission
 

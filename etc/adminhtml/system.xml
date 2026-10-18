@@ -7,7 +7,7 @@
             <tab>commercekings</tab>
             <resource>CommerceKings_Notification::config</resource>
             <group id="general" translate="label comment" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
-                <label>Email delivery</label>
+                <label>Delivery</label>
                 <comment>Shared by all CommerceKings notifications.</comment>
                 <field id="provider_email" translate="label comment" type="select" sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Email provider</label>

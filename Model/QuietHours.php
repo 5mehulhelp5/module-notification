@@ -5,6 +5,7 @@ namespace CommerceKings\Notification\Model;
 
 use CommerceKings\Notification\Api\Channel;
 use CommerceKings\Notification\Api\QuietHoursInterface;
+use CommerceKings\Notification\Api\QuietHoursZoneInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
@@ -13,33 +14,41 @@ use Magento\Store\Model\ScopeInterface;
 /**
  * The store's quiet hours (Stores > Configuration > CommerceKings > Notifications > Quiet hours), in the store's time
  * zone: a daily window from - to that may cross midnight, for the selected channels (none selected: every channel
- * except email), the same for every recipient. Wall-clock times: on the day clocks go forward, a time in the skipped
- * hour means the first time after it; on the day they go back, a time in the repeated hour means its first occurrence.
+ * except email). The window is kept in the store's time zone, or in the zones the channel's zone provider gives
+ * (di.xml "zones", e.g. the recipient's): quiet when it is on in any of them, until the latest end. Wall-clock times:
+ * on the day clocks go forward, a time in the skipped hour means the first time after it; on the day they go back, a
+ * time in the repeated hour means its first occurrence.
  */
 class QuietHours implements QuietHoursInterface
 {
     private const PATH = 'commercekings_notification/quiet_hours/';
 
+    /** @param array<string, QuietHoursZoneInterface> $zones by channel code */
     public function __construct(
         private readonly ScopeConfigInterface $scopeConfig,
         private readonly TimezoneInterface $timezone,
-        private readonly DateTime $dateTime
+        private readonly DateTime $dateTime,
+        private readonly array $zones = []
     ) {
+        foreach ($zones as $provider) {
+            if (!$provider instanceof QuietHoursZoneInterface) {
+                throw new \InvalidArgumentException('Quiet hours zones must implement QuietHoursZoneInterface.');
+            }
+        }
     }
 
-    /** The store's window is the same for every recipient: the recipient is not needed. */
     public function isQuiet(int $storeId, string $channel, ?string $recipient = null): bool
     {
-        return $this->windowEnd($storeId, $channel) !== null;
+        return $this->windowEnd($storeId, $channel, $recipient) !== null;
     }
 
     public function nextAllowedAt(int $storeId, string $channel, ?string $recipient = null): ?\DateTimeImmutable
     {
-        return $this->windowEnd($storeId, $channel)?->setTimezone(new \DateTimeZone('UTC'));
+        return $this->windowEnd($storeId, $channel, $recipient)?->setTimezone(new \DateTimeZone('UTC'));
     }
 
-    /** The end of the quiet window the store is in now, in the store's time zone; null when not quiet. */
-    private function windowEnd(int $storeId, string $channel): ?\DateTimeImmutable
+    /** The latest end of the quiet windows on now in the recipient's zones; null when not quiet in any. */
+    private function windowEnd(int $storeId, string $channel, ?string $recipient): ?\DateTimeImmutable
     {
         if (!$this->scopeConfig->isSetFlag(self::PATH . 'enabled', ScopeInterface::SCOPE_STORE, $storeId)
             || !$this->appliesTo($storeId, $channel)) {
@@ -50,9 +59,37 @@ class QuietHours implements QuietHoursInterface
         if ($from === null || $to === null || $from === $to) {
             return null;
         }
-        $zone = (string)$this->timezone->getConfigTimezone(ScopeInterface::SCOPE_STORE, (string)$storeId);
-        $now = (new \DateTimeImmutable('@' . $this->dateTime->gmtTimestamp()))
-            ->setTimezone(new \DateTimeZone($zone !== '' ? $zone : 'UTC'));
+        $now = new \DateTimeImmutable('@' . $this->dateTime->gmtTimestamp());
+        $latest = null;
+        foreach ($this->zonesFor($storeId, $channel, $recipient) as $zone) {
+            $end = $this->endIn($now->setTimezone($zone), $from, $to);
+            if ($end !== null && ($latest === null || $end > $latest)) {
+                $latest = $end;
+            }
+        }
+        return $latest;
+    }
+
+    /** @return \DateTimeZone[] the channel's zone provider's, else the store's time zone */
+    private function zonesFor(int $storeId, string $channel, ?string $recipient): array
+    {
+        if (!isset($this->zones[$channel])) {
+            $zone = (string)$this->timezone->getConfigTimezone(ScopeInterface::SCOPE_STORE, (string)$storeId);
+            return [new \DateTimeZone($zone !== '' ? $zone : 'UTC')];
+        }
+        $zones = $this->zones[$channel]->getZones($storeId, $channel, $recipient);
+        foreach ($zones as $zone) {
+            if (!$zone instanceof \DateTimeZone) {
+                throw new \UnexpectedValueException(sprintf('Quiet hours zones for "%s" must be DateTimeZone objects.',
+                    $channel));
+            }
+        }
+        return $zones;
+    }
+
+    /** The end of the window on at $now (in its zone), in that zone; null when it is not on. */
+    private function endIn(\DateTimeImmutable $now, int $from, int $to): ?\DateTimeImmutable
+    {
         // Compared as instants, not wall-clock minutes, so a window is never interrupted when clocks go back.
         // Yesterday's window still runs after midnight when it crosses midnight.
         foreach ([$now->modify('-1 day'), $now] as $day) {

@@ -16,6 +16,8 @@ class QuietHoursTest extends TestCase
     /** settings per store id: enabled, from, to, channels */
     private array $settings = [];
     private array $zones = [];
+    /** zone providers by channel (di.xml "zones") */
+    private array $zoneProviders = [];
 
     private function quietHours(string $nowUtc): QuietHours
     {
@@ -30,7 +32,7 @@ class QuietHoursTest extends TestCase
         $timezone->method('getConfigTimezone')->willReturnCallback(fn ($type, $store) => $this->zones[$store] ?? 'Europe/Berlin');
         $clock = $this->createStub(DateTime::class);
         $clock->method('gmtTimestamp')->willReturn((new \DateTimeImmutable($nowUtc, new \DateTimeZone('UTC')))->getTimestamp());
-        return new QuietHours($scope, $timezone, $clock);
+        return new QuietHours($scope, $timezone, $clock, $this->zoneProviders);
     }
 
     private function window(string $from, string $to, ?string $channels = null, int $store = 1): void
@@ -104,6 +106,71 @@ class QuietHoursTest extends TestCase
         $this->assertTrue($quietHours->isQuiet(1, 'sms', null));
         $this->assertEquals($quietHours->nextAllowedAt(1, 'sms'), $quietHours->nextAllowedAt(1, 'sms', '+12125550100'));
         $this->assertFalse($this->quietHours('2026-06-10 12:00')->isQuiet(1, 'sms', '+381601234567'));
+    }
+
+    /** @param array<string, string[]> $zones zone names by recipient ('' for null) */
+    private function zoneProvider(array $zones, array &$asked = []): \CommerceKings\Notification\Api\QuietHoursZoneInterface
+    {
+        $provider = $this->createStub(\CommerceKings\Notification\Api\QuietHoursZoneInterface::class);
+        $provider->method('getZones')->willReturnCallback(function ($store, $channel, $recipient) use ($zones, &$asked) {
+            $asked[] = [$store, $channel, $recipient];
+            return array_map(fn ($name) => new \DateTimeZone($name), $zones[$recipient ?? ''] ?? []);
+        });
+        return $provider;
+    }
+
+    /** A channel's zone provider puts the store's window into the recipient's time zone. */
+    public function testTheWindowInTheRecipientsZone(): void
+    {
+        $this->window('21,00,00', '08,00,00');
+        $asked = [];
+        $this->zoneProviders['sms'] = $this->zoneProvider(['+12125550100' => ['America/New_York'],
+            '+381601234567' => ['Europe/Belgrade']], $asked);
+        // 02:00 UTC: 22:00 in New York, 04:00 in Belgrade; 14:00 UTC: 10:00 and 16:00
+        $quietHours = $this->quietHours('2026-06-11 02:00');
+        $this->assertSame('2026-06-11 12:00', $quietHours->nextAllowedAt(1, 'sms', '+12125550100')?->format('Y-m-d H:i'));
+        $this->assertSame('2026-06-11 06:00', $quietHours->nextAllowedAt(1, 'sms', '+381601234567')?->format('Y-m-d H:i'));
+        $this->assertFalse($this->quietHours('2026-06-11 14:00')->isQuiet(1, 'sms', '+12125550100'));
+        $this->assertSame([1, 'sms', '+12125550100'], $asked[0], 'asked with the store, channel and recipient');
+        $this->assertFalse($quietHours->isQuiet(1, 'sms', '+999'), 'a number it cannot place: not quiet');
+        $this->assertFalse($quietHours->isQuiet(1, 'sms'), 'the whole store: [] - each delivery is held on its own');
+        $this->assertNull($quietHours->nextAllowedAt(1, 'sms'));
+        $this->assertTrue($quietHours->isQuiet(1, 'whatsapp', '+12125550100'), 'another channel keeps the store zone');
+    }
+
+    /** A number whose area spans zones: quiet while any of them is, until the latest end. */
+    public function testSeveralZonesHoldUntilTheLatestEnd(): void
+    {
+        $this->window('21,00,00', '08,00,00');
+        $this->zoneProviders['sms'] = $this->zoneProvider(['+1' => ['America/Chicago', 'America/Denver']]);
+        // 03:30 UTC: 22:30 in Chicago, 21:30 in Denver; 13:30 UTC: 08:30 and 07:30; 14:00 UTC: 09:00 and 08:00
+        $this->assertSame('2026-06-11 14:00', $this->quietHours('2026-06-11 03:30')->nextAllowedAt(1, 'sms', '+1')
+            ?->format('Y-m-d H:i'), 'until 08:00 in Denver');
+        $this->assertSame('2026-06-11 14:00', $this->quietHours('2026-06-11 13:30')->nextAllowedAt(1, 'sms', '+1')
+            ?->format('Y-m-d H:i'), 'over in Chicago, still on in Denver');
+        $this->assertFalse($this->quietHours('2026-06-11 14:00')->isQuiet(1, 'sms', '+1'));
+        // 02:30 UTC: 21:30 in Chicago, 20:30 in Denver - quiet in one is enough
+        $this->assertSame('2026-06-11 13:00', $this->quietHours('2026-06-11 02:30')->nextAllowedAt(1, 'sms', '+1')
+            ?->format('Y-m-d H:i'));
+    }
+
+    public function testZoneProvidersAreChecked(): void
+    {
+        $this->window('21,00,00', '08,00,00');
+        $this->zoneProviders['sms'] = $this->zoneProvider([]);
+        $this->assertFalse($this->quietHours('2026-06-10 22:00')->isQuiet(1, 'sms', '+1'), 'disabled: zones not needed');
+
+        $bad = $this->createStub(\CommerceKings\Notification\Api\QuietHoursZoneInterface::class);
+        $bad->method('getZones')->willReturn(['America/New_York']);
+        $this->zoneProviders['sms'] = $bad;
+        try {
+            $this->quietHours('2026-06-10 22:00')->isQuiet(1, 'sms', '+1');
+            $this->fail('a zone name instead of a DateTimeZone');
+        } catch (\UnexpectedValueException) {
+        }
+        $this->zoneProviders = ['sms' => new \stdClass()];
+        $this->expectException(\InvalidArgumentException::class);
+        $this->quietHours('2026-06-10 22:00');
     }
 
     public function testChannels(): void
