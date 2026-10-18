@@ -19,6 +19,9 @@ interface RecipientBlockInterface
 
     public function unblock(string $channel, string $recipient): void;
 
+    /** Lifts blocks without a sign-up attempt for the configured days; returns how many. */
+    public function cleanUp(): int;
+
     /** A sign-up attempt for a blocked recipient: restarts the lift timer. False when not blocked. */
     public function touch(string $channel, string $recipient): bool;
 

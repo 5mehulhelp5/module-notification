@@ -3,14 +3,14 @@ declare(strict_types=1);
 
 namespace CommerceKings\Notification\Cron;
 
-use CommerceKings\Notification\Model\RecipientBlock;
+use CommerceKings\Notification\Api\RecipientBlockInterface;
 use Psr\Log\LoggerInterface;
 
 /** Lifts do-not-contact blocks without a sign-up attempt for the configured days. */
 class CleanUpRecipientBlocks
 {
     public function __construct(
-        private readonly RecipientBlock $blocks,
+        private readonly RecipientBlockInterface $blocks,
         private readonly LoggerInterface $logger
     ) {
     }

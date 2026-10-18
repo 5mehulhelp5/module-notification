@@ -25,7 +25,7 @@ $form = static function (string $action, string $label) use ($block, $escaper): 
     <p><?= $escaper->escapeHtml(__('Changed your mind?')) ?></p>
     <?= /* @noEscape */ $form('undo', (string)__('Turn reminders back on')) ?>
     <?php else: ?>
-    <p><?= $escaper->escapeHtml(__('Reminders are on again for this address.')) ?></p>
+    <p><?= $escaper->escapeHtml(__('Done. You can sign up for reminders again; earlier sign-ups were removed when you stopped the emails.')) ?></p>
     <?php endif; ?>
     <a class="action primary" href="<?= $escaper->escapeUrl($block->getUrl('')) ?>"><?= $escaper->escapeHtml(__('Back to the store')) ?></a>
 </div>

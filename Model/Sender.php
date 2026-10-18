@@ -109,6 +109,6 @@ class Sender implements SenderInterface
     {
         return $recipient === $delivery->recipient ? $delivery : new Delivery($delivery->storeId, $delivery->templateId,
             $delivery->sender, $recipient, $delivery->content, $delivery->useCooldown, $delivery->isRecipientCurrent,
-            $delivery->channel);
+            $delivery->channel, $delivery->marketing);
     }
 }

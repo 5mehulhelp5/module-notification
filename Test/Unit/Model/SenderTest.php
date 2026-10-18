@@ -276,6 +276,17 @@ class SenderTest extends TestCase
         $this->assertSame(1, $this->sent);
     }
 
+    public function testServiceMessageKeepsGoingWhenItsRecipientIsNormalized(): void
+    {
+        $this->blocked = ['email:a@test.com'];
+        $service = new Delivery(3, 'tpl', 'general', '  a@test.com ', fn () => new DeliveryContent([], 'Jane'),
+            false, null, Channel::EMAIL, false);
+        $this->assertSame(SenderInterface::SENT, $this->sender()->send($service), 'trimming must not turn it into marketing');
+        $this->assertSame(['a@test.com', 'Jane'], $this->mail['addTo']);
+        $marketing = new Delivery(3, 'tpl', 'general', '  a@test.com ', fn () => new DeliveryContent([], 'Jane'));
+        $this->assertSame(SenderInterface::BLOCKED, $this->sender()->send($marketing), 'the normalized address is blocked');
+    }
+
     public function testProviderReportingSentKeepsTheClaim(): void
     {
         $sent = new MessageSentException('accepted, then the API timed out');

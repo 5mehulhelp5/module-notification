@@ -66,7 +66,7 @@ class Index extends Action implements HttpGetActionInterface, HttpPostActionInte
         $page->getConfig()->getTitle()->set((string)match ($state) {
             self::STATE_INVALID => __('Link expired'),
             self::STATE_BLOCKED => __('Emails stopped'),
-            self::STATE_UNBLOCKED => __('Emails turned back on'),
+            self::STATE_UNBLOCKED => __('Emails allowed again'),
             default => __('Stop these emails?'),
         });
         $page->getConfig()->setRobots('NOINDEX,NOFOLLOW');
