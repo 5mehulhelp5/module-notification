@@ -121,7 +121,8 @@ Details, including how to build an SMS provider: [for module authors](docs/modul
   notification with their number (with Magento_AdminNotification; otherwise only the log records it). Removed
   blocks cannot be restored; nothing is removed automatically
   ([details](docs/recipient-block.md#encryption-key-change)). Subscriptions, contacts and consent records are not
-  affected; consent withdrawal and cart restore links are (see those modules).
+  affected, and consent withdrawal links keep working while the old key stays in `env.php`; cart restore links
+  expire (see those modules).
 
 ## More
 
