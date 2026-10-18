@@ -46,7 +46,8 @@ class Consumer
             $type->process($reference);
         } catch (MessageLockException | ConnectionLostException | NotFoundException $error) {
             throw $error;
-        } catch (\Exception $error) {
+        } catch (\Throwable $error) {
+            // an \Error (e.g. a TypeError in a provider) too: wrapped, so the consumer rejects the message and keeps running
             throw new \RuntimeException(sprintf('CommerceKings_Notification: %s %s failed (%s, code %s, at %s:%d)',
                 $code, ctype_digit($reference) ? $reference : 'with a non-numeric reference', get_class($error),
                 $error->getCode(), $error->getFile(), $error->getLine()));

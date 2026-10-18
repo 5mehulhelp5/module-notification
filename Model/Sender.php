@@ -13,10 +13,8 @@ use CommerceKings\Notification\Api\RecipientBlockInterface;
 use CommerceKings\Notification\Api\SenderInterface;
 use CommerceKings\Notification\Exception\MessageSentException;
 use Magento\Framework\App\Area;
-use Magento\Framework\App\ObjectManager;
 use Magento\Store\Model\App\Emulation;
 use Psr\Log\LoggerInterface;
-use Psr\Log\NullLogger;
 
 /**
  * Sends one notification: marketing deliveries to a blocked recipient are dropped, then the optional recipient
@@ -26,22 +24,15 @@ use Psr\Log\NullLogger;
  */
 class Sender implements SenderInterface
 {
-    private readonly LoggerInterface $logger;
-    private readonly RecipientNormalizerPool $normalizers;
-    private readonly RecipientBlockInterface $blocks;
-
     public function __construct(
         private readonly ProviderPoolInterface $providers,
         private readonly Emulation $emulation,
         private readonly CooldownInterface $cooldown,
         private readonly Config $config,
-        ?LoggerInterface $logger = null,
-        ?RecipientNormalizerPool $normalizers = null,
-        ?RecipientBlockInterface $blocks = null
+        private readonly LoggerInterface $logger,
+        private readonly RecipientNormalizerPool $normalizers,
+        private readonly RecipientBlockInterface $blocks
     ) {
-        $this->logger = $logger ?? new NullLogger();
-        $this->normalizers = $normalizers ?? new RecipientNormalizerPool();
-        $this->blocks = $blocks ?? ObjectManager::getInstance()->get(RecipientBlockInterface::class);
     }
 
     public function send(Delivery $delivery): string

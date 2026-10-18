@@ -89,6 +89,19 @@ class ConsumerTest extends TestCase
         }
     }
 
+    public function testAnErrorIsWrappedSoTheConsumerKeepsRunning(): void
+    {
+        $typeError = new \TypeError('Argument #1 ($to) must be of type string, null given for jane@example.com');
+        try {
+            $this->failingConsumer($typeError)->process('cart_reminder|42');
+            $this->fail('Expected the failure to reach Magento as an exception it rejects');
+        } catch (\RuntimeException $error) {
+            $this->assertStringStartsWith('CommerceKings_Notification: cart_reminder 42 failed (TypeError, code 0, at ',
+                $error->getMessage(), 'Magento\'s consumer catches exceptions, not errors: unwrapped, it would stop');
+            $this->assertStringNotContainsString('jane@example.com', $error->getMessage());
+        }
+    }
+
     public function testMagentoQueueExceptionsKeepTheirMeaning(): void
     {
         foreach ([new MessageLockException(new Phrase('locked')), new ConnectionLostException('gone'),

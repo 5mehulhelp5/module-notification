@@ -161,6 +161,9 @@ class SubscriptionManagementTest extends TestCase
         $this->assertTrue($this->management()->subscribeCustomer(9, 'test_type', 'masked'));
         $this->assertSame([], $this->queries, 'no subscription written');
         $this->assertSame([], $this->contacts, 'no contact (no address) stored');
+        $this->assertCount(1, $this->deletes, 'the guest\'s previous subscription of this cart is removed');
+        $this->assertSame('ck_notification_subscription', $this->deletes[0]['table']);
+        $this->assertContains('customer_id IS NULL', self::conditions($this->deletes[0]['where']), 'only the guest row');
         $this->assertSame([['email', 'guest@example.test'], ['email', 'customer@test.com']], $touched,
             'each attempt restarts the lift timer');
     }

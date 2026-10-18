@@ -115,7 +115,8 @@ class SubscriptionTest extends TestCase
         $filters = $this->om->create(FilterManager::class);
         return new SubscriptionManagement($this->resource, new SubscriptionTypePool([$this->type => $type]),
             $this->permission(), $contacts ?? $this->om->get(ContactRepositoryInterface::class), $this->stores,
-            new EmailAddress(), new StringLength(['max' => 255]), $filters);
+            new EmailAddress(), new StringLength(['max' => 255]), $filters,
+            $this->om->get(\CommerceKings\Notification\Api\RecipientBlockInterface::class), $this->om->get(\Magento\Customer\Api\CustomerRepositoryInterface::class));
     }
 
     private function afterContactSave(\Closure $afterSave): ContactRepositoryInterface

@@ -27,7 +27,8 @@ Global across stores, like the cooldown.
 ## Blocking
 
 - Every marketing email gets `block_url`: *"Didn't start this? Stop these emails to this address."*
-- The link is signed (HMAC with Magento's key) for the recipient hash.
+- The link carries the recipient encrypted with Magento's key (`r`) and an HMAC signature over it (`s`); no
+  address appears in the URL.
 - It opens a confirmation page; only its **POST** blocks, so email scanners that open links block nothing.
 - On confirm: the row is written, every subscription for that recipient is deleted, and the page offers **Undo**
   (*"Changed your mind? Turn reminders back on."*).

@@ -11,7 +11,6 @@ use CommerceKings\Notification\Api\SubscriptionManagementInterface;
 use CommerceKings\Notification\Api\SubscriptionPermissionInterface;
 use CommerceKings\Notification\Api\SubscriptionTypeInterface;
 use Magento\Customer\Api\CustomerRepositoryInterface;
-use Magento\Framework\App\ObjectManager;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Exception\InputException;
 use Magento\Framework\Filter\FilterManager;
@@ -30,9 +29,6 @@ class SubscriptionManagement implements SubscriptionManagementInterface
 {
     public const TABLE = 'ck_notification_subscription';
 
-    private readonly RecipientBlockInterface $blocks;
-    private readonly CustomerRepositoryInterface $customers;
-
     public function __construct(
         private readonly ResourceConnection $resource,
         private readonly SubscriptionTypePool $types,
@@ -42,11 +38,9 @@ class SubscriptionManagement implements SubscriptionManagementInterface
         private readonly EmailAddress $emailValidator,
         private readonly StringLength $emailLengthValidator,
         private readonly FilterManager $filterManager,
-        ?RecipientBlockInterface $blocks = null,
-        ?CustomerRepositoryInterface $customers = null
+        private readonly RecipientBlockInterface $blocks,
+        private readonly CustomerRepositoryInterface $customers
     ) {
-        $this->blocks = $blocks ?? ObjectManager::getInstance()->get(RecipientBlockInterface::class);
-        $this->customers = $customers ?? ObjectManager::getInstance()->get(CustomerRepositoryInterface::class);
     }
 
     public function subscribeGuest(string $type, string $reference, mixed $email): bool
@@ -66,6 +60,8 @@ class SubscriptionManagement implements SubscriptionManagementInterface
             return false;
         }
         if ($this->blocks->touch(Channel::EMAIL, $email)) {
+            // a changed address must not leave the previous recipient's subscription behind; the answer stays the same
+            $this->unsubscribeGuest($type, $subscriptionType, $target);
             return true;
         }
         $db = $this->resource->getConnection();
