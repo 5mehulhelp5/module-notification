@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace CommerceKings\Notification\Model;
 
+use CommerceKings\Notification\Api\Channel;
 use CommerceKings\Notification\Api\CooldownInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\Encryption\EncryptorInterface;
@@ -28,6 +29,17 @@ class Cooldown implements CooldownInterface
     public function hash(string $email): string
     {
         return $this->encryptor->hash('commercekings_notification_recipient|' . ContactRepository::normalize($email));
+    }
+
+    /** The cooldown key of a recipient on a channel: email keeps the plain address, other channels a prefix. */
+    public static function key(string $channel, string $recipient): string
+    {
+        return $channel === Channel::EMAIL ? $recipient : $channel . ':' . $recipient;
+    }
+
+    public function isRecentFor(string $channel, string $recipient): bool
+    {
+        return $this->isRecent(self::key($channel, $recipient));
     }
 
     public function isRecent(string $email): bool

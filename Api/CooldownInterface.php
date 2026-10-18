@@ -13,6 +13,15 @@ interface CooldownInterface
 {
     public function isRecent(string $email): bool;
 
+    /**
+     * Has the recipient had a notification on this channel within the cooldown? The same key the sender claims, so a
+     * finder can leave out a recipient before it queues anything (e.g. a phone number on Channel::SMS).
+     *
+     * @param string $recipient in the channel's normalized form, as the sender keys it (a stored contact's recipient
+     *     is in that form; email: the address)
+     */
+    public function isRecentFor(string $channel, string $recipient): bool;
+
     /** Atomic across workers. Returns the claim token, or null while the address is still in cooldown. */
     public function claim(string $email): ?string;
 

@@ -33,6 +33,28 @@ class CooldownTest extends TestCase
         $this->assertSame(str_repeat('a', 64), $this->cooldown()->hash('  Guest@Example.Test  '));
     }
 
+    /** A finder checks the same key the sender claims: email plain, other channels with their prefix. */
+    public function testIsRecentForUsesTheSendersKeyPerChannel(): void
+    {
+        $inputs = [];
+        $encryptor = $this->createStub(EncryptorInterface::class);
+        $encryptor->method('hash')->willReturnCallback(function ($input) use (&$inputs) {
+            $inputs[] = $input;
+            return str_repeat('c', 64);
+        });
+        $config = $this->createStub(Config::class);
+        $config->method('getCooldownDays')->willReturn(7);
+        $cooldown = new Cooldown($this->resource(), $encryptor, $this->createStub(Random::class), $config);
+        $this->fetchOneResult = 'c';
+        $this->assertTrue($cooldown->isRecentFor(\CommerceKings\Notification\Api\Channel::SMS, '+381601234567'));
+        $this->fetchOneResult = false;
+        $this->assertFalse($cooldown->isRecentFor(\CommerceKings\Notification\Api\Channel::EMAIL, 'guest@example.test'));
+        $this->assertSame(['commercekings_notification_recipient|sms:+381601234567',
+            'commercekings_notification_recipient|guest@example.test'], $inputs);
+        $this->assertSame('viber:+381601234567', Cooldown::key('viber', '+381601234567'));
+        $this->assertSame('guest@example.test', Cooldown::key('email', 'guest@example.test'));
+    }
+
     /** One contact is one cooldown: the cooldown hashes exactly what the contact key normalizes. */
     public function testTheCooldownNormalizesLikeContacts(): void
     {

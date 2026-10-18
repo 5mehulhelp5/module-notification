@@ -32,7 +32,9 @@ channel and recipient; nothing was sent or claimed. Send it again at
 failure). A finder can leave out a store while `isQuiet($storeId, $channel)` – without a recipient it asks whether
 everyone is held, and a per-recipient rule answers no. Deliveries with `$stoppable = false` are never held. Pass your
 notification type code as `Delivery::$type` (e.g. `type: 'cart_reminder'`), so providers with templates of their own
-can pick one. Replace the cooldown with a `CooldownInterface` preference; for quiet hours in the recipient's time zone
+can pick one. A finder leaves out a recipient in cooldown before queuing with
+`CooldownInterface::isRecentFor($channel, $recipient)` (the key the sender claims). Replace the cooldown with a
+`CooldownInterface` preference; for quiet hours in the recipient's time zone
 register a zone provider for the channel ([`QuietHoursZoneInterface`](#quiet-hours-in-the-recipients-time-zone)).
 
 ## Providers

@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace CommerceKings\Notification\Model;
 
-use CommerceKings\Notification\Api\Channel;
 use CommerceKings\Notification\Api\CooldownInterface;
 use CommerceKings\Notification\Api\Data\Delivery;
 use CommerceKings\Notification\Api\Data\DeliveryContent;
@@ -56,8 +55,7 @@ class Sender implements SenderInterface
             && $this->quietHours->isQuiet($delivery->storeId, $delivery->channel, $delivery->recipient)) {
             return self::QUIET_HOURS;
         }
-        $key = $delivery->channel === Channel::EMAIL
-            ? $delivery->recipient : $delivery->channel . ':' . $delivery->recipient;
+        $key = Cooldown::key($delivery->channel, $delivery->recipient);
         $claim = null;
         if ($delivery->useCooldown && $this->config->getCooldownDays() > 0) {
             $claim = $this->cooldown->claim($key);
