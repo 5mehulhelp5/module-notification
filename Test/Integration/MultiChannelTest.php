@@ -48,6 +48,9 @@ class MultiChannelTest extends TestCase
     private Sender $sender;
     private ContactRepository $contacts;
     private RecipientNormalizerPool $normalizers;
+    /** EVENT_SAVED data dispatched by the management */
+    private array $saved = [];
+    private ?int $customerId = null;
 
     protected function setUp(): void
     {
@@ -86,16 +89,40 @@ class MultiChannelTest extends TestCase
         $permission->method('validCondition')->willReturn('1 = 1');
         $this->management = $this->om->create(SubscriptionManagement::class, ['types' => $types,
             'permissions' => new PermissionResolver($permission, $types, $this->resource), 'contacts' => $this->contacts,
-            'stopList' => $this->stopList, 'normalizers' => $this->normalizers]);
+            'stopList' => $this->stopList, 'normalizers' => $this->normalizers, 'events' => $this->events()]);
         $providers = new ProviderPool($this->om->get(Config::class),
             [$this->provider('acme_sms', 'sms'), $this->provider('acme_whatsapp', 'whatsapp')]);
         $this->sender = $this->om->create(Sender::class,
             ['providers' => $providers, 'normalizers' => $this->normalizers, 'stopList' => $this->stopList]);
     }
 
+    private function events(): \Magento\Framework\Event\ManagerInterface
+    {
+        $events = $this->createStub(\Magento\Framework\Event\ManagerInterface::class);
+        $events->method('dispatch')->willReturnCallback(function ($name, $data) {
+            if ($name === \CommerceKings\Notification\Api\SubscriptionManagementInterface::EVENT_SAVED) {
+                $this->saved[] = $data;
+            }
+        });
+        return $events;
+    }
+
+    private function customer(): int
+    {
+        $customer = $this->om->get(\Magento\Customer\Api\Data\CustomerInterfaceFactory::class)->create();
+        $customer->setWebsiteId(1)->setEmail('ck-multi-' . $this->run . '@example.test')->setFirstname('Multi')
+            ->setLastname('Channel');
+        return $this->customerId = (int)$this->om->get(\Magento\Customer\Api\CustomerRepositoryInterface::class)
+            ->save($customer)->getId();
+    }
+
     protected function tearDown(): void
     {
         $db = $this->resource->getConnection();
+        if ($this->customerId !== null) {
+            $db->delete($this->resource->getTableName('customer_entity'), ['entity_id = ?' => $this->customerId]);
+            $this->stopList->resume('email', 'ck-multi-' . $this->run . '@example.test');
+        }
         $db->delete($this->resource->getTableName(SubscriptionManagement::TABLE),
             ['type IN (?)' => [$this->type('sms'), $this->type('whatsapp')]]);
         $db->delete($this->resource->getTableName(ContactRepository::TABLE),
@@ -223,5 +250,50 @@ class MultiChannelTest extends TestCase
         $this->assertStringNotContainsString(substr($this->number(), 2), $url, 'the number is encrypted');
         $link = $this->stopList->fromLink($query['r'], $query['s']);
         $this->assertSame(['sms', $this->number(), true], [$link['channel'], $link['recipient'], $link['current']]);
+    }
+
+    /** A signed-in customer gives a phone number for an SMS type: their contact on that channel, next to the account. */
+    public function testACustomerSubscribesTheirPhoneNumber(): void
+    {
+        $customerId = $this->customer();
+        $this->assertTrue($this->management->subscribeCustomer($customerId, $this->type('sms'), 'ref', $this->number()));
+        $db = $this->resource->getConnection();
+        $row = $db->fetchRow($db->select()->from($this->resource->getTableName(SubscriptionManagement::TABLE))
+            ->where('type = ?', $this->type('sms')));
+        $this->assertSame($customerId, (int)$row['customer_id']);
+        $repository = $this->om->get(\CommerceKings\Notification\Api\SubscriptionRepositoryInterface::class);
+        $subscription = $repository->get((int)$row['subscription_id']);
+        $this->assertSame(['channel' => 'sms', 'recipient' => $this->number()], $repository->getRecipient($subscription));
+        $this->assertSame('ck-multi-' . $this->run . '@example.test', $repository->getEmail($subscription),
+            'getEmail() stays the account email');
+
+        // stopping the account email leaves the SMS subscription; stopping the number removes it
+        $this->stopList->stop('email', 'ck-multi-' . $this->run . '@example.test');
+        $this->assertSame(['sms' => $this->number()], $this->subscriptions());
+        $this->stopList->stop('sms', '+381' . substr($this->number(), 1));
+        $this->assertSame([], $this->subscriptions(), 'the customer\'s SMS subscription is gone');
+        $this->assertTrue($this->management->subscribeCustomer($customerId, $this->type('sms'), 'ref', $this->number()),
+            'a stopped number is answered as stored...');
+        $this->assertSame([], $this->subscriptions(), '...but not written');
+    }
+
+    /** Real MySQL: a new row, a changed row and an identical retry; only the first two are announced. */
+    public function testTheSavedEventFollowsWhatTheDatabaseWrote(): void
+    {
+        $this->management->subscribeGuest($this->type('sms'), 'ref', $this->number());
+        $this->management->subscribeGuest($this->type('sms'), 'ref', $this->number());
+        // another number: the last digit changed
+        $other = substr($this->number(), 0, -1) . (((int)substr($this->number(), -1) + 1) % 10);
+        $this->management->subscribeGuest($this->type('sms'), 'ref', $other);
+        $id = (int)$this->resource->getConnection()->fetchOne($this->resource->getConnection()->select()
+            ->from($this->resource->getTableName(SubscriptionManagement::TABLE), 'subscription_id')
+            ->where('type = ?', $this->type('sms')));
+        $this->assertCount(2, $this->saved, 'the identical retry is not announced');
+        $this->assertSame([$id, true, 'sms'], [$this->saved[0]['subscription_id'], $this->saved[0]['created'], $this->saved[0]['channel']]);
+        $this->assertSame([$id, false], [$this->saved[1]['subscription_id'], $this->saved[1]['created']],
+            'a changed number: the same row, not created');
+        $this->assertNotSame($this->saved[0]['contact_id'], $this->saved[1]['contact_id']);
+        $this->resource->getConnection()->delete($this->resource->getTableName(ContactRepository::TABLE),
+            ['contact_id = ?' => $this->saved[1]['contact_id']]);
     }
 }

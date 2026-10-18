@@ -48,11 +48,10 @@ class SubscriptionRepository implements SubscriptionRepositoryInterface
 
     public function getEmail(Subscription $subscription): ?string
     {
-        if ($subscription->contactId !== null) {
-            return $this->contacts->getEmail($subscription->contactId);
-        }
-        if ($subscription->customerId === null) {
-            return null;
+        // a guest's email contact; a customer's other-channel contact (e.g. a phone) leaves the account email
+        $email = $subscription->contactId !== null ? $this->contacts->getEmail($subscription->contactId) : null;
+        if ($email !== null || $subscription->customerId === null) {
+            return $email;
         }
         try {
             return $this->customers->getById($subscription->customerId)->getEmail() ?: null;

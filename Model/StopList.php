@@ -183,8 +183,9 @@ class StopList implements StopListInterface
                 ['entity_id', 'email'])->where('email = ?', trim($recipient)));
             $customers = array_keys(array_filter($candidates, fn ($candidate) => ContactRepository::key((string)$candidate) === $key));
         }
+        // a customer's email subscriptions have no contact (the account email); their other channels' rows have one
         $where = $customers
-            ? $db->quoteInto('(contact_id IN (' . $contacts . ') OR customer_id IN (?))', $customers)
+            ? $db->quoteInto('(contact_id IN (' . $contacts . ') OR (customer_id IN (?) AND contact_id IS NULL))', $customers)
             : 'contact_id IN (' . $contacts . ')';
         $kept = array_keys(array_filter($this->types->getAll(), fn ($type) => !$type->isStoppable()));
         $db->delete($this->resource->getTableName(SubscriptionManagement::TABLE),

@@ -114,7 +114,9 @@ For notifications a visitor signs up for, also:
    - `getPurpose()`: what the subscription is for (with the consent bridge: the Consent purpose your module declares);
    - `getChannel()`: the channel its subscribers are reached on – `Channel::EMAIL`, or your provider's code (e.g.
      `sms`). Guests subscribe with `recipient` (REST `{"type", "reference", "recipient"}`): an email address, or e.g.
-     a phone number; it is stored as a contact on that channel. An address the channel does not take is Magento's 400;
+     a phone number; it is stored as a contact on that channel. An address the channel does not take is Magento's 400.
+     Signed-in customers (`subscribeCustomer()`, REST `/mine`) use the account email on email types; on other
+     channels they pass `recipient` too (required), stored as their contact next to the customer id;
    - `isSingle()`: one subscription per reference (a new email replaces it) or one per person;
    - `getPermission()` and `getSubscriber()`: your type's own permission and subscriber, or `null` for the shop-wide
      ones (see [Permission](#permission));
@@ -154,6 +156,13 @@ For notifications a visitor signs up for, also:
    ```
 4. Keep your send history keyed by what "once" means for you (e.g. the cart), never by the subscription id:
    a withdrawal deletes the subscription, and subscribing again creates a new one.
+5. To react to a sign-up – e.g. an SMS opt-in confirmation ("Reply YES to confirm") – observe
+   `commercekings_notification_subscription_saved` (`SubscriptionManagementInterface::EVENT_SAVED`). It is dispatched
+   after the row is committed, with `subscription_id`, `type`, `channel`, `store_id`, `contact_id`, `customer_id` and
+   `created` (true for a new row; false when an existing one changed, e.g. a new number or permission); not for a
+   refusal, a stopped recipient or an identical retry. Read the address with
+   `SubscriptionRepositoryInterface::get()` and `getRecipient()`. Your observer's error is logged (its class only)
+   and never fails the sign-up – send or queue from it, but do not rely on it to block one.
 
 
 With the consent bridge, your type's purpose needs a Consent purpose declaration. Declare it in your `di.xml` on

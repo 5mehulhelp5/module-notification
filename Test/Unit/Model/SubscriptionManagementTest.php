@@ -8,6 +8,7 @@ use CommerceKings\Notification\Api\Data\Permission;
 use CommerceKings\Notification\Api\Data\Target;
 use CommerceKings\Notification\Api\SubscriptionPermissionInterface;
 use CommerceKings\Notification\Api\SubscriptionTypeInterface;
+use CommerceKings\Notification\Api\SubscriptionManagementInterface;
 use CommerceKings\Notification\Model\SubscriptionManagement;
 use CommerceKings\Notification\Model\SubscriptionTypePool;
 use CommerceKings\Notification\Test\Unit\DbTestTrait;
@@ -39,6 +40,10 @@ class SubscriptionManagementTest extends TestCase
     private array $found = [];
     /** the type's own permission (getPermission()); null = the shop-wide one */
     private ?SubscriptionPermissionInterface $ownPermission = null;
+    /** dispatched EVENT_SAVED data */
+    private array $events = [];
+    private ?\Throwable $observerFailure = null;
+    private array $errors = [];
 
     protected function setUp(): void
     {
@@ -92,7 +97,27 @@ class SubscriptionManagementTest extends TestCase
                     $digits = preg_replace('/\D/', '', $recipient);
                     return strlen($digits) >= 8 ? '+' . $digits : '';
                 }
-            }]));
+            }]), $this->eventManager(), $this->logger());
+    }
+
+    private function eventManager(): \Magento\Framework\Event\ManagerInterface
+    {
+        $events = $this->createStub(\Magento\Framework\Event\ManagerInterface::class);
+        $events->method('dispatch')->willReturnCallback(function ($name, $data) {
+            $this->transactionEvents[] = 'event';
+            $this->events[] = [$name, $data];
+            if ($this->observerFailure !== null) {
+                throw $this->observerFailure;
+            }
+        });
+        return $events;
+    }
+
+    private function logger(): \Psr\Log\LoggerInterface
+    {
+        $logger = $this->createStub(\Psr\Log\LoggerInterface::class);
+        $logger->method('error')->willReturnCallback(function ($message, $context) { $this->errors[] = [$message, $context]; });
+        return $logger;
     }
 
     private function assertNothingWritten(): void
@@ -118,7 +143,8 @@ class SubscriptionManagementTest extends TestCase
         $this->contactFailure = null;
         $this->assertTrue($management->subscribeGuest('test_type', 'masked', 'guest@example.test'));
         $this->assertCount(1, $this->queries);
-        $this->assertSame(['beginTransaction', 'rollBack', 'beginTransaction', 'commit'], $this->transactionEvents);
+        $this->assertSame(['beginTransaction', 'rollBack', 'beginTransaction', 'commit', 'event'], $this->transactionEvents,
+            'only the stored retry is announced');
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('subscriberKinds')]
@@ -163,7 +189,7 @@ class SubscriptionManagementTest extends TestCase
         $this->assertStringContainsString("FROM DUAL WHERE VALID('new-consent') AND (STILL_YOURS) ON DUPLICATE KEY UPDATE", $sql);
         $this->assertSame(['test_type', 42, 1, '', 5, null, 'new-consent'], array_slice($bind, 0, 7));
         $this->assertSame([5, null, 'new-consent'], array_slice($bind, 7, 3), 'compared before replacing');
-        $this->assertSame(['beginTransaction', 'commit'], $this->transactionEvents);
+        $this->assertSame(['beginTransaction', 'commit', 'event'], $this->transactionEvents, 'announced after the commit');
     }
 
     /** A type with its own permission (e.g. an SMS checkbox) is checked and guarded by it, not the shop-wide one. */
@@ -396,5 +422,99 @@ class SubscriptionManagementTest extends TestCase
         $this->assertFalse($this->management()->subscribeGuest('test_type', 'masked', recipient: '  '));
         $this->assertCount(1, $this->deletes);
         $this->assertSame([], $this->contacts);
+    }
+
+    /** A new row: EVENT_SAVED after the commit, with everything an observer (e.g. an SMS opt-in message) needs. */
+    public function testANewSubscriptionIsAnnouncedAfterTheCommit(): void
+    {
+        $this->fetchOneResult = '31';   // SELECT LAST_INSERT_ID()
+        $this->assertTrue($this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test'));
+        $this->assertSame([[SubscriptionManagementInterface::EVENT_SAVED, ['subscription_id' => 31, 'type' => 'test_type',
+            'channel' => 'email', 'store_id' => 1, 'contact_id' => 5, 'customer_id' => null, 'created' => true]]], $this->events);
+        $this->assertStringContainsString('subscription_id = LAST_INSERT_ID(subscription_id)', $this->queries[0][0],
+            'an update reports the existing row\'s id');
+    }
+
+    public function testAChangedSubscriptionIsAnnouncedAsNotCreated(): void
+    {
+        $this->queryRowCounts = [2];   // MySQL: an existing row changed (e.g. a new address or permission)
+        $this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test');
+        $this->assertFalse($this->events[0][1]['created']);
+    }
+
+    /** Nothing written, nothing announced: an identical retry, a refusal, a stopped recipient. */
+    public function testOnlyAWrittenRowIsAnnounced(): void
+    {
+        $this->queryRowCounts = [0];
+        $this->fetchOneResult = '7';
+        $this->assertTrue($this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test'), 'identical retry');
+        $this->current = Permission::refused();
+        $this->assertFalse($this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test'));
+        $this->current = Permission::granted('new-consent');
+        $this->stopList = $this->createStub(\CommerceKings\Notification\Api\StopListInterface::class);
+        $this->stopList->method('touch')->willReturn(true);
+        $this->assertTrue($this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test'));
+        $this->assertSame([], $this->events);
+    }
+
+    public function testAnObserverErrorIsLoggedAndNeverFailsTheSignUp(): void
+    {
+        $this->observerFailure = new \RuntimeException('observer broke with guest@example.test');
+        $this->assertTrue($this->management()->subscribeGuest('test_type', 'masked', 'guest@example.test'));
+        $this->assertSame(['exception_class' => \RuntimeException::class], $this->errors[0][1], 'the class only, no message');
+    }
+
+    /** A customer on another channel gives the number; it is stored as their contact, next to the customer id. */
+    public function testACustomerSubscribesAPhoneNumberAsTheirContact(): void
+    {
+        $this->channel = 'sms';
+        $this->single = false;
+        $this->assertTrue($this->management()->subscribeCustomer(17, 'test_type', '42', ' +381 60 123 4567 '));
+        $this->assertSame([[1, '+381 60 123 4567', 'sms']], $this->contacts);
+        [$sql, $bind] = $this->queries[0];
+        $this->assertSame(['test_type', 42, 1, 'u:17', 5, 17], array_slice($bind, 0, 6),
+            'contact and customer; one per customer whatever the number');
+        $this->assertSame(['beginTransaction', 'commit', 'event'], $this->transactionEvents);
+        $this->assertSame([5, 17, 'sms'], [$this->events[0][1]['contact_id'], $this->events[0][1]['customer_id'],
+            $this->events[0][1]['channel']]);
+    }
+
+    public function testACustomerOnAnotherChannelNeedsAValidRecipient(): void
+    {
+        $this->channel = 'sms';
+        foreach ([null, '', '  ', 'abc', ['+381601234567']] as $recipient) {
+            try {
+                $this->management()->subscribeCustomer(17, 'test_type', '42', $recipient);
+                $this->fail('Expected Magento\'s 400');
+            } catch (\Magento\Framework\Exception\InputException) {
+            }
+        }
+        $this->assertSame([], $this->queries);
+        $this->assertSame([], $this->authorized, 'validated before the type is asked');
+    }
+
+    public function testAnEmailTypeKeepsTheAccountEmailAndTakesNoRecipient(): void
+    {
+        $this->assertTrue($this->management()->subscribeCustomer(17, 'test_type', '42'));
+        $this->assertSame([], $this->contacts, 'no contact: the account email');
+        $this->expectException(\Magento\Framework\Exception\InputException::class);
+        $this->management()->subscribeCustomer(17, 'test_type', '42', 'other@example.test');
+    }
+
+    /** A stopped number is answered like a stored sign-up for customers too, and restarts the lift timer. */
+    public function testAStoppedNumberIsNotStoredForACustomer(): void
+    {
+        $this->channel = 'sms';
+        $touched = [];
+        $this->stopList = $this->createStub(\CommerceKings\Notification\Api\StopListInterface::class);
+        $this->stopList->method('touch')->willReturnCallback(function ($channel, $recipient) use (&$touched) {
+            $touched[] = [$channel, $recipient];
+            return true;
+        });
+        $this->assertTrue($this->management()->subscribeCustomer(17, 'test_type', '42', '+381601234567'));
+        $this->assertSame([['sms', '+381601234567']], $touched);
+        $this->assertSame([], $this->contacts);
+        $this->assertSame([], $this->queries);
+        $this->assertSame([], $this->events);
     }
 }

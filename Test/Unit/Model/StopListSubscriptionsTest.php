@@ -65,7 +65,8 @@ class StopListSubscriptionsTest extends TestCase
     {
         // the email column's collation also returns other accents; letter case and spaces are the same address
         $this->stop([5 => ' JOSE@Example.test ', 6 => 'josé@example.test'], ['cart_reminder' => $this->type(true)]);
-        $this->assertSame(['(contact_id IN (SELECT contact_id) OR customer_id IN (5))'], $this->deleted[0]);
+        $this->assertSame(['(contact_id IN (SELECT contact_id) OR (customer_id IN (5) AND contact_id IS NULL))'], $this->deleted[0],
+            'the account email\'s subscriptions only: a customer\'s phone contact is another channel');
     }
 
     public function testWithoutAMatchingCustomerOnlyContactsCount(): void

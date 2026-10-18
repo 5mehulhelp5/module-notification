@@ -22,8 +22,9 @@ interface SubscriptionRepositoryInterface
     public function getEmail(Subscription $subscription): ?string;
 
     /**
-     * Where the subscriber is reached, on any channel: the guest contact's channel and address, or the customer's
-     * account email; null if neither exists (a customer's phone number is the feature's to find).
+     * Where the subscriber is reached, on any channel: the subscription's contact (a guest's address, or the address a
+     * customer gave for a non-email type, e.g. a phone number), else the customer's account email; null if neither
+     * exists.
      *
      * @return array{channel: string, recipient: string}|null
      */

@@ -20,6 +20,14 @@
 - A provider without one-click unsubscribe (e.g. SMS) is not given the stop link as a one-click URL, so nothing is
   logged; the stop page says "messages" and "number" for channels other than email.
 - `ProviderPool` and `RecipientNormalizerPool` are `@api`: their di.xml arguments are stable extension points.
+- **Customers on other channels:** `subscribeCustomer($customerId, $type, $reference, $recipient = null)` and the
+  REST `/mine` body take `recipient` for non-email types (required there, validated like a guest's; email types keep
+  the account email and take none). It is stored as the customer's contact on that channel, `getRecipient()` returns
+  it, a stop of that number removes it, and a stopped number is answered as stored without a write. A stop of the
+  account email leaves the customer's other-channel subscriptions.
+- **`commercekings_notification_subscription_saved`** (`SubscriptionManagementInterface::EVENT_SAVED`): after a
+  subscription row was written and committed – subscription_id, type, channel, store_id, contact_id, customer_id,
+  created – not for refusals, stops or an identical retry; an observer error is logged, never the sign-up's.
 - **"Stop" everywhere:** `StopListInterface` (`isStopped`, `stop`, `resume`, `getStopUrl`), `SenderInterface::STOPPED`,
   the `stop_url` variable, `/cknotification/stop` and `ck_notification_stop`. "Do not contact" stays the
   people-facing name.
