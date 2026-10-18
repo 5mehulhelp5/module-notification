@@ -17,6 +17,8 @@ use Magento\Store\Model\StoreManagerInterface;
  *
  * Per type, through a di.xml virtual type with the argument "typeCode", injected into the type and returned by its
  * getPermission().
+ *
+ * @api a virtual type with the "typeCode" argument is a stable extension point
  */
 class AddressConsent implements SubscriptionPermissionInterface
 {

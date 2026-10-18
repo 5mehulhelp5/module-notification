@@ -18,6 +18,8 @@ use Magento\Store\Model\ScopeInterface;
  * (di.xml "zones", e.g. the recipient's): quiet when it is on in any of them, until the latest end. Wall-clock times:
  * on the day clocks go forward, a time in the skipped hour means the first time after it; on the day they go back, a
  * time in the repeated hour means its first occurrence.
+ *
+ * @api the "zones" di.xml argument is a stable extension point
  */
 class QuietHours implements QuietHoursInterface
 {

@@ -29,7 +29,7 @@ class Config
         return is_string($code) && $code !== '' ? $code : null;
     }
 
-    /** The "stop these emails" link in marketing notifications of this store. */
+    /** The "stop these emails" link in stoppable notifications of this store. */
     public function isStopLinkEnabled(int $storeId): bool
     {
         return $this->scopeConfig->isSetFlag('commercekings_notification/do_not_contact/link', ScopeInterface::SCOPE_STORE,

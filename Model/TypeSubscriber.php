@@ -9,6 +9,8 @@ use CommerceKings\Notification\Api\SubscriberInterface;
 /**
  * One type's subscriber as a SubscriberInterface: its own (getSubscriber()) or the shop-wide one. A feature injects it
  * for its type with a di.xml virtual type (argument "typeCode"), like TypePermission.
+ *
+ * @api a virtual type with the "typeCode" argument is a stable extension point
  */
 class TypeSubscriber implements SubscriberInterface
 {

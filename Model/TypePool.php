@@ -5,7 +5,11 @@ namespace CommerceKings\Notification\Model;
 
 use CommerceKings\Notification\Api\NotificationTypeInterface;
 
-/** Notification types, registered by the modules that own them (di.xml array argument "types"). */
+/**
+ * Notification types, registered by the modules that own them (di.xml array argument "types").
+ *
+ * @api the "types" di.xml argument is a stable extension point
+ */
 class TypePool
 {
     /** @param array<string, NotificationTypeInterface> $types */

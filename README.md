@@ -9,12 +9,14 @@ Works with Magento 2.4.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQ
 - **Fast storefront.** Every notification is sent in the background by a queue consumer, never during a page view.
   Optional shopper subscriptions are one quick write.
 - **Marketing and service messages.** Reminders shoppers opt into, or order and staff messages that need no subscription.
-- **Pluggable channels.** Email built in; SMS, WhatsApp or any other service plugs in as a provider module.
+- **Email, SMS, WhatsApp.** Email built in; a provider module adds a messaging service. Phone numbers, consent for a
+  number (a checkbox, stored as evidence), STOP replies and quiet hours are part of Notification.
 - **Inbox-ready at volume.** Optional RFC 8058 one-click unsubscribe, as Gmail and Yahoo require from bulk senders.
-- **Do not contact.** A suppression list: one click in a marketing email stops all marketing to that address, whoever
-  signs it up again; order emails still arrive.
+- **Do not contact.** One click in a marketing email (or a STOP reply) stops all marketing to that recipient, whoever
+  signs them up again; order messages still arrive.
+- **Quiet hours.** Marketing is held at night and sent after – in the store's time zone, or the recipient's.
 - **Scales with you.** Add consumers when traffic grows; RabbitMQ or Magento's MySQL queue.
-- **Private by default.** The cooldown keeps hashes, never addresses; unused contacts are removed.
+- **Private by default.** Cooldown, stops and consents keep keyed hashes, never addresses; unused contacts are removed.
 
 A feature (e.g. abandoned cart) says *what and when*; Notification handles *who and how*.
 
@@ -23,18 +25,18 @@ A feature (e.g. abandoned cart) says *what and when*; Notification handles *who 
 - A **notification type** is one kind of message, registered by a feature. It decides when to send and builds
   the content.
 - A **subscription** is a shopper's sign-up for a type, e.g. reminders for one cart. Marketing types need one;
-  service messages don't. A guest is stored as a **contact** (one per website, channel and address); a customer by account.
-- A **permission** decides who may subscribe: everyone (opt-out), or only with consent (opt-in, with the privacy
-  bundle). Withdrawing the consent removes the subscription. The **subscriber** provides the unsubscribe link.
+  service messages don't. Its address is a **contact** (one per website, channel and address) or a customer's
+  account email.
+- A **permission** decides who may subscribe: everyone (opt-out), only with consent (opt-in, with the privacy bundle),
+  or – per type – an **address consent**: a checkbox for one number. The **subscriber** provides the unsubscribe link.
 - The **queue** carries `<type>|<reference>`. One consumer sends every type, so nothing is sent during a page view.
-- The **sender** checks a **delivery** against the cooldown and Do not contact, builds its content in the
-  store's language, then hands it to a provider.
+- The **delivery state** keeps each feature's send history per subscriber (sent, queued, retries), so a new sign-up
+  does not send twice.
+- The **sender** checks a **delivery** against Do not contact, quiet hours and the cooldown, builds its content in
+  the store's language, then hands it to a provider.
 - A **channel** is where a delivery goes: email, SMS, WhatsApp, or a code a provider module brings. A **normalizer**
-  gives each channel one recipient form; SMS and WhatsApp numbers are E.164 out of the box.
-- A **provider** delivers on one channel; the email provider is chosen in the admin. Magento email is built in, with
-  optional one-click unsubscribe; SMS, WhatsApp or an email service come as provider modules.
-- The **cooldown** keeps a minimum gap between notifications to one recipient. **Do not contact** stops all
-  marketing to a recipient. Both store keyed hashes, never addresses.
+  gives each channel one recipient form; SMS and WhatsApp numbers are E.164.
+- A **provider** delivers on one channel, chosen in the admin when there are several. Magento email is built in.
 
 ## Installation
 
@@ -53,78 +55,53 @@ withdrawing it removes the subscription, and notices are off by default.
 
 **Stores > Configuration > CommerceKings > Notifications**:
 
-| Field | Default |
+| Group | Fields (default) |
 |---|---|
-| Email provider (website) | Magento email – provider modules add their own |
-| Cooldown (days, global) | 7 – minimum gap between notifications to one recipient on a channel; 0 turns it off |
-| One-click unsubscribe (website) | No – RFC 8058 headers; the feature's unsubscribe link, or the "Stop these emails" link, accepts the POST |
-| Do not contact: "Stop these emails" link (store view) | Yes – one click stops all marketing emails to that address; always on in opt-out mode |
-| Do not contact: lifts after (days without attempts, global) | 90 – each sign-up attempt for a stopped address restarts it |
+| Delivery | Provider per channel (Magento email); Cooldown in days (7, global, 0 = off); One-click unsubscribe (No) |
+| Do not contact | "Stop these emails" link (Yes; always on in opt-out mode); Lifts after days without attempts (90) |
+| Quiet hours | Enabled (No); From – To (21:00 – 08:00, may cross midnight); Channels (all but email) |
+| Consent for an address | Checkbox text for text messages and WhatsApp, per store view; Keep withdrawn consents (1825 days) |
 
 ## Before going live
 
-- Run the consumer `commerceKingsNotificationSend` (RabbitMQ or Magento's database queue) with
-  `--max-messages=1000`, and restart it after each deployment.
-- **Recommended:** rate-limit `POST /rest/<store>/V1/ck-notification/subscriptions` per IP, e.g. 10 a minute – in your
-  web server, proxy or CDN first, and with [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit)
-  (Magento 2.4.7+, set in the admin). Without one, a script can make the shop email any address, up to the hourly cap.
+- Run the consumer `commerceKingsNotificationSend` with `--max-messages=1000` and restart it after each deployment.
+- **Recommended:** rate-limit the anonymous routes `POST /rest/<store>/V1/ck-notification/subscriptions` and
+  `…/address-consents` per IP (e.g. 10 a minute) in your web server, proxy or CDN, and optionally with
+  [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit). Without one, a script can
+  make the shop message any address, up to the feature's hourly cap.
 
-Both: [operations](docs/operations.md).
+Details: [operations](docs/operations.md).
 
 ## Extending
 
-Notification types work **with or without subscriptions**: with them for messages shoppers sign up for, without for
-service messages and staff alerts.
+Types work **with or without subscriptions**: with them for messages shoppers sign up for, without for service
+messages and staff alerts. The public API (`@api`):
 
-`Api\NotificationTypeInterface` – a notification type, registered in a pool
+| For | Use |
+|---|---|
+| A notification type | `Api\NotificationTypeInterface` (`Model\TypePool` "types"), `Api\QueueInterface`, `Api\SenderInterface` with `Data\Delivery` |
+| Its send history | `Api\DeliveryStateInterface` |
+| Sign-ups | `Api\SubscriptionTypeInterface` (`Model\SubscriptionTypePool` "types"), `Api\SubscriptionManagementInterface` and its `commercekings_notification_subscription_saved` event, `Api\SubscriptionRepositoryInterface`, `Api\SubscriptionGuardInterface`, `Api\SubscriptionRemovalInterface` |
+| Who may subscribe | `Api\SubscriptionPermissionInterface`, `Api\SubscriberInterface`; per type `Model\TypePermission`, `Model\TypeSubscriber`, `Model\AddressConsent` (virtual types) |
+| A checkbox consent | `Api\AddressConsentManagementInterface`, `address-consent.phtml` with `ViewModel\AddressConsent` |
+| A channel or service | `Api\ProviderInterface` (`Model\ProviderPool` "providers"), `Api\RecipientNormalizerInterface` (`Model\RecipientNormalizerPool` "normalizers"), `Model\Config\Source\Provider` (virtual type "channel"), `Model\KeyedHash` |
+| Replies and timing | `Api\StopListInterface`, `Api\QuietHoursInterface`, `Api\QuietHoursZoneInterface` (`Model\QuietHours` "zones"), `Api\CooldownInterface` |
+| Housekeeping and UI | `Api\ContactReferenceInterface` (`Model\ContactReferencePool` "references"), `Api\OptOutNoticeInterface` |
 
-`Api\QueueInterface` – publish its messages
-
-`Api\SenderInterface` – send a `Delivery` (email, or `Delivery::text()` for any other channel)
-
-`Api\ProviderInterface` – deliver on a channel; Magento email is built in, SMS or WhatsApp come as provider modules
-
-`Api\RecipientNormalizerInterface` – one canonical recipient form per channel (e.g. phone numbers in E.164)
-
-`Api\StopListInterface` – Do not contact: the "stop these emails" link and its list
-
-`Api\CooldownInterface` – the minimum gap between notifications to one recipient
-
-`Api\SubscriptionTypeInterface` – something a shopper subscribes to
-
-`Api\SubscriptionPermissionInterface` – who may subscribe (the consent bridge replaces it)
-
-`Api\SubscriberInterface` – who the subscriber is and their unsubscribe link
-
-`Api\SubscriptionGuardInterface` – SQL condition for a feature's atomic send claim
-
-`Api\SubscriptionRepositoryInterface` – read subscriptions
-
-`Api\SubscriptionRemovalInterface` – remove subscriptions (revoked permission, unsubscribe)
-
-`Api\ContactReferenceInterface` – tell the cleanup which contacts your module still uses
-
-`Api\OptOutNoticeInterface` – a notice where shoppers subscribe (Automatic, Yes or No)
-
-Details, including messaging (SMS, WhatsApp) for provider modules: [for module authors](docs/module-authors.md).
+How to use them, including messaging for provider modules: [for module authors](docs/module-authors.md).
 
 ## Limitations
 
-- No rate limit in code: protect the guest endpoint in your web server, proxy or CDN; optionally also with
-  [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit).
 - A failed send is not retried by Notification; the feature decides (abandoned cart queues the cart again).
-- Do not contact stops, the "stop these emails" links and the cooldown are keyed with Magento's encryption key.
-  After `encryption:key:change` nothing needs to be run: stops and stop links keep working while the old key stays
-  in `env.php` (Magento keeps it) – a stop found under an older key moves to the newest one, and an old stop link
-  can still stop the emails (one-click too) but not turn them back on. The cooldown restarts. Don't remove an old key
-  from `env.php` while stops may still use it: those not yet moved would lift
-  ([details](docs/stop-list.md#encryption-key-change)). Subscriptions, contacts and consent records are not
-  affected, and consent withdrawal links keep working the same way; cart restore links expire (see those modules).
+- Quiet hours have one window per store view for all selected channels.
+- Stops, stop links, consents and the cooldown are keyed with Magento's encryption key. After
+  `encryption:key:change` nothing needs to be run while the old key stays in `env.php`; the cooldown restarts
+  ([details](docs/stop-list.md#encryption-key-change)).
 
 ## More
 
 [How it works](docs/how-it-works.md) · [For module authors](docs/module-authors.md) · [Operations](docs/operations.md) ·
-[Compatibility](COMPATIBILITY.md) · [Changes](CHANGELOG.md)
+[Stop list](docs/stop-list.md) · [Compatibility](COMPATIBILITY.md) · [Changes](CHANGELOG.md)
 
 ## Disclaimer
 

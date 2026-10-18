@@ -5,7 +5,11 @@ namespace CommerceKings\Notification\Model;
 
 use CommerceKings\Notification\Api\SubscriptionTypeInterface;
 
-/** Subscription types, registered by the modules that own them (di.xml array argument "types"). */
+/**
+ * Subscription types, registered by the modules that own them (di.xml array argument "types").
+ *
+ * @api the "types" di.xml argument is a stable extension point
+ */
 class SubscriptionTypePool
 {
     /** @param array<string, SubscriptionTypeInterface> $types */

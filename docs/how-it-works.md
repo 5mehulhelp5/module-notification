@@ -1,6 +1,6 @@
 # How it works
 
-Subscriptions, contacts, sending and cooldown in `commercekings/module-notification`. Start with the [README](../README.md).
+Subscriptions, contacts, consent for an address, sending, quiet hours and the stop list in `commercekings/module-notification`. Start with the [README](../README.md).
 
 ## Parts
 
@@ -18,14 +18,24 @@ Each module answers one question:
 - **Subscribe endpoint** for every type. Order, nothing written before the last step: email rules → the type's
   `authorize()` → the permission for the type's purpose and website → contact → one INSERT that repeats the
   permission check and the type's condition, so a withdrawal or a changed reference at the same moment wins.
+- **Saved event**: every written subscription row dispatches `commercekings_notification_subscription_saved` after
+  the commit (with `created` and `previous_contact_id`), e.g. for an opt-in confirmation; an observer error is
+  logged, never the sign-up's.
 - **Withdrawal**: one handler removes the subscriptions of withdrawn permissions for every type.
+- **Address consent** (`Model\AddressConsent`, a type's own permission): a checkbox consent for one address, per
+  type, channel and website, recorded through `Api\AddressConsentManagementInterface` with the exact wording shown.
+  Evidence in `ck_notification_address_consent`: the wording and its hash, the time, the store view, keyed hashes of
+  the address and the IP – never the number itself. Unchecking or a stop withdraws it and ends the subscriptions on
+  it; cron `commercekings_notification_address_consent_cleanup` (daily 03:25) deletes withdrawn evidence after the
+  store view's days. Active consents are kept.
 - **Contacts**: guest recipients – an email address, a phone number, … – one per website, channel and address
   (`ck_notification_contact`: `channel`, `recipient`). Identity is `recipient_key`, a hash of the normalized
   address: for email trimmed, Unicode-normalized and lower-cased (letter case is ignored, an accent or any other
   character makes another address – the `recipient` column's collation would merge them); for other channels the
-  channel's `RecipientNormalizerInterface`. Customers use their account email. Cron `commercekings_notification_contact_cleanup` (daily 03:15) removes
+  channel's `RecipientNormalizerInterface`. Customers use their account email; on other channels the address they give
+  is stored as their contact. Cron `commercekings_notification_contact_cleanup` (daily 03:15) removes
   contacts nothing uses after a 24-hour grace period; modules that store contact ids themselves register an
-  `Api\ContactReferenceInterface` (`Model\ContactReferencePool` "references").
+  `Api\ContactReferenceInterface` (`Model\ContactReferencePool` "references", an `@api` extension point).
   Guest capture acquires the contact and creates its subscription in one short transaction, so cleanup
   cannot remove an old contact while it is being reused. Failed storage rolls back both writes.
 - **Delivery state** (`Api\DeliveryStateInterface`, `ck_notification_delivery_state`): each feature's send history
@@ -82,19 +92,20 @@ limits cap how often a stranger's address can be mailed, but not how fast a scri
 | `POST /rest/<store>/V1/ck-notification/subscriptions/mine` (`self`) | customer: storefront AJAX session or token | `{"type", "reference"}`; non-email types add `"recipient"` (e.g. the phone number) |
 | `POST /rest/<store>/V1/ck-notification/address-consents` (anonymous), `/mine` (`self`) | guest / customer, authorized by the type | `{"type", "reference", "recipient", "wordingHash", "given"}`: a checkbox consent for one address (Address consent) |
 
-Both return `true` when stored (including an identical retry) and `false` when refused or removed. An unknown
-type or invalid email is Magento's 400 without echoing the address.
+They return `true` when stored (including an identical retry) and `false` when refused or removed. An unknown
+type or invalid address is Magento's 400 without echoing it.
 
 - **Guest:** an empty email, a missing permission or a type that is not accepting removes the guest's subscription
   of a single type. Subscriptions of a one-per-person type are removed by the withdrawal link only.
-- **Customer:** without a permission in this browser nothing changes; a permission from another device stays.
+- **Customer:** email types use the account email; other channels need `recipient`. Without a permission nothing
+  changes; a permission from another device stays.
 - A change of contact, customer or permission sets `captured_at` (a type may use it to restart a delay);
   an identical retry does not.
 
 ## Admin
 
 **Stores > Configuration > CommerceKings > Notifications**, *Delivery*: *Email provider*, default *Magento email*
-(per website; a provider module for another channel adds its selector here);
+(per website; a provider module adds the selector for its channel here);
 *Cooldown (days)*, per channel, default 7, **0 turns it off** (global); *One-click unsubscribe*, default No (per website) – RFC 8058 headers on every
 notification whose content passes an HTTPS unsubscribe URL (an http URL sends the email without them and logs a
 warning); that URL must accept the mail client's POST.
@@ -102,6 +113,8 @@ warning); that URL must accept the mail client's POST.
 (global, default 90) – see [stop list](stop-list.md).
 **Quiet hours** (store view): *Enabled* (default No), *From* / *To* (default 21:00 / 08:00, store time zone) and
 *Channels* (none selected, the default: every channel except email).
+**Consent for an address** (store view): *Checkbox text* for text messages and WhatsApp (empty: no checkbox) and
+*Keep withdrawn consents (days)*, default 1825.
 
 ## Tests
 

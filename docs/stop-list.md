@@ -76,7 +76,7 @@ Global across stores, like the cooldown.
 
 ## Tests
 
-- Unit: hash and signature, silent subscribe restarting the timer, sender drops marketing and passes service
+- Unit: hash and signature, silent subscribe restarting the timer, sender drops stoppable deliveries and passes service
   messages, cron deletes only quiet stops.
 - End-to-end on a sandbox: 3 attacker carts → stop → no more email → a new attempt restarts the timer → 90 quiet
   days (simulated) → cron lifts the stop → the next cart is reminded; plus Undo.

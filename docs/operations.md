@@ -57,8 +57,12 @@ type's own job (e.g. abandoned cart releases its claim so the next finder run qu
 - Cron `commercekings_notification_subscription_cleanup` (daily 03:10) removes subscriptions whose item is gone
   (each type's `orphanCondition()`); subscriptions of a type that is no longer registered are left alone.
 - Cron `commercekings_notification_contact_cleanup` (daily 03:15) then removes contacts nothing uses.
+- Cron `commercekings_notification_delivery_state_cleanup` (daily 03:12) removes send history of vanished references
+  and, after 90 days, of people without a subscription.
 - Cron `commercekings_notification_stop_cleanup` (daily 03:20) lifts Do not contact stops after
   *Lifts after (days without attempts)*.
+- Cron `commercekings_notification_address_consent_cleanup` (daily 03:25) deletes withdrawn address consents after
+  *Keep withdrawn consents (days)*.
 
 ## Rate limiting
 
@@ -66,7 +70,8 @@ type's own job (e.g. abandoned cart releases its claim so the next finder run qu
 make the shop send one reminder to any address it likes, up to the feature's hourly cap (e.g. abandoned cart's
 *Maximum reminders per hour*) – and those reminders take the place of real shoppers' in that hour.
 
-Rate-limit `POST /rest/<store>/V1/ck-notification/subscriptions` per client IP in front of Magento – it then never
+Rate-limit `POST /rest/<store>/V1/ck-notification/subscriptions` (and `…/address-consents`, the checkbox consent) per
+client IP in front of Magento – it then never
 starts for a flood. The storefront scripts treat HTTP 429 as temporary and retry with back-off, so shoppers are not
 affected. A checkout sends a few requests per minute at most; suggested: 10 per minute per IP with a small burst.
 
@@ -77,7 +82,7 @@ nginx (keep your usual Magento REST handling in the location):
 limit_req_zone $binary_remote_addr zone=ck_subscribe:10m rate=10r/m;
 
 # server {}
-location ~ ^/rest/[^/]+/V1/ck-notification/subscriptions {
+location ~ ^/rest/[^/]+/V1/ck-notification/(subscriptions|address-consents) {
     limit_req zone=ck_subscribe burst=5 nodelay;
     limit_req_status 429;
     try_files $uri $uri/ /index.php$is_args$args;
@@ -94,6 +99,6 @@ A request rate cannot see what a request contains: a slow script can still try m
 recipient cooldown on and set the feature's hourly sending limit (e.g. abandoned cart's *Maximum reminders per hour*).
 A bot challenge (e.g. Cloudflare Turnstile) can be added at the same layer; none is shipped.
 
-**Inside Magento (Magento 2.4.7+):** [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit) limits this endpoint per guest IP
+**Inside Magento (Magento 2.4.7+):** [commercekings/module-rate-limit](https://github.com/commercekings/module-rate-limit) limits these endpoints per guest IP
 and per customer from the admin and answers 429 before it runs. Keep the rule above as the first line of defense –
 it stops a flood before PHP starts; the module is the second line.

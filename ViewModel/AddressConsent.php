@@ -8,7 +8,11 @@ use Magento\Framework\UrlInterface;
 use Magento\Framework\View\Element\Block\ArgumentInterface;
 use Magento\Store\Model\StoreManagerInterface;
 
-/** The address consent checkbox (address-consent.phtml): the store view's wording, its hash and the REST routes. */
+/**
+ * The address consent checkbox (address-consent.phtml): the store view's wording, its hash and the REST routes.
+ *
+ * @api the view model of address-consent.phtml, for features that add the checkbox
+ */
 class AddressConsent implements ArgumentInterface
 {
     public function __construct(

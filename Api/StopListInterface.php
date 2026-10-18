@@ -4,8 +4,8 @@ declare(strict_types=1);
 namespace CommerceKings\Notification\Api;
 
 /**
- * Do not contact: recipients who stopped marketing notifications from a signed link in one of them. Stopped
- * recipients are not subscribed again and get no marketing deliveries; each sign-up attempt restarts the lift timer,
+ * Do not contact: recipients who stopped stoppable notifications (a signed link in one of them, or a STOP reply).
+ * Stopped recipients are not subscribed again and get no stoppable deliveries; each sign-up attempt restarts the lift timer,
  * and a cron lifts a stop after the configured days without attempts. Replaceable with a di.xml preference.
  *
  * @api

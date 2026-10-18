@@ -11,6 +11,8 @@ use CommerceKings\Notification\Api\SubscriptionTypeInterface;
 /**
  * One type's permission as a SubscriptionPermissionInterface: its own (getPermission()) or the shop-wide one. A feature
  * injects it for its type with a di.xml virtual type (argument "typeCode"), e.g. where it claims and sends.
+ *
+ * @api a virtual type with the "typeCode" argument is a stable extension point
  */
 class TypePermission implements SubscriptionPermissionInterface
 {

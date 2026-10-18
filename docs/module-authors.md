@@ -16,6 +16,7 @@ Building a notification type on `commercekings/module-notification`. Start with 
        </arguments>
    </type>
    ```
+   The `types` argument of `Model\TypePool` is `@api`: a stable extension point.
 3. Queue work with `Api\QueueInterface::publish('my_notification', $reference)`.
 
 `Delivery::$useCooldown = false` for notifications the recipient asked for (e.g. back in stock): they are always
@@ -31,8 +32,8 @@ channel and recipient; nothing was sent or claimed. Send it again at
 failure). A finder can leave out a store while `isQuiet($storeId, $channel)` – without a recipient it asks whether
 everyone is held, and a per-recipient rule answers no. Deliveries with `$stoppable = false` are never held. Pass your
 notification type code as `Delivery::$type` (e.g. `type: 'cart_reminder'`), so providers with templates of their own
-can pick one. Replace the cooldown with a `CooldownInterface` preference, the quiet hours with a `QuietHoursInterface`
-preference (e.g. one that uses the recipient's time zone: answer for the recipient, and `false` for `null`).
+can pick one. Replace the cooldown with a `CooldownInterface` preference; for quiet hours in the recipient's time zone
+register a zone provider for the channel ([`QuietHoursZoneInterface`](#quiet-hours-in-the-recipients-time-zone)).
 
 ## Providers
 
@@ -61,7 +62,8 @@ The sender keeps the cooldown, recipient re-check, stop list, quiet hours and st
 
 With one provider installed for a channel it is used automatically. To choose between several, the stored code is
 `commercekings_notification/general/provider_<channel>` (read per store view, e.g. set per website). The first module
-for a channel adds the field to the *Delivery* group, with `Model\Config\Source\Provider` for its channel:
+for a channel adds the field to the *Delivery* group, with `Model\Config\Source\Provider` for its channel (`@api`:
+a virtual type with its `channel` argument is a stable extension point):
 
 ```xml
 <!-- etc/di.xml -->
@@ -168,6 +170,8 @@ Florida's FTSA go by the recipient's local time: register a zone provider for yo
 </type>
 ```
 
+The `zones` argument of `Model\QuietHours` is `@api`: a stable extension point.
+
 `Api\QuietHoursZoneInterface::getZones($storeId, $channel, $recipient)` returns the zones the number may be in (e.g.
 from its country and area code): quiet while the window is on in any of them, until the latest end. Return `[]` when
 you cannot tell and for a `null` recipient (the whole store, asked by a finder before it knows the recipients) – the
@@ -180,7 +184,7 @@ A messaging type usually needs its own consent for the number (a checkbox): see 
 
 ## Permission
 
-Who may subscribe is `Api\SubscriptionPermissionInterface`: `check($type, $target)` returns a `Permission`
+Who may subscribe is `Api\SubscriptionPermissionInterface`: `check($type, $target, $recipient)` returns a `Permission`
 (granted with a reference stored on the subscription, absent – a guest's single subscription is removed – or
 refused – nothing changes), and `validCondition($referenceColumn)` is the SQL that the subscribe INSERT and every
 send-time check (`SubscriptionGuardInterface`) contain, so a revocation at the same moment wins.
@@ -206,7 +210,8 @@ returns its own `SubscriptionPermissionInterface` – e.g. an SMS offer with its
 that one alone decides for its subscriptions, at sign-up and at send time. `null` keeps the shop-wide one. Its
 subscriber comes with it: `getSubscriber()` returns the matching `SubscriberInterface` (recognizing the visitor, the
 unsubscribe link), `null` the shop-wide one. Inject either for your type with a di.xml virtual type of
-`Model\TypePermission` / `Model\TypeSubscriber` (argument `typeCode`), so your code follows the type.
+`Model\TypePermission` / `Model\TypeSubscriber` (argument `typeCode`), so your code follows the type. Both virtual
+types are `@api`: stable extension points.
 
 ## Subscription types
 
@@ -241,6 +246,7 @@ For notifications a visitor signs up for, also:
        </arguments>
    </type>
    ```
+   The `types` argument of `Model\SubscriptionTypePool` is `@api`: a stable extension point.
    With the consent bridge, withdrawing your purpose's consent removes the subscriptions; nothing else to register.
 3. Queue the **subscription id**; read it with `Api\SubscriptionRepositoryInterface` (`getEmail()` gives the
    contact's address or the customer's current one; `getRecipient()` the channel and address for guests on any channel). Repeat the check inside your atomic claim: without the
@@ -316,7 +322,8 @@ offers at this number"). Notification ships it; your type only declares it:
        </arguments>
    </type>
    ```
-   Use the same virtual type wherever your feature claims or rechecks (instead of `TypePermission`).
+   Use the same virtual type wherever your feature claims or rechecks (instead of `TypePermission`). The virtual type
+   with `typeCode` and `ViewModel\AddressConsent` are `@api`: stable extension points.
 2. The checkbox: add `CommerceKings_Notification::address-consent.phtml` next to the phone field, with
    `view_model` (`CommerceKings\Notification\ViewModel\AddressConsent`), `type`, `channel` (e.g. `sms`) and `phone`
    (a CSS selector of the phone input); `reference` defaults to the checkout's cart and `mine` to whether the checkout
