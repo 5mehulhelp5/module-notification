@@ -11,6 +11,8 @@ Works with Magento 2.4.4+ · Luma and Hyvä · PHP 8.1–8.5 · RabbitMQ or MySQ
 - **Marketing and service messages.** Reminders shoppers opt into, or order and staff messages that need no subscription.
 - **Pluggable channels.** Email built in; SMS, WhatsApp or any other service plugs in as a provider module.
 - **Inbox-ready at volume.** Optional RFC 8058 one-click unsubscribe, as Gmail and Yahoo require from bulk senders.
+- **Do not contact.** A suppression list: one click in a marketing email stops all marketing to that address, whoever
+  signs it up again; order emails still arrive.
 - **Scales with you.** Add consumers when traffic grows; RabbitMQ or Magento's MySQL queue.
 - **Private by default.** The cooldown keeps hashes, never addresses; unused contacts are removed.
 
