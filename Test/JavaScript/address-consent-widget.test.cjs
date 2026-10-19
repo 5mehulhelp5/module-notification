@@ -168,8 +168,8 @@ test('a cleared number withdraws the consent; if that fails, the box stays check
 test('a wording with {{number}} is shown with the number, and follows a changed number (checked or not)', async () => {
     const {state, user} = widget([], {wording: 'Yes, text me at {{number}}. Reply STOP to stop.', noNumber: 'this number'});
     assert.equal(state.label, 'Yes, text me at +381 60 123 4567. Reply STOP to stop.');
-    await user.number('+381611234530');
-    assert.equal(state.label, 'Yes, text me at +381 61 123 4530. Reply STOP to stop.');
+    await user.number('+12025550123');
+    assert.equal(state.label, 'Yes, text me at +1 202 555 0123. Reply STOP to stop.');
     assert.deepEqual(state.posts, [], 'unchecked: only the label changes');
     await user.number('');
     assert.equal(state.label, 'Yes, text me at this number. Reply STOP to stop.');
@@ -178,6 +178,6 @@ test('a wording with {{number}} is shown with the number, and follows a changed 
 test('a wording without the placeholder is left as the template rendered it', async () => {
     const {state, user} = widget([], {wording: 'Yes, text me offers at this number.'});
     assert.equal(state.label, 'rendered by the template');
-    await user.number('+381611234530');
+    await user.number('+12025550123');
     assert.equal(state.label, 'rendered by the template');
 });

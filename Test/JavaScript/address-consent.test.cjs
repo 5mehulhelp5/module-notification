@@ -47,7 +47,7 @@ test('a refusal or an error rejects, so the checkbox is not shown as given', asy
 
 test('formatNumber groups a number readably: calling code, a short first group, then threes, the last up to four', () => {
     const {formatNumber} = core();
-    assert.equal(formatNumber('+381611234530'), '+381 61 123 4530');
+    assert.equal(formatNumber('+12025550123'), '+1 202 555 0123');
     assert.equal(formatNumber('+381601234567'), '+381 60 123 4567');
     assert.equal(formatNumber('+12125550100'), '+1 212 555 0100');
     assert.equal(formatNumber('+4915123456789'), '+49 1512 345 6789');
@@ -61,16 +61,16 @@ test('formatNumber groups a number readably: calling code, a short first group, 
 test('renderWording fills {{number}} (every one), or the no-number text; a wording without it stays as it is', () => {
     const {renderWording, NUMBER} = core();
     assert.equal(NUMBER, '{{number}}');
-    assert.equal(renderWording('Yes, text me at {{number}}. Reply STOP to stop.', '+381611234530', 'this number'),
-        'Yes, text me at +381 61 123 4530. Reply STOP to stop.');
+    assert.equal(renderWording('Yes, text me at {{number}}. Reply STOP to stop.', '+12025550123', 'this number'),
+        'Yes, text me at +1 202 555 0123. Reply STOP to stop.');
     assert.equal(renderWording('{{number}} / {{number}}', '+12125550100', ''), '+1 212 555 0100 / +1 212 555 0100');
     assert.equal(renderWording('Yes, text me at {{number}}.', '', 'this number'), 'Yes, text me at this number.');
-    assert.equal(renderWording('Yes, text me offers at this number.', '+381611234530', 'x'), 'Yes, text me offers at this number.');
+    assert.equal(renderWording('Yes, text me offers at this number.', '+12025550123', 'x'), 'Yes, text me offers at this number.');
 });
 
 test('the wording hash sent is the configured wording\'s, never the rendered text\'s', async () => {
     const {fetch, calls} = fetcher(200, true);
-    await core().record({url: '/u', type: 't', reference: 'r', recipient: '+381611234530',
+    await core().record({url: '/u', type: 't', reference: 'r', recipient: '+12025550123',
         wordingHash: 'hash-of-the-template', fetch});
     assert.equal(calls[0].body.wordingHash, 'hash-of-the-template', 'passed through unchanged');
 });

@@ -172,14 +172,14 @@ class AddressConsentTest extends TestCase
     public function testAWordingWithTheNumberPlaceholderIsHashedAndStoredAsConfigured(): void
     {
         $this->wording = 'Yes, text me offers at {{number}}. Reply STOP to stop.';
-        $this->assertTrue($this->management()->recordGuest('sms_offer', 'masked', '+381611234530',
+        $this->assertTrue($this->management()->recordGuest('sms_offer', 'masked', '+12025550123',
             hash('sha256', 'Yes, text me offers at {{number}}. Reply STOP to stop.')));
-        $this->assertSame(['record', 'sms_offer', 'sms', '+381611234530', 2, 3,
+        $this->assertSame(['record', 'sms_offer', 'sms', '+12025550123', 2, 3,
             'Yes, text me offers at {{number}}. Reply STOP to stop.',
             'H(commercekings_notification_address_consent_ip|203.0.113.7)'], $this->calls('record')[0]);
         try {
-            $this->management()->recordGuest('sms_offer', 'masked', '+381611234530',
-                hash('sha256', 'Yes, text me offers at +381 61 123 4530. Reply STOP to stop.'));
+            $this->management()->recordGuest('sms_offer', 'masked', '+12025550123',
+                hash('sha256', 'Yes, text me offers at +1 202 555 0123. Reply STOP to stop.'));
             $this->fail('The rendered text is not the evidence');
         } catch (InputException $error) {
             $this->assertStringContainsString('changed', $error->getMessage());

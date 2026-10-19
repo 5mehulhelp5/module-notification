@@ -365,7 +365,7 @@ banner installed for other reasons does not show your switch in the opt-out setu
 ### Address consent
 
 A messaging type usually needs a consent for the number itself – a checkbox next to the phone field ("Yes, text me
-offers at +381 61 123 4530"). Notification ships it; your type only declares it:
+offers at +1 202 555 0123"). Notification ships it; your type only declares it:
 
 1. A virtual type of `Model\AddressConsent` for your type code, injected into your type and returned by its
    `getPermission()`:
@@ -394,7 +394,7 @@ offers at +381 61 123 4530"). Notification ships it; your type only declares it:
    a module's own channel (e.g. `telegram`) the provider module adds `wording_<channel>` to that group in its own
    `system.xml`, with a default in its `config.xml`. A wording may contain `{{number}}`
    (`AddressConsentManagementInterface::NUMBER`): the checkbox shows it with the number, grouped
-   (`address-consent-core`'s `renderWording()` / `formatNumber()`: "+381 61 123 4530"; "this number" while there is
+   (`address-consent-core`'s `renderWording()` / `formatNumber()`: "+1 202 555 0123"; "this number" while there is
    none); a wording without it is shown as it is. Only the Luma checkout is supported; a custom checkout can build on
    `CommerceKings_Notification/js/address-consent-core` (`record()`) or the REST routes.
 3. REST: `POST /V1/ck-notification/address-consents` (guest) and `/mine` (customer) with `{"type", "reference",

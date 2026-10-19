@@ -1,7 +1,7 @@
 /**
  * Address consent, framework-free: record() posts a checkbox consent (or its withdrawal) for one address to
  * Notification's REST route; renderWording() shows the configured wording with its {{number}} placeholder filled in
- * (formatNumber(): "+381 61 123 4530"). The evidence is the configured wording itself - its hash is what record()
+ * (formatNumber(): "+1 202 555 0123"). The evidence is the configured wording itself - its hash is what record()
  * sends - and the number is stored with it as the recipient. Framework-free: a custom storefront can build its
  * checkbox on it (only Luma's is shipped).
  */
@@ -58,7 +58,7 @@ define([], function () {
 
     /**
      * A number in E.164 as people read it: the calling code, a short first group, then groups of three, the last of
-     * up to four - "+381 61 123 4530", "+1 212 555 0100", "+49 1512 345 6789". Anything else is returned unchanged.
+     * up to four - "+381 60 123 4567", "+1 212 555 0100", "+49 1512 345 6789". Anything else is returned unchanged.
      *
      * @param {string} number
      * @return {string}
