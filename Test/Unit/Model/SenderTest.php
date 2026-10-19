@@ -49,10 +49,15 @@ class SenderTest extends TestCase
     private array $quietRecipients = [];
     /** quiet hours calls: [store, channel, recipient] */
     private array $quietAsked = [];
+    /** thrown by the cooldown claim, by the next cooldown releases (one each), by the stop list check */
+    private ?\Throwable $claimFails = null;
+    private array $releaseFails = [];
+    private ?\Throwable $stopListFails = null;
 
     /** @param object|null $mailMessage the transport's message; null: Magento 2.4.8+ (Symfony) */
     /** @param ProviderInterface[] $extra more providers; $selected the stored provider code */
-    private function sender(int $cooldownDays = 7, bool $stopFails = false, ?object $mailMessage = null,
+    /** @param bool|\Throwable $stopFails leaving the store's emulation fails (true: a RuntimeException) */
+    private function sender(int $cooldownDays = 7, bool|\Throwable $stopFails = false, ?object $mailMessage = null,
         array $extra = [], ?string $selected = null, array $normalizers = []): Sender
     {
         $this->native = (new \Symfony\Component\Mime\Email())->from('shop@example.test')->to('a@test.com')->text('x');
@@ -81,15 +86,23 @@ class SenderTest extends TestCase
         $emulation->method('stopEnvironmentEmulation')->willReturnCallback(function () use ($stopFails) {
             $this->emulated[] = 'stop';
             if ($stopFails) {
-                throw new \RuntimeException('emulation cleanup failed');
+                throw $stopFails instanceof \Throwable ? $stopFails : new \RuntimeException('emulation cleanup failed');
             }
         });
         $cooldown = $this->createStub(CooldownInterface::class);
         $cooldown->method('claim')->willReturnCallback(function ($email) {
             $this->claims[] = $email;
+            if ($this->claimFails) {
+                throw $this->claimFails;
+            }
             return $this->inCooldown ? null : 'token';
         });
-        $cooldown->method('release')->willReturnCallback(function ($email, $token) { $this->released[] = [$email, $token]; });
+        $cooldown->method('release')->willReturnCallback(function ($email, $token) {
+            if ($this->releaseFails) {
+                throw array_shift($this->releaseFails); // not released
+            }
+            $this->released[] = [$email, $token];
+        });
         $config = $this->createStub(Config::class);
         $config->method('getCooldownDays')->willReturn($cooldownDays);
         $config->method('getProviderCode')->willReturn($selected);
@@ -98,7 +111,12 @@ class SenderTest extends TestCase
         $logger->method('warning')->willReturnCallback(function ($text) { $this->warnings[] = $text; });
         $this->pool = new ProviderPool($config, [new MagentoEmail($builder, new OneClickHeaders(), $logger), ...$extra]);
         $stopList = $this->createStub(\CommerceKings\Notification\Api\StopListInterface::class);
-        $stopList->method('isStopped')->willReturnCallback(fn ($channel, $recipient) => in_array($channel . ':' . $recipient, $this->stopped, true));
+        $stopList->method('isStopped')->willReturnCallback(function ($channel, $recipient) {
+            if ($this->stopListFails) {
+                throw $this->stopListFails;
+            }
+            return in_array($channel . ':' . $recipient, $this->stopped, true);
+        });
         $stopList->method('getStopUrl')->willReturnCallback(fn () => $this->stopUrl);
         $quietHours = $this->createStub(\CommerceKings\Notification\Api\QuietHoursInterface::class);
         $quietHours->method('isQuiet')->willReturnCallback(function ($storeId, $channel, $recipient = null) {
@@ -459,5 +477,68 @@ class SenderTest extends TestCase
             fn () => new DeliveryContent([], text: 'Your cart is waiting'))));
         $this->assertNull($this->mail['text_one_click']);
         $this->assertSame([], $this->warnings, 'no warning for a link the sender added itself');
+    }
+
+    /** A deadlock or lock wait (Magento's DB adapter) where the sender writes or reads its state. */
+    public static function lockErrors(): array
+    {
+        return ['deadlock' => [new \Magento\Framework\DB\Adapter\DeadlockException('Deadlock found')],
+            'lock wait timeout' => [new \Magento\Framework\DB\Adapter\LockWaitException('Lock wait timeout')]];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('lockErrors')]
+    public function testALockErrorAtTheCooldownClaimSurfacesAndNothingIsSent(\Throwable $error): void
+    {
+        $this->claimFails = $error;
+        try {
+            $this->sender()->send($this->message());
+            $this->fail('The lock error must reach the caller, so the message is rejected and retried later.');
+        } catch (\Throwable $thrown) {
+            $this->assertSame($error, $thrown);
+        }
+        $this->assertSame(0, $this->sent);
+        $this->assertSame([], $this->released, 'nothing was claimed, nothing to release');
+        $this->assertSame([], $this->emulated, 'never handed to a provider');
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('lockErrors')]
+    public function testALockErrorAtTheStopListCheckSurfacesBeforeAnyClaim(\Throwable $error): void
+    {
+        $this->stopListFails = $error;
+        try {
+            $this->sender()->send($this->message());
+            $this->fail('Expected the lock error');
+        } catch (\Throwable $thrown) {
+            $this->assertSame($error, $thrown);
+        }
+        $this->assertSame([[], 0], [$this->claims, $this->sent]);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('lockErrors')]
+    public function testALockErrorInThePostSendCleanupKeepsTheClaimAndSaysSent(\Throwable $error): void
+    {
+        $sender = $this->sender(stopFails: $error);
+        try {
+            $sender->send($this->message());
+            $this->fail('Expected MessageSentException');
+        } catch (MessageSentException $sent) {
+            $this->assertSame($error, $sent->getPrevious());
+        }
+        $this->assertSame(1, $this->sent);
+        $this->assertSame([], $this->released, 'the cooldown stays claimed: a retry must not send again');
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('lockErrors')]
+    public function testALockErrorReleasingAChangedRecipientsClaimIsRetriedOnce(\Throwable $error): void
+    {
+        $this->releaseFails = [$error];
+        try {
+            $this->sender()->send($this->message(current: fn () => false));
+            $this->fail('Expected the lock error');
+        } catch (\Throwable $thrown) {
+            $this->assertSame($error, $thrown);
+        }
+        $this->assertSame([['a@test.com', 'token']], $this->released, 'released on the second try');
+        $this->assertSame(0, $this->sent);
     }
 }
