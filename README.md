@@ -23,6 +23,8 @@ A feature (e.g. abandoned cart) says *what and when*; Notification handles *who 
 
 Provider modules: [Twilio](https://github.com/commercekings/module-notification-twilio), [Infobip](https://github.com/commercekings/module-notification-infobip) · Features: [Abandoned Cart](https://github.com/commercekings/module-abandoned-cart) (+ [SMS](https://github.com/commercekings/module-abandoned-cart-sms))
 
+Infobip is tested on a live account (outgoing texts and delivery reports); Twilio so far only against a simulated API.
+
 ## The model
 
 - A **notification type** is one kind of message, registered by a feature. It decides when to send and builds
