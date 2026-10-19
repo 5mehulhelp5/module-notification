@@ -35,19 +35,31 @@ interface StopListInterface
 
     /**
      * Stops the recipient and removes their stoppable subscriptions; a link or reply stop also withdraws the address's
-     * checkbox consents (and the subscriptions on them). A stronger reason already stored is kept.
+     * checkbox consents (and the subscriptions on them). A stronger reason already stored is kept, and so is the later
+     * stop time: the same stop delivered twice changes nothing.
      *
      * @param string $reason a REASON_* constant
+     * @param \DateTimeImmutable|null $requestedAt when the person asked (e.g. the provider's receive time of a STOP
+     *     reply); null: now. A time in the future counts as now.
      * @throws \InvalidArgumentException for an unknown reason, or a recipient not valid for the channel (normalizes to '')
      */
-    public function stop(string $channel, string $recipient, string $reason = self::REASON_LINK): void;
+    public function stop(
+        string $channel,
+        string $recipient,
+        string $reason = self::REASON_LINK,
+        ?\DateTimeImmutable $requestedAt = null
+    ): void;
 
     /**
-     * Lifts the stop, whatever its reason (e.g. a START reply). Removed subscriptions do not come back.
+     * Lifts the stop, whatever its reason (e.g. a START reply). Removed subscriptions do not come back. With
+     * $requestedAt, only a stop older than it is lifted: a START that arrives late, after a newer STOP, leaves the
+     * recipient stopped (webhooks can be retried and arrive out of order).
      *
+     * @param \DateTimeImmutable|null $requestedAt when the person asked (e.g. the provider's receive time of a START
+     *     reply); null: lift whatever stop there is. A time in the future counts as now.
      * @throws \InvalidArgumentException when the recipient is not valid for the channel (normalizes to '')
      */
-    public function resume(string $channel, string $recipient): void;
+    public function resume(string $channel, string $recipient, ?\DateTimeImmutable $requestedAt = null): void;
 
     /** Lifts link and undeliverable stops without a sign-up attempt for the configured days; returns how many. */
     public function cleanUp(): int;

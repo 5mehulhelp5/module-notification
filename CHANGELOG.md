@@ -44,7 +44,8 @@ First release. Requires Magento 2.4.4 or later (`magento/framework ^103.0.4`).
   channel and removes those subscriptions; sign-ups for a stopped recipient are answered as stored but not written.
   Each stop has a reason (`REASON_LINK`, `REASON_REPLY`, `REASON_UNDELIVERABLE`; the strongest is kept): link and
   undeliverable stops lift after *Lifts after (days without attempts)*, default 90; a STOP reply only by `resume()`
-  (START); an undeliverable number keeps its consents. Stops and links survive
+  (START); an undeliverable number keeps its consents. `stop()` and `resume()` take the request's time (e.g. a
+  reply's receive time): a START lifts only an older stop, so replies delivered out of order cannot undo a newer STOP. Stops and links survive
   `encryption:key:change` while the old key stays in `env.php` (`Model\KeyedHash`).
 - **Quiet hours:** `QuietHoursInterface` and *Quiet hours* (per store view: from – to, may cross midnight; channels; on
   by default: 20:00–08:00 for every channel except email). Stoppable deliveries are held

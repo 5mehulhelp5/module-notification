@@ -20,7 +20,7 @@ or consent the next sign-up comes from.
 |---|---|
 | `recipient_hash` | keyed hash of channel + normalized recipient, like the cooldown – never the address |
 | `reason` | `link`, `reply` (STOP reply or button) or `undeliverable` (`StopListInterface::REASON_*`); the strongest is kept |
-| `stopped_at` | when it was stopped |
+| `stopped_at` | when it was stopped: the latest stop's time – the request time when the caller gave one (e.g. a STOP reply's receive time), else the server's |
 | `last_attempt_at` | the last sign-up attempt for this recipient (starts as `stopped_at`) |
 
 Global, like the cooldown: a stop applies in every website and store, whichever one it came from.

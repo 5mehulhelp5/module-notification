@@ -169,6 +169,9 @@ counts a failed attempt.
   nothing for Notification to do.
 - **START** (UNSTOP, YES – the whole reply, as for STOP): `resume($channel, $from)`. It lifts the stop only – the
   removed subscriptions do not come back; the recipient signs up again (with consent).
+- **Order:** a service that retries its webhooks can deliver a STOP and a START out of order. Pass the reply's own time
+  when the service sends one: `stop($channel, $from, REASON_REPLY, $receivedAt)` and `resume($channel, $from,
+  $receivedAt)` – a START lifts only a stop older than it, and the same STOP twice changes nothing.
 - **Undeliverable numbers** (invalid, a landline, not reachable): when the service refuses at once, `send()` throws, so
   the feature counts a failed attempt and gives up after its retries. When it reports later (a status callback, e.g.
   Twilio 30003/30005/30006, 21211), call `stop($channel, $to, StopListInterface::REASON_UNDELIVERABLE)`: the number is

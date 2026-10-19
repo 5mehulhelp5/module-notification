@@ -32,6 +32,9 @@ class StopList implements StopListInterface
     ) {
     }
 
+    /** SQL for a bound request time: never later than now; NULL (no time given) is now. */
+    private const TIME = 'LEAST(COALESCE(?, NOW()), NOW())';
+
     /** How strong a reason is: a stop keeps the strongest it was given. */
     private const STRENGTH = [self::REASON_UNDELIVERABLE => 1, self::REASON_LINK => 2, self::REASON_REPLY => 3];
 
@@ -52,8 +55,12 @@ class StopList implements StopListInterface
         return is_string($reason) && $reason !== '' ? $reason : null;
     }
 
-    public function stop(string $channel, string $recipient, string $reason = self::REASON_LINK): void
-    {
+    public function stop(
+        string $channel,
+        string $recipient,
+        string $reason = self::REASON_LINK,
+        ?\DateTimeImmutable $requestedAt = null
+    ): void {
         if (!isset(self::STRENGTH[$reason])) {
             throw new \InvalidArgumentException(sprintf('Unknown stop reason "%s".', $reason));
         }
@@ -67,16 +74,19 @@ class StopList implements StopListInterface
             // parallel stops of one recipient wait for each other instead of conflicting (MariaDB refuses to update a
             // row changed since the transaction first read).
             $strength = "FIELD(%s, 'undeliverable', 'link', 'reply')";
-            $upsert = sprintf('INSERT INTO %s (recipient_hash, reason, stopped_at, last_attempt_at) VALUES (?, ?, NOW(), NOW())'
-                . ' ON DUPLICATE KEY UPDATE last_attempt_at = NOW(), reason = IF(%s > %s, VALUES(reason), reason)',
-                $db->quoteIdentifier($table), sprintf($strength, 'VALUES(reason)'), sprintf($strength, 'reason'));
-            $db->query($upsert, [$hashes[0], $reason]);
+            // the stop time is the latest stop's (a resume with a time lifts only an older stop)
+            $upsert = sprintf('INSERT INTO %s (recipient_hash, reason, stopped_at, last_attempt_at)'
+                . ' VALUES (?, ?, %s, NOW()) ON DUPLICATE KEY UPDATE last_attempt_at = NOW(),'
+                . ' reason = IF(%s > %s, VALUES(reason), reason), stopped_at = GREATEST(stopped_at, VALUES(stopped_at))',
+                $db->quoteIdentifier($table), self::TIME, sprintf($strength, 'VALUES(reason)'), sprintf($strength, 'reason'));
+            $db->query($upsert, [$hashes[0], $reason, $this->utc($requestedAt)]);
             if (count($hashes) > 1) {
-                // the same recipient stopped under an older key: its reason counts too, then one row under the newest key
-                foreach ($db->fetchCol($db->select()->from($table, 'reason')
+                // the same recipient stopped under an older key: its reason and time count too, then one row under the
+                // newest key
+                foreach ($db->fetchAll($db->select()->from($table, ['reason', 'stopped_at'])
                     ->where('recipient_hash IN (?)', array_slice($hashes, 1))) as $older) {
-                    if (isset(self::STRENGTH[$older])) {
-                        $db->query($upsert, [$hashes[0], (string)$older]);
+                    if (isset(self::STRENGTH[$older['reason']])) {
+                        $db->query($upsert, [$hashes[0], (string)$older['reason'], (string)$older['stopped_at']]);
                     }
                 }
                 $db->delete($table, ['recipient_hash IN (?)' => array_slice($hashes, 1)]);
@@ -96,10 +106,21 @@ class StopList implements StopListInterface
         }
     }
 
-    public function resume(string $channel, string $recipient): void
+    public function resume(string $channel, string $recipient, ?\DateTimeImmutable $requestedAt = null): void
     {
-        $this->resource->getConnection()->delete($this->resource->getTableName(self::TABLE),
-            ['recipient_hash IN (?)' => $this->hashes($channel, $recipient)]);
+        $db = $this->resource->getConnection();
+        $where = ['recipient_hash IN (?)' => $this->hashes($channel, $recipient)];
+        if ($requestedAt !== null) {
+            // same second: which came first is unknown, so the stop stays (the safe side)
+            $where[] = $db->quoteInto('stopped_at < ' . self::TIME, $this->utc($requestedAt));
+        }
+        $db->delete($this->resource->getTableName(self::TABLE), $where);
+    }
+
+    /** A request time as the database session's UTC timestamp; null stays null (then TIME is NOW()). */
+    private function utc(?\DateTimeImmutable $time): ?string
+    {
+        return $time?->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s');
     }
 
     public function touch(string $channel, string $recipient): bool
