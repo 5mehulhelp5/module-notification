@@ -122,13 +122,30 @@ class MultiChannelTest extends TestCase
     {
         $db = $this->resource->getConnection();
         if ($this->customerId !== null) {
-            $db->delete($this->resource->getTableName('customer_entity'), ['entity_id = ?' => $this->customerId]);
+            // through the repository: Magento's customer grid row goes too
+            $registry = $this->om->get(\Magento\Framework\Registry::class);
+            $registry->register('isSecureArea', true, true);
+            try {
+                $this->om->get(\Magento\Customer\Api\CustomerRepositoryInterface::class)->deleteById($this->customerId);
+            } finally {
+                $registry->unregister('isSecureArea');
+            }
             $this->stopList->resume('email', 'ck-multi-' . $this->run . '@example.test');
         }
-        $db->delete($this->resource->getTableName(SubscriptionManagement::TABLE),
-            ['type IN (?)' => [$this->type('sms'), $this->type('whatsapp')]]);
-        $db->delete($this->resource->getTableName(ContactRepository::TABLE),
-            ['channel IN (?)' => ['sms', 'whatsapp'], 'recipient LIKE ?' => '%' . $this->number()]);
+        $types = [$this->type('sms'), $this->type('whatsapp')];
+        $contacts = $db->fetchCol($db->select()->from($this->resource->getTableName(SubscriptionManagement::TABLE),
+            'contact_id')->where('type IN (?)', $types));
+        $db->delete($this->resource->getTableName(SubscriptionManagement::TABLE), ['type IN (?)' => $types]);
+        // this run's numbers on both channels however they were typed, also of sign-ups replaced during a test
+        $website = (int)$this->om->get(StoreManagerInterface::class)->getStore($this->storeId)->getWebsiteId();
+        foreach (['sms', 'whatsapp'] as $channel) {
+            foreach ([$this->number(), $this->otherNumber()] as $number) {
+                $contacts[] = $this->contacts->find($website, $number, $channel);
+            }
+        }
+        if (array_filter($contacts)) {
+            $db->delete($this->resource->getTableName(ContactRepository::TABLE), ['contact_id IN (?)' => array_filter($contacts)]);
+        }
         foreach (['sms', 'whatsapp'] as $channel) {
             $this->stopList->resume($channel, $this->number());
             $db->delete($this->resource->getTableName('ck_notification_cooldown'),
@@ -145,6 +162,12 @@ class MultiChannelTest extends TestCase
     private function number(): string
     {
         return '06' . substr((string)hexdec($this->run), 0, 8);
+    }
+
+    /** Another number of this run: the last digit changed. */
+    private function otherNumber(): string
+    {
+        return substr($this->number(), 0, -1) . (((int)substr($this->number(), -1) + 1) % 10);
     }
 
     private function subscriptionType(string $channel): SubscriptionTypeInterface
@@ -284,9 +307,7 @@ class MultiChannelTest extends TestCase
     {
         $this->management->subscribeGuest($this->type('sms'), 'ref', $this->number());
         $this->management->subscribeGuest($this->type('sms'), 'ref', $this->number());
-        // another number: the last digit changed
-        $other = substr($this->number(), 0, -1) . (((int)substr($this->number(), -1) + 1) % 10);
-        $this->management->subscribeGuest($this->type('sms'), 'ref', $other);
+        $this->management->subscribeGuest($this->type('sms'), 'ref', $this->otherNumber());
         $id = (int)$this->resource->getConnection()->fetchOne($this->resource->getConnection()->select()
             ->from($this->resource->getTableName(SubscriptionManagement::TABLE), 'subscription_id')
             ->where('type = ?', $this->type('sms')));
@@ -297,8 +318,6 @@ class MultiChannelTest extends TestCase
         $this->assertNotSame($this->saved[0]['contact_id'], $this->saved[1]['contact_id']);
         $this->assertSame([null, $this->saved[0]['contact_id']],
             [$this->saved[0]['previous_contact_id'], $this->saved[1]['previous_contact_id']], 'the number before the change');
-        $this->resource->getConnection()->delete($this->resource->getTableName(ContactRepository::TABLE),
-            ['contact_id = ?' => $this->saved[1]['contact_id']]);
     }
 
     /** first_for_address: the first subscription of a number in the website, not every new one of a known number. */
@@ -307,12 +326,8 @@ class MultiChannelTest extends TestCase
         $this->management->subscribeGuest($this->type('sms'), 'ref', $this->number());
         $this->references['sms'] = random_int(1000000000, 2000000000);   // another cart, the same number
         $this->management->subscribeGuest($this->type('sms'), 'ref', $this->number());
-        $other = substr($this->number(), 0, -1) . (((int)substr($this->number(), -1) + 1) % 10);
-        $this->management->subscribeGuest($this->type('sms'), 'ref', $other);
+        $this->management->subscribeGuest($this->type('sms'), 'ref', $this->otherNumber());
         $this->assertSame([true, false, true], array_map(fn ($event) => $event['first_for_address'], $this->saved),
             'first cart: confirm; second cart of the number: not again; a new number: confirm');
-        $db = $this->resource->getConnection();
-        $db->delete($this->resource->getTableName(SubscriptionManagement::TABLE), ['contact_id = ?' => $this->saved[2]['contact_id']]);
-        $db->delete($this->resource->getTableName(ContactRepository::TABLE), ['contact_id = ?' => $this->saved[2]['contact_id']]);
     }
 }

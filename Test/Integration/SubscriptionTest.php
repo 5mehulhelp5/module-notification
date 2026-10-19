@@ -76,8 +76,10 @@ class SubscriptionTest extends TestCase
         $contacts = $db->fetchCol($db->select()->from($this->table(SubscriptionManagement::TABLE), 'contact_id')
             ->where('type = ?', $this->type)->where('contact_id IS NOT NULL'));
         $db->delete($this->table(SubscriptionManagement::TABLE), ['type = ?' => $this->type]);
+        // every address of this run: name.<type>@example.test, and person.<type>@ in two spellings
         $contacts = array_merge($contacts, $db->fetchCol($db->select()->from($this->table(ContactRepository::TABLE), 'contact_id')
-            ->where('recipient LIKE ?', '%.' . $this->type . '@example.test')));
+            ->where('recipient LIKE ?', '%.' . $this->type . '@example.test')
+            ->orWhere('recipient LIKE ?', 'person.' . $this->type . '@%')));
         if ($contacts) {
             $db->delete($this->table(ContactRepository::TABLE), ['contact_id IN (?)' => $contacts]);
         }
@@ -397,7 +399,6 @@ class SubscriptionTest extends TestCase
         $this->assertTrue($management->subscribeGuest($this->type, 'ref', $plain));
         $this->assertTrue($management->subscribeGuest($this->type, 'ref', $accented));
         $this->assertSame([$plain, $accented], array_column($this->rows(), 'email'), 'each subscription mails its own address');
-        $this->resource->getConnection()->delete($this->table(ContactRepository::TABLE), ['contact_id IN (?)' => [$plainId, $accentedId]]);
     }
 
     public function testCleanupRemovesOnlyOrphanedSubscriptionsOfRegisteredTypes(): void

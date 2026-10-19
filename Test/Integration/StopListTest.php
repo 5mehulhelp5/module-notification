@@ -104,7 +104,9 @@ class StopListTest extends TestCase
         $this->assertFalse($this->stopList->touch(Channel::EMAIL, $this->email('a')), 'not stopped: nothing to touch');
         $this->stopList->stop(Channel::EMAIL, $this->email('a'));
         $this->stopList->stop(Channel::EMAIL, $this->email('b'));
-        $db->update($table, ['last_attempt_at' => new \Zend_Db_Expr('NOW() - INTERVAL 400 DAY')]);
+        // only this test's stops: aging every row would let the cleanup lift other recipients' stops
+        $db->update($table, ['last_attempt_at' => new \Zend_Db_Expr('NOW() - INTERVAL 400 DAY')],
+            ['recipient_hash IN (?)' => [$this->hashOf($this->email('a')), $this->hashOf($this->email('b'))]]);
         $this->assertTrue($this->stopList->touch(Channel::EMAIL, $this->email('a')), 'an attempt keeps a\'s stop alive');
         $this->stopList->cleanUp();
         $this->assertTrue($this->stopList->isStopped(Channel::EMAIL, $this->email('a')));

@@ -12,6 +12,7 @@ use CommerceKings\Notification\Model\AddressConsent;
 use CommerceKings\Notification\Model\AddressConsentManagement;
 use CommerceKings\Notification\Model\AddressConsentRepository;
 use CommerceKings\Notification\Model\Config;
+use CommerceKings\Notification\Model\ContactRepository;
 use CommerceKings\Notification\Model\PermissionResolver;
 use CommerceKings\Notification\Model\StopList;
 use CommerceKings\Notification\Model\SubscriptionManagement;
@@ -36,6 +37,8 @@ class AddressConsentTest extends TestCase
     private int $storeId;
     private int $referenceId;
     private string $number;
+    /** another number of this run (the last digit changed) */
+    private string $other;
     private AddressConsentManagement $consents;
     private SubscriptionManagement $subscriptions;
     private StopList $stopList;
@@ -57,6 +60,7 @@ class AddressConsentTest extends TestCase
         $this->code = 'ck_ac_' . $run;
         $this->referenceId = random_int(1000000000, 2000000000);
         $this->number = '+38160' . substr((string)hexdec($run), 0, 7);
+        $this->other = substr($this->number, 0, -1) . (((int)substr($this->number, -1) + 1) % 10);
 
         $permission = $this->om->create(AddressConsent::class, ['typeCode' => $this->code]);
         $type = $this->createStub(SubscriptionTypeInterface::class);
@@ -72,16 +76,28 @@ class AddressConsentTest extends TestCase
         $shopWide->method('validCondition')->willReturn('1 = 0');
         $this->consents = $this->om->create(AddressConsentManagement::class, ['types' => $types]);
         $this->stopList = $this->om->create(StopList::class, ['types' => $types]);
+        // no subscription observers: a provider module's opt-in confirmation would queue a real text to the number
         $this->subscriptions = $this->om->create(SubscriptionManagement::class, ['types' => $types,
-            'permissions' => new PermissionResolver($shopWide, $types, $this->resource), 'stopList' => $this->stopList]);
+            'permissions' => new PermissionResolver($shopWide, $types, $this->resource), 'stopList' => $this->stopList,
+            'events' => $this->createStub(\Magento\Framework\Event\ManagerInterface::class)]);
     }
 
     protected function tearDown(): void
     {
         $db = $this->resource->getConnection();
+        $contacts = $db->fetchCol($db->select()->from($this->resource->getTableName(SubscriptionManagement::TABLE),
+            'contact_id')->where('type = ?', $this->code));
         $db->delete($this->resource->getTableName(SubscriptionManagement::TABLE), ['type = ?' => $this->code]);
         $db->delete($this->resource->getTableName(AddressConsentRepository::TABLE), ['type = ?' => $this->code]);
         $this->stopList->resume('sms', $this->number);
+        // the numbers' contacts, also of a sign-up removed during the test
+        $website = (int)$this->om->get(StoreManagerInterface::class)->getStore($this->storeId)->getWebsiteId();
+        foreach ([$this->number, $this->other] as $number) {
+            $contacts[] = $this->om->get(ContactRepository::class)->find($website, $number, 'sms');
+        }
+        if (array_filter($contacts)) {
+            $db->delete($this->resource->getTableName(ContactRepository::TABLE), ['contact_id IN (?)' => array_filter($contacts)]);
+        }
     }
 
     private function wordingHash(): string
@@ -116,7 +132,7 @@ class AddressConsentTest extends TestCase
 
         $this->assertTrue($this->subscriptions->subscribeGuest($this->code, 'ref', $this->number));
         $this->assertSame($evidence[0]['reference'], $this->subscription()['permission_ref']);
-        $this->assertFalse($this->subscriptions->subscribeGuest($this->code, 'ref', '+381609999999'),
+        $this->assertFalse($this->subscriptions->subscribeGuest($this->code, 'ref', $this->other),
             'another number for the same cart');
         $this->assertNull($this->subscription(), 'and the previous sign-up of the cart is gone');
     }
