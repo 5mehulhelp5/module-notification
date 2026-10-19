@@ -16,8 +16,14 @@ if ($wording === '') {
 }
 $type = (string)$block->getData('type');
 $id = 'ck-address-consent-' . preg_replace('/[^a-z0-9_-]/i', '', $type);
+$noNumber = (string)__('this number');
+// until the widget has the number: the wording with "this number" in place of {{number}}
+$shown = str_replace(\CommerceKings\Notification\Api\AddressConsentManagementInterface::NUMBER, $noNumber, $wording);
 $options = [
     'type' => $type,
+    // the configured wording is the evidence (its hash is sent); the label shows it with the number in it
+    'wording' => $wording,
+    'noNumber' => $noNumber,
     'wordingHash' => $viewModel->getWordingHash($channel),
     'urls' => $viewModel->getUrls(),
     'phone' => (string)$block->getData('phone'),
@@ -28,5 +34,5 @@ $options = [
 <div class="field choice ck-address-consent"
      data-mage-init="<?= $escaper->escapeHtmlAttr(json_encode(['CommerceKings_Notification/js/address-consent' => $options])) ?>">
     <input type="checkbox" class="checkbox" id="<?= $escaper->escapeHtmlAttr($id) ?>"/>
-    <label class="label" for="<?= $escaper->escapeHtmlAttr($id) ?>"><span><?= $escaper->escapeHtml($wording) ?></span></label>
+    <label class="label" for="<?= $escaper->escapeHtmlAttr($id) ?>"><span><?= $escaper->escapeHtml($shown) ?></span></label>
 </div>

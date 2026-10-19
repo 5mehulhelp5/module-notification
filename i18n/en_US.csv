@@ -39,7 +39,7 @@
 "Messages allowed again","Messages allowed again"
 "Messages stopped","Messages stopped"
 "Minimum gap between notifications to the same recipient on the same channel (e.g. the same email address), across all notifications that use it and all stores. 0 turns it off. Default: 7 days.","Minimum gap between notifications to the same recipient on the same channel (e.g. the same email address), across all notifications that use it and all stores. 0 turns it off. Default: 7 days."
-"Name your store and say what you send, how often and how to stop. Changing it asks visitors who have the old text open to confirm again. Empty: no consent can be given.","Name your store and say what you send, how often and how to stop. Changing it asks visitors who have the old text open to confirm again. Empty: no consent can be given."
+"Name your store and say what you send, how often and how to stop. {{number}} shows the shopper's number (e.g. +381 61 123 4530). Changing it asks visitors who have the old text open to confirm again. Empty: no consent can be given.","Name your store and say what you send, how often and how to stop. {{number}} shows the shopper's number (e.g. +381 61 123 4530). Changing it asks visitors who have the old text open to confirm again. Empty: no consent can be given."
 "No notification provider is available for the %1 channel.","No notification provider is available for the %1 channel."
 "No","No"
 "None selected: every channel except email (e.g. SMS, WhatsApp).","None selected: every channel except email (e.g. SMS, WhatsApp)."
@@ -73,3 +73,4 @@
 "Who delivers the emails. Magento email uses the store's mail settings; an installed provider module adds its own options and settings.","Who delivers the emails. Magento email uses the store's mail settings; an installed provider module adds its own options and settings."
 "Yes","Yes"
 "On by default: 20:00 to 08:00 for every channel except email, as US state rules allow texts from 8 am to 8 pm only. Email is held only if you select it below.","On by default: 20:00 to 08:00 for every channel except email, as US state rules allow texts from 8 am to 8 pm only. Email is held only if you select it below."
+"this number","this number"

@@ -165,6 +165,28 @@ class AddressConsentTest extends TestCase
         $this->assertSame([], $this->calls('record'));
     }
 
+    /**
+     * A wording with {{number}} is shown with the number in it, but the evidence is the configured wording: its hash is
+     * what the browser sends, and it is stored as configured, with the number as the recipient.
+     */
+    public function testAWordingWithTheNumberPlaceholderIsHashedAndStoredAsConfigured(): void
+    {
+        $this->wording = 'Yes, text me offers at {{number}}. Reply STOP to stop.';
+        $this->assertTrue($this->management()->recordGuest('sms_offer', 'masked', '+381611234530',
+            hash('sha256', 'Yes, text me offers at {{number}}. Reply STOP to stop.')));
+        $this->assertSame(['record', 'sms_offer', 'sms', '+381611234530', 2, 3,
+            'Yes, text me offers at {{number}}. Reply STOP to stop.',
+            'H(commercekings_notification_address_consent_ip|203.0.113.7)'], $this->calls('record')[0]);
+        try {
+            $this->management()->recordGuest('sms_offer', 'masked', '+381611234530',
+                hash('sha256', 'Yes, text me offers at +381 61 123 4530. Reply STOP to stop.'));
+            $this->fail('The rendered text is not the evidence');
+        } catch (InputException $error) {
+            $this->assertStringContainsString('changed', $error->getMessage());
+        }
+        $this->assertSame('{{number}}', \CommerceKings\Notification\Api\AddressConsentManagementInterface::NUMBER);
+    }
+
     public function testUncheckingWithdrawsTheConsentAndItsSubscriptions(): void
     {
         $this->assertTrue($this->management()->recordGuest('sms_offer', 'masked', '+381601234567', '', false));

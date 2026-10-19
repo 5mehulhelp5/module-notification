@@ -72,7 +72,7 @@
                 <comment>The checkbox next to a phone field for notifications that ask for their own consent (e.g. text message offers). Each consent is stored with this exact text, the time and a hashed IP address, for that one number.</comment>
                 <field id="wording_sms" translate="label comment" type="textarea" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Checkbox text: text messages</label>
-                    <comment>Name your store and say what you send, how often and how to stop. Changing it asks visitors who have the old text open to confirm again. Empty: no consent can be given.</comment>
+                    <comment><![CDATA[Name your store and say what you send, how often and how to stop. {{number}} shows the shopper's number (e.g. +381 61 123 4530). Changing it asks visitors who have the old text open to confirm again. Empty: no consent can be given.]]></comment>
                 </field>
                 <field id="wording_whatsapp" translate="label comment" type="textarea" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Checkbox text: WhatsApp</label>

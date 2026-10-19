@@ -8,8 +8,8 @@ const vm = require('node:vm');
  * The Luma checkbox (address-consent.js) with a minimal jQuery stand-in and a scripted core: each core.record() call
  * takes the next answer (true: recorded, false: failed).
  */
-function widget(answers) {
-    const state = {checked: false, phone: '+381601234567', events: [], posts: []};
+function widget(answers, options = {}) {
+    const state = {checked: false, phone: '+381601234567', events: [], posts: [], label: 'rendered by the template'};
     const element = (name) => ({
         name,
         handlers: {},
@@ -34,14 +34,19 @@ function widget(answers) {
         val() { return state.phone; }
     });
     const box = element('box');
-    const root = Object.assign(element('root'), {find: () => box});
+    const label = {text(value) { state.label = value; return label; }, first() { return label; }};
+    const root = Object.assign(element('root'), {find: (selector) => (selector.includes('label') ? label : box)});
     const doc = element('document');
     const phone = element('phone');
     const document = {};
     let proto;
     const $ = (target) => (target === document ? doc : phone);
     $.widget = (name, definition) => { proto = definition; $.commercekings = {ckAddressConsent: definition}; };
+    let real;
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '../../view/frontend/web/js/address-consent-core.js'), 'utf8'),
+        vm.createContext({define: (names, factory) => { real = factory(); }, JSON, Promise, String, Object, Math}));
     const core = {
+        ...real,
         record: (options) => {
             state.posts.push({recipient: options.recipient, given: options.given});
             return answers.shift() ? Promise.resolve(true) : Promise.reject(new Error('Address consent not recorded (503)'));
@@ -55,7 +60,7 @@ function widget(answers) {
     }));
     const instance = Object.create(proto);
     Object.assign(instance, {element: root, uuid: 1,
-        options: {...proto.options, type: 'cart_reminder_sms', phone: '#phone', urls: {guest: '/g', mine: '/m'}}});
+        options: {...proto.options, type: 'cart_reminder_sms', phone: '#phone', urls: {guest: '/g', mine: '/m'}, ...options}});
     instance._create();
     /** what the shopper does: tick or untick the box, or change the number (the phone field's change event) */
     const user = {
@@ -134,4 +139,21 @@ test('a cleared number withdraws the consent; if that fails, the box stays check
     assert.deepEqual(state.posts.slice(1), [{recipient: '+381601234567', given: false}]);
     assert.equal(state.checked, true);
     assert.equal(instance.recordedFor, '+381601234567');
+});
+
+test('a wording with {{number}} is shown with the number, and follows a changed number (checked or not)', async () => {
+    const {state, user} = widget([], {wording: 'Yes, text me at {{number}}. Reply STOP to stop.', noNumber: 'this number'});
+    assert.equal(state.label, 'Yes, text me at +381 60 123 4567. Reply STOP to stop.');
+    await user.number('+381611234530');
+    assert.equal(state.label, 'Yes, text me at +381 61 123 4530. Reply STOP to stop.');
+    assert.deepEqual(state.posts, [], 'unchecked: only the label changes');
+    await user.number('');
+    assert.equal(state.label, 'Yes, text me at this number. Reply STOP to stop.');
+});
+
+test('a wording without the placeholder is left as the template rendered it', async () => {
+    const {state, user} = widget([], {wording: 'Yes, text me offers at this number.'});
+    assert.equal(state.label, 'rendered by the template');
+    await user.number('+381611234530');
+    assert.equal(state.label, 'rendered by the template');
 });

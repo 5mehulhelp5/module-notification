@@ -18,9 +18,9 @@
                 <lift_days>90</lift_days>
             </do_not_contact>
             <address_consent>
-                <wording_sms>Yes, text me offers and reminders at this number. Message frequency varies; message and data rates may apply. Reply STOP to stop.</wording_sms>
-                <wording_whatsapp>Yes, send me offers and reminders on WhatsApp at this number. I can stop them at any time.</wording_whatsapp>
-                <wording_viber>Yes, send me offers and reminders on Viber at this number. I can stop them at any time.</wording_viber>
+                <wording_sms>Yes, text me offers and reminders at {{number}}. Msg frequency varies; msg &amp; data rates may apply. Reply STOP to stop.</wording_sms>
+                <wording_whatsapp>Yes, send me offers and reminders on WhatsApp at {{number}}. I can stop them at any time.</wording_whatsapp>
+                <wording_viber>Yes, send me offers and reminders on Viber at {{number}}. I can stop them at any time.</wording_viber>
                 <keep_withdrawn_days>1825</keep_withdrawn_days>
             </address_consent>
         </commercekings_notification>

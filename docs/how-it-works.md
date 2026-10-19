@@ -23,12 +23,14 @@ Each module answers one question:
   the commit (with `created` and `previous_contact_id`), e.g. for an opt-in confirmation; an observer error is
   logged, never the sign-up's.
 - **Withdrawal**: one handler removes the subscriptions of withdrawn permissions for every type.
-- **Address consent** (`Model\AddressConsent`, a type's own permission): a checkbox consent for one address, per
-  type, channel and website, recorded through `Api\AddressConsentManagementInterface` with the exact wording shown.
-  Evidence in `ck_notification_address_consent`: the wording and its hash, the time, the store view, keyed hashes of
-  the address and the IP – never the number itself. Unchecking or a stop withdraws it and ends the subscriptions on
-  it; cron `commercekings_notification_address_consent_cleanup` (daily 03:25) deletes withdrawn evidence after the
-  store view's days. Active consents are kept.
+- **Address consent** (`Model\AddressConsent`, a type's own permission): a checkbox consent for one address, per type,
+  channel and website, recorded through `Api\AddressConsentManagementInterface` with the exact wording shown – a
+  configured wording may hold `{{number}}`, shown with the number in it and stored as configured (its hash is the
+  configured text's), the number being the consent's recipient. Evidence in `ck_notification_address_consent`: the
+  wording and its hash, the time, the store view, keyed hashes of the address and the IP – never the number itself.
+  Unchecking or a stop withdraws it and ends the subscriptions on it; cron
+  `commercekings_notification_address_consent_cleanup` (daily 03:25) deletes withdrawn evidence after the store view's
+  days. Active consents are kept.
 - **Contacts**: guest recipients – an email address, a phone number, … – one per website, channel and address
   (`ck_notification_contact`: `channel`, `recipient`). Identity is `recipient_key`, a hash of the normalized
   address: for email trimmed, Unicode-normalized and lower-cased (letter case is ignored, an accent or any other

@@ -27,10 +27,11 @@ First release. Requires Magento 2.4.4 or later (`magento/framework ^103.0.4`).
   unsubscribe link). Alone: opt-out (`OpenPermission`); with `commercekings/module-consent-notification`: consent.
   Per type: `Model\TypePermission`, `Model\TypeSubscriber`. `OptOutNoticeInterface` resolves a feature's notice.
 - **Address consent:** a checkbox consent for one number, per type, channel and website (`Model\AddressConsent`),
-  recorded through `AddressConsentManagementInterface` (REST `/V1/ck-notification/address-consents`, `/mine`) with
-  the exact wording shown (*Consent for an address*, per store view and channel), the time and keyed hashes of the
-  number and IP (`ck_notification_address_consent`). Unchecking or a stop withdraws it; withdrawn evidence is deleted
-  after *Keep withdrawn consents (days)*, default 1825. Luma checkbox on a framework-free `js/address-consent-core`.
+  recorded through `AddressConsentManagementInterface` (REST `/V1/ck-notification/address-consents`, `/mine`) with the
+  exact wording shown (*Consent for an address*, per store view and channel; `{{number}}` shows the number, while the
+  configured wording is stored and hashed), the time and keyed hashes of the number and IP
+  (`ck_notification_address_consent`). Unchecking or a stop withdraws it; withdrawn evidence is deleted after *Keep
+  withdrawn consents (days)*, default 1825. Luma checkbox on a framework-free `js/address-consent-core`.
 - **Delivery state:** `DeliveryStateInterface` (`ck_notification_delivery_state`) – a feature's send history per
   subscription key, so it survives a withdrawal and a new sign-up; a documented table for atomic claims (also for
   sending once, e.g. an opt-in confirmation; the daily cleanup covers subscription types only).

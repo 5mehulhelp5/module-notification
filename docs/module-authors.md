@@ -362,7 +362,7 @@ banner installed for other reasons does not show your switch in the opt-out setu
 ### Address consent
 
 A messaging type usually needs a consent for the number itself – a checkbox next to the phone field ("Yes, text me
-offers at this number"). Notification ships it; your type only declares it:
+offers at +381 61 123 4530"). Notification ships it; your type only declares it:
 
 1. A virtual type of `Model\AddressConsent` for your type code, injected into your type and returned by its
    `getPermission()`:
@@ -387,14 +387,17 @@ offers at this number"). Notification ships it; your type only declares it:
    element triggers `ckAddressConsent:recorded`. The text is *Notifications > Consent for an address* per store view and
    channel (empty: no checkbox), read from `commercekings_notification/address_consent/wording_<channel>`: `sms`,
    `whatsapp` and `viber` have their fields; for a module's own channel (e.g. `telegram`) the provider module adds
-   `wording_<channel>` to that group in its own `system.xml`, with a default in its `config.xml`. Only the Luma checkout
-   is supported; a custom checkout can build on `CommerceKings_Notification/js/address-consent-core` (`record()`) or
-   the REST routes.
-3. REST: `POST /V1/ck-notification/address-consents` (guest) and `/mine` (customer) with
-   `{"type", "reference", "recipient", "wordingHash", "given"}`. Your type's `authorize()` decides who may record for
-   the reference. `wordingHash` is sha256 of the text the visitor saw: the server stores the store view's configured
-   text and refuses a different hash, so the evidence holds the exact words. `given: false` withdraws the number's
-   consent for the type and website and removes the subscriptions that rested on it.
+   `wording_<channel>` to that group in its own `system.xml`, with a default in its `config.xml`. A wording may contain
+   `{{number}}` (`AddressConsentManagementInterface::NUMBER`): the checkbox shows it with the number, grouped
+   (`address-consent-core`'s `renderWording()` / `formatNumber()`: "+381 61 123 4530"; "this number" while there is
+   none); a wording without it is shown as it is. Only the Luma checkout is supported; a custom checkout can build on
+   `CommerceKings_Notification/js/address-consent-core` (`record()`) or the REST routes.
+3. REST: `POST /V1/ck-notification/address-consents` (guest) and `/mine` (customer) with `{"type", "reference",
+   "recipient", "wordingHash", "given"}`. Your type's `authorize()` decides who may record for the reference.
+   `wordingHash` is sha256 of the store view's configured wording – the template, with its `{{number}}`, not the
+   rendered text: the server stores that wording and refuses a different hash, so the evidence holds the exact words,
+   and the number they were shown with is the consent's recipient. `given: false` withdraws the number's consent for the
+   type and website and removes the subscriptions that rested on it.
 
 What it grants: a subscription of that type, for that exact number (normalized), in that website – another number for
 the same cart gets a fresh check and is refused. Evidence per consent in `ck_notification_address_consent`: the text,

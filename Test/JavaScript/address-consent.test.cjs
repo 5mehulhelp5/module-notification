@@ -8,7 +8,7 @@ const vm = require('node:vm');
 function core() {
     const source = fs.readFileSync(path.join(__dirname, '../../view/frontend/web/js/address-consent-core.js'), 'utf8');
     let module;
-    vm.runInContext(source, vm.createContext({define: (names, factory) => { module = factory(); }, JSON, Promise, String}));
+    vm.runInContext(source, vm.createContext({define: (names, factory) => { module = factory(); }, JSON, Promise, String, Object, Math}));
     return module;
 }
 
@@ -43,4 +43,34 @@ test('a refusal or an error rejects, so the checkbox is not shown as given', asy
         fetch: fetcher(200, false).fetch}), /refused/);
     await assert.rejects(core().record({url: '/u', type: 't', reference: 'r', recipient: '+1', wordingHash: 'h',
         fetch: fetcher(400, {message: 'The consent text has changed.'}).fetch}), /400/);
+});
+
+test('formatNumber groups a number readably: calling code, a short first group, then threes, the last up to four', () => {
+    const {formatNumber} = core();
+    assert.equal(formatNumber('+381611234530'), '+381 61 123 4530');
+    assert.equal(formatNumber('+381601234567'), '+381 60 123 4567');
+    assert.equal(formatNumber('+12125550100'), '+1 212 555 0100');
+    assert.equal(formatNumber('+4915123456789'), '+49 1512 345 6789');
+    assert.equal(formatNumber('+447700900123'), '+44 770 090 0123');
+    assert.equal(formatNumber('+38160123456'), '+381 60 123 456', 'a shorter national number');
+    for (const value of ['', 'abc', '+0123456789', '060 123 4567']) {
+        assert.equal(formatNumber(value), value, 'not E.164: unchanged');
+    }
+});
+
+test('renderWording fills {{number}} (every one), or the no-number text; a wording without it stays as it is', () => {
+    const {renderWording, NUMBER} = core();
+    assert.equal(NUMBER, '{{number}}');
+    assert.equal(renderWording('Yes, text me at {{number}}. Reply STOP to stop.', '+381611234530', 'this number'),
+        'Yes, text me at +381 61 123 4530. Reply STOP to stop.');
+    assert.equal(renderWording('{{number}} / {{number}}', '+12125550100', ''), '+1 212 555 0100 / +1 212 555 0100');
+    assert.equal(renderWording('Yes, text me at {{number}}.', '', 'this number'), 'Yes, text me at this number.');
+    assert.equal(renderWording('Yes, text me offers at this number.', '+381611234530', 'x'), 'Yes, text me offers at this number.');
+});
+
+test('the wording hash sent is the configured wording\'s, never the rendered text\'s', async () => {
+    const {fetch, calls} = fetcher(200, true);
+    await core().record({url: '/u', type: 't', reference: 'r', recipient: '+381611234530',
+        wordingHash: 'hash-of-the-template', fetch});
+    assert.equal(calls[0].body.wordingHash, 'hash-of-the-template', 'passed through unchanged');
 });
