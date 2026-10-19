@@ -103,6 +103,15 @@ How to use them, including messaging for provider modules: [for module authors](
   `encryption:key:change` nothing needs to be run while the old key stays in `env.php`; the cooldown restarts
   ([details](docs/stop-list.md#encryption-key-change)).
 
+## Tested (as of 0.1.0)
+
+- **Automated tests:** 252 unit, 31 integration and 16 JavaScript tests (unit and JavaScript tests run on every push).
+- **Line coverage:** 93.8% with unit and integration tests combined.
+- **End to end on Magento 2.4.9:** email reminders through Magento's mail (caught by a test mail server), with RabbitMQ and with the MySQL queue; SMS and WhatsApp against a simulated Twilio API – opt-in confirmation, STOP and START, quiet hours, provider errors and timeouts.
+- **Load:** 100,000 abandoned carts through the sender, about 3 messages a second per worker, growing linearly, none sent twice; 300 of 300 texts delivered to a simulated provider.
+- **Install:** a fresh install of every CommerceKings package from GitHub on an empty Magento database, verified.
+- **Not tested:** a STOP reply from a real phone (STOP is tested with the providers' webhook formats).
+
 ## More
 
 [How it works](docs/how-it-works.md) · [For module authors](docs/module-authors.md) · [Operations](docs/operations.md) ·
@@ -114,15 +123,6 @@ These modules help you ask for, record and respect your shoppers' choices – th
 their own. You are responsible for your store's privacy: what you collect, the wording you show, your privacy policy and
 whether your setup meets the laws that apply to you (e.g. GDPR, ePrivacy, email and SMS marketing rules). Get legal
 advice if you are unsure.
-
-## Tested (as of 0.1.0)
-
-- **Automated tests:** 252 unit, 31 integration and 16 JavaScript tests (unit and JavaScript tests run on every push).
-- **Line coverage:** 93.8% with unit and integration tests combined.
-- **End to end on Magento 2.4.9:** email reminders through Magento's mail (caught by a test mail server), with RabbitMQ and with the MySQL queue; SMS and WhatsApp against a simulated Twilio API – opt-in confirmation, STOP and START, quiet hours, provider errors and timeouts.
-- **Load:** 100,000 abandoned carts through the sender, about 3 messages a second per worker, growing linearly, none sent twice; 300 of 300 texts delivered to a simulated provider.
-- **Install:** a fresh install of every CommerceKings package from GitHub on an empty Magento database, verified.
-- **Not tested:** a STOP reply from a real phone (STOP is tested with the providers' webhook formats).
 
 ---
 
