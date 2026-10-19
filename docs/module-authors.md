@@ -386,12 +386,14 @@ offers at +381 61 123 4530"). Notification ships it; your type only declares it:
 2. The checkbox: add `CommerceKings_Notification::address-consent.phtml` next to the phone field, with `view_model`
    (`CommerceKings\Notification\ViewModel\AddressConsent`), `type`, `channel` (e.g. `sms`) and `phone` (a CSS selector
    of the phone input); `reference` defaults to the checkout's cart and `mine` to whether the checkout customer is
-   signed in. Checking records the consent, unchecking withdraws it, a changed number moves it. Subscribe after the
-   element triggers `ckAddressConsent:recorded`. The text is *Notifications > Consent for an address* per store view and
-   channel (empty: no checkbox), read from `commercekings_notification/address_consent/wording_<channel>`: `sms`,
-   `whatsapp` and `viber` have their fields; for a module's own channel (e.g. `telegram`) the provider module adds
-   `wording_<channel>` to that group in its own `system.xml`, with a default in its `config.xml`. A wording may contain
-   `{{number}}` (`AddressConsentManagementInterface::NUMBER`): the checkbox shows it with the number, grouped
+   signed in. Checking records the consent, unchecking withdraws it; a changed number (the phone field's change event)
+   unchecks the box and withdraws the consent – a new number gets one only when the box is checked again, never on the
+   shopper's behalf. Subscribe after the element triggers `ckAddressConsent:recorded`. The text is *Notifications >
+   Consent for an address* per store view and channel (empty: no checkbox), read from
+   `commercekings_notification/address_consent/wording_<channel>`: `sms`, `whatsapp` and `viber` have their fields; for
+   a module's own channel (e.g. `telegram`) the provider module adds `wording_<channel>` to that group in its own
+   `system.xml`, with a default in its `config.xml`. A wording may contain `{{number}}`
+   (`AddressConsentManagementInterface::NUMBER`): the checkbox shows it with the number, grouped
    (`address-consent-core`'s `renderWording()` / `formatNumber()`: "+381 61 123 4530"; "this number" while there is
    none); a wording without it is shown as it is. Only the Luma checkout is supported; a custom checkout can build on
    `CommerceKings_Notification/js/address-consent-core` (`record()`) or the REST routes.

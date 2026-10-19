@@ -108,27 +108,51 @@ test('a failed withdrawal checks the box again - the server still holds the cons
     assert.equal(instance.recordedFor, null);
 });
 
-test('a new number whose old consent could not be withdrawn keeps the box checked and retries on the next change',
+test('a new number while checked: the old consent is withdrawn and the box unchecked - nothing recorded for it',
     async () => {
-        const {state, instance, user, events} = widget([true, false, true, true]);
+        const {state, instance, user, events} = widget([true, true, true]);
         await user.check(true);
         await user.number('+381609999999');
-        assert.deepEqual(state.posts.slice(1), [{recipient: '+381601234567', given: false}], 'the new number waits');
-        assert.equal(state.checked, true);
+        assert.deepEqual(state.posts, [{recipient: '+381601234567', given: true},
+            {recipient: '+381601234567', given: false}]);
+        assert.equal(state.checked, false, 'the shopper checks again for the new number');
+        assert.equal(instance.recordedFor, null);
+        assert.deepEqual(events(), ['ckAddressConsent:recorded']);
+        await user.check(true);
+        assert.deepEqual(state.posts.slice(2), [{recipient: '+381609999999', given: true}],
+            'recorded on the new check');
+        assert.equal(instance.recordedFor, '+381609999999');
+    });
+
+test('a new number whose old consent could not be withdrawn: checked again, the next change retries the withdrawal',
+    async () => {
+        const {state, instance, user, events} = widget([true, false, true]);
+        await user.check(true);
+        await user.number('+381609999999');
+        assert.deepEqual(state.posts.slice(1), [{recipient: '+381601234567', given: false}]);
+        assert.equal(state.checked, true, 'the server still holds the consent for the old number');
         assert.equal(instance.recordedFor, '+381601234567');
         assert.deepEqual(events(), ['ckAddressConsent:recorded', 'ckAddressConsent:failed']);
         await user.number('+381609999999');
-        assert.deepEqual(state.posts.slice(2), [{recipient: '+381601234567', given: false},
-            {recipient: '+381609999999', given: true}]);
-        assert.equal(instance.recordedFor, '+381609999999');
-        assert.equal(state.checked, true);
+        assert.deepEqual(state.posts.slice(2), [{recipient: '+381601234567', given: false}], 'withdrawn now');
+        assert.equal(instance.recordedFor, null);
+        assert.equal(state.checked, false);
+        assert.equal(state.posts.filter((post) => post.recipient === '+381609999999').length, 0,
+            'never a consent for the new number without a check');
     });
 
-test('withdrawn, then the new number not recorded: unchecked', async () => {
-    const {state, instance, user} = widget([true, true, false]);
+test('the same number again (a change event without a change) keeps the consent', async () => {
+    const {state, user} = widget([true]);
     await user.check(true);
+    await user.number('+381601234567');
+    assert.equal(state.checked, true);
+    assert.equal(state.posts.length, 1);
+});
+
+test('a number changed while unchecked records nothing', async () => {
+    const {state, user} = widget([]);
     await user.number('+381609999999');
-    assert.equal(instance.recordedFor, null);
+    assert.deepEqual(state.posts, []);
     assert.equal(state.checked, false);
 });
 

@@ -35,7 +35,8 @@ First release. Requires Magento 2.4.4 or later (`magento/framework ^103.0.4`).
   exact wording shown (*Consent for an address*, per store view and channel; `{{number}}` shows the number, while the
   configured wording is stored and hashed), the time and keyed hashes of the number and IP
   (`ck_notification_address_consent`). Unchecking or a stop withdraws it; withdrawn evidence is deleted after *Keep
-  withdrawn consents (days)*, default 1825. Luma checkbox on a framework-free `js/address-consent-core`.
+  withdrawn consents (days)*, default 1825. Luma checkbox on a framework-free `js/address-consent-core`; a changed
+  number unchecks it and withdraws the consent – a new number is never recorded without a new check.
 - **Delivery state:** `DeliveryStateInterface` (`ck_notification_delivery_state`) – a feature's send history per
   subscription key, so it survives a withdrawal and a new sign-up; a documented table for atomic claims (also for
   sending once, e.g. an opt-in confirmation; the daily cleanup covers subscription types only).
