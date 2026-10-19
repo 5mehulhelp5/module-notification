@@ -4,6 +4,10 @@
 
 First release. Requires Magento 2.4.4 or later (`magento/framework ^103.0.4`).
 
+- **Temporary refusals:** `Exception\TemporaryFailureException` (`@api`, `getRetryAfter()`, `parseRetryAfter()`) for a
+  provider refusing for now - nothing sent, send it again soon. *Magento email* throws it for an SMTP 4xx reply (421,
+  450, 451, 452: busy, throttled, greylisted; Symfony Mailer and Laminas Mail); the sender releases the cooldown claim
+  and passes it on.
 - **Sending:** one queue consumer `commerceKingsNotificationSend` (RabbitMQ or Magento's database queue) hands
   `<type>|<reference>` to registered notification types (`NotificationTypeInterface`, `Model\TypePool`). The sender
   (`SenderInterface`, `Data\Delivery`) checks Do not contact, quiet hours and the recipient cooldown, re-checks the

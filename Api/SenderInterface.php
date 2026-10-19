@@ -33,6 +33,8 @@ interface SenderInterface
      *     claim
      * @throws \CommerceKings\Notification\Exception\MessageSentException when a step failed after the provider
      *     accepted it
+     * @throws \CommerceKings\Notification\Exception\TemporaryFailureException when the provider refused it for now
+     *     (nothing sent, the cooldown claim released): send it again after a short wait
      */
     public function send(Delivery $delivery): string;
 }

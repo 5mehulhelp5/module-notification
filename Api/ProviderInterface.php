@@ -33,7 +33,9 @@ interface ProviderInterface
 
     /**
      * Throws if the service did not accept the notification. A failure after it accepted it must be thrown as
-     * \CommerceKings\Notification\Exception\MessageSentException - it is out, it must never be sent again.
+     * \CommerceKings\Notification\Exception\MessageSentException - it is out, it must never be sent again. A refusal
+     * for now (e.g. HTTP 429, or 503 with Retry-After) is thrown as
+     * \CommerceKings\Notification\Exception\TemporaryFailureException - nothing was sent, try again soon.
      */
     public function send(Delivery $delivery, DeliveryContent $content): void;
 }

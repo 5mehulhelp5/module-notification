@@ -7,12 +7,17 @@ use CommerceKings\Notification\Api\Channel;
 use CommerceKings\Notification\Api\Data\Delivery;
 use CommerceKings\Notification\Api\Data\DeliveryContent;
 use CommerceKings\Notification\Api\ProviderInterface;
+use CommerceKings\Notification\Exception\TemporaryFailureException;
 use CommerceKings\Notification\Model\OneClickHeaders;
 use Magento\Framework\App\Area;
 use Magento\Framework\Mail\Template\TransportBuilder;
 use Psr\Log\LoggerInterface;
 
-/** The default email provider: Magento's email templates and mail transport, optional RFC 8058 headers. */
+/**
+ * The default email provider: Magento's email templates and mail transport, optional RFC 8058 headers. A mail server
+ * refusing for now (an SMTP 4xx reply: busy, throttled, greylisted) is a TemporaryFailureException; any other
+ * failure is rethrown as it is.
+ */
 class MagentoEmail implements ProviderInterface
 {
     public function __construct(
@@ -62,6 +67,35 @@ class MagentoEmail implements ProviderInterface
                     . ' one-click headers; sent without them (the email\'s unsubscribe link still works).');
             }
         }
-        $transport->sendMessage();
+        try {
+            $transport->sendMessage();
+        } catch (\Throwable $error) {
+            $code = self::temporarySmtpCode($error);
+            if ($code !== null) {
+                throw new TemporaryFailureException(sprintf('The mail server refused the email for now (SMTP %d);'
+                    . ' nothing was sent, try again soon.', $code), null, $error);
+            }
+            throw $error;
+        }
+    }
+
+    /**
+     * The SMTP 4xx reply behind a send failure (Magento wraps the transport's error in a MailException), or null:
+     * Symfony Mailer (Magento 2.4.8+) carries the reply code as the exception code, Laminas Mail (earlier) starts the
+     * message with the server's reply ("451 4.7.1 Try again later").
+     */
+    private static function temporarySmtpCode(\Throwable $error): ?int
+    {
+        for ($cause = $error; $cause !== null; $cause = $cause->getPrevious()) {
+            if ($cause instanceof \Symfony\Component\Mailer\Exception\TransportExceptionInterface
+                && $cause->getCode() >= 400 && $cause->getCode() < 500) {
+                return (int)$cause->getCode();
+            }
+            if ((str_starts_with(get_class($cause), 'Laminas\\Mail\\') || str_starts_with(get_class($cause), 'Zend\\Mail\\'))
+                && preg_match('/^\s*(4\d\d)[ -]/', $cause->getMessage(), $match)) {
+                return (int)$match[1];
+            }
+        }
+        return null;
     }
 }
