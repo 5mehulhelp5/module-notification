@@ -41,7 +41,7 @@ register a zone provider for the channel ([`QuietHoursZoneInterface`](#quiet-hou
 
 A provider delivers notifications on one channel: `Api\Channel::EMAIL`, `Channel::SMS`, `Channel::WHATSAPP`,
 `Channel::VIBER`, or a
-code your module chooses. The admin selects one provider per channel (*Delivery* group); the email one is
+code your module chooses. The admin selects one provider per channel (*Channels and providers* group, `general`); the email one is
 **Email provider**, default *Magento email*. A provider module needs:
 
 1. A class implementing `Api\ProviderInterface`: `getCode()`, `getLabel()`, `getChannel()`,
@@ -66,10 +66,10 @@ The sender keeps the cooldown, recipient re-check, stop list, quiet hours and st
 
 With one provider installed for a channel it is used automatically. Install one provider module per channel: recipient
 time zones (`QuietHours` "zones") and opt-in confirmations are per module. With several and none selected, the first
-installed (module load order) is used and a warning is logged once per process – select one under *Delivery*, since a
+installed (module load order) is used and a warning is logged once per process – select one under *Channels and providers*, since a
 deployment can change that order. To choose between several, the stored code is
 `commercekings_notification/general/provider_<channel>` (read per store view, e.g. set per website). The first module
-for a channel adds the field to the *Delivery* group, with `Model\Config\Source\Provider` for its channel (`@api`: a
+for a channel adds the field to the *Channels and providers* group (`general`), with `Model\Config\Source\Provider` for its channel (`@api`: a
 virtual type with its `channel` argument is a stable extension point):
 
 ```xml
@@ -210,7 +210,7 @@ target for SMS pumping.
 
 ### Quiet hours in the recipient's time zone
 
-The store's quiet hours (*Quiet hours*: from – to, channels; on by default, 20:00–08:00 for every channel except
+The store's quiet hours (*Sending rules > Quiet hours*: from – to, channels; on by default, 20:00–08:00 for every channel except
 email) are kept in the store's time zone. US state laws such as
 Florida's FTSA go by the recipient's local time: register a zone provider for your channel instead of replacing
 `QuietHoursInterface` – Notification keeps the settings, the window and clock changes:

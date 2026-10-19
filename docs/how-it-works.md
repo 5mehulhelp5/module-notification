@@ -114,18 +114,21 @@ type or invalid address is Magento's 400 without echoing it.
 
 ## Admin
 
-**Stores > Configuration > CommerceKings > Notifications**, *Delivery*: *Email provider*, default *Magento email*
-(per website; a provider module adds the selector for its channel here);
-*Cooldown (days)*, default 7, **0 turns it off** (global, for every channel; kept per channel); *One-click unsubscribe*, default No (per website) – RFC 8058 headers on every
-notification whose content passes an HTTPS unsubscribe URL (an http URL sends the email without them and logs a
-warning); that URL must accept the mail client's POST.
-**Do not contact**: *"Stop these emails" link* (store view, default Yes) and *Lifts after (days without attempts)*
-(global, default 90) – see [stop list](stop-list.md).
-**Quiet hours** (store view): *Enabled* (default Yes), *From* / *To* (default 20:00 / 08:00, store time zone – US
-state rules allow texts 8 am to 8 pm) and *Channels* (none selected, the default: every channel except email – so
-email is not held unless selected).
-**Consent for an address** (store view): *Checkbox text* for text messages, WhatsApp and Viber (empty: no checkbox) and
-*Keep withdrawn consents (days)*, default 1825.
+**Stores > Configuration > CommerceKings > Notifications**, general to specific:
+
+1. **Channels and providers** (`general`): *Email provider*, default *Magento email* (per website; a provider module
+   adds the selector for its channel here); *One-click unsubscribe*, default No (per website) – RFC 8058 headers on
+   every notification whose content passes an HTTPS unsubscribe URL (an http URL sends the email without them and
+   logs a warning); that URL must accept the mail client's POST.
+2. **Sending rules** (`quiet_hours`): *Quiet hours* (store view, default Yes), *From* / *To* (default 20:00 / 08:00,
+   store time zone – US state rules allow texts 8 am to 8 pm) and *Channels* (none selected, the default: every
+   channel except email – so email is not held unless selected); *Cooldown (days)*, default 7, **0 turns it off**
+   (global, for every channel; kept per channel – stored as `commercekings_notification/general/cooldown_days`).
+3. **Consent for an address** (store view): *Checkbox text* for text messages, WhatsApp and Viber (empty: no checkbox)
+   and *Keep withdrawn consents (days)*, default 1825.
+4. **Do not contact**: *"Stop these emails" link* (store view, default Yes) and *Lifts after (days without attempts)*
+   (global, default 90) – see [stop list](stop-list.md).
+5. Provider modules' own groups (e.g. *Twilio*, *Infobip*) follow, when installed.
 
 ## Tests
 

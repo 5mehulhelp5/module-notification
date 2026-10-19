@@ -15,7 +15,7 @@ First release. Requires Magento 2.4.4 or later (`magento/framework ^103.0.4`).
   `MessageSentException` when a step fails after the provider accepted it; a recipient the channel cannot take is an
   `InvalidArgumentException` before any claim. `Delivery::$type` names the notification
   type (templates of template-based channels), `Delivery::text()` builds a plain-text delivery.
-- **Providers and channels:** `ProviderInterface` per channel (`Model\ProviderPool`; *Delivery > Email provider*, and
+- **Providers and channels:** `ProviderInterface` per channel (`Model\ProviderPool`; *Channels and providers > Email provider*, and
   `provider_<channel>` selectors that provider modules add). Built in: *Magento email*, with optional RFC 8058 one-click
   unsubscribe headers (also on 2.4.4–2.4.7; a replaced mail transport sends without them and logs a warning).
   `Channel::EMAIL`, `SMS`, `WHATSAPP` and `VIBER`; one recipient form per channel (`RecipientNormalizerInterface`,
@@ -47,11 +47,11 @@ First release. Requires Magento 2.4.4 or later (`magento/framework ^103.0.4`).
   (START); an undeliverable number keeps its consents. `stop()` and `resume()` take the request's time (e.g. a
   reply's receive time): a START lifts only an older stop, so replies delivered out of order cannot undo a newer STOP. Stops and links survive
   `encryption:key:change` while the old key stays in `env.php` (`Model\KeyedHash`).
-- **Quiet hours:** `QuietHoursInterface` and *Quiet hours* (per store view: from – to, may cross midnight; channels; on
+- **Quiet hours:** `QuietHoursInterface` and *Sending rules > Quiet hours* (per store view: from – to, may cross midnight; channels; on
   by default: 20:00–08:00 for every channel except email). Stoppable deliveries are held
   (`SenderInterface::QUIET_HOURS`) and sent after `nextAllowedAt()`. The window is kept in the store's time zone, or in
   the recipient's through a zone provider per channel (`QuietHoursZoneInterface`, `Model\QuietHours` "zones").
-- **Recipient cooldown:** an optional minimum gap per recipient and channel (*Cooldown (days)*, default 7);
+- **Recipient cooldown:** an optional minimum gap per recipient and channel (*Sending rules > Cooldown (days)*, default 7);
   keyed hashes only. `CooldownInterface::isRecentFor($channel, $recipient)` checks the key the sender claims, so a
   finder can leave out a recipient in cooldown on any channel before it queues anything.
 - **Stable extension points (`@api`):** the interfaces in `Api\`, `Model\KeyedHash`, and the di.xml arguments and

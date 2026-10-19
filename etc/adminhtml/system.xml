@@ -7,17 +7,12 @@
             <tab>commercekings</tab>
             <resource>CommerceKings_Notification::config</resource>
             <group id="general" translate="label comment" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
-                <label>Delivery</label>
-                <comment>Shared by all CommerceKings notifications.</comment>
+                <label>Channels and providers</label>
+                <comment>Who sends each channel, for all CommerceKings notifications.</comment>
                 <field id="provider_email" translate="label comment" type="select" sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>Email provider</label>
                     <source_model>CommerceKings\Notification\Model\Config\Source\Provider</source_model>
                     <comment>Who delivers the emails. Magento email uses the store's mail settings; an installed provider module adds its own options and settings.</comment>
-                </field>
-                <field id="cooldown_days" translate="label comment" type="text" sortOrder="10" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Cooldown (days)</label>
-                    <comment>Minimum gap between notifications to the same recipient on the same channel (e.g. the same email address), across all notifications that use it and all stores. 0 turns it off. Default: 7 days.</comment>
-                    <validate>required-entry validate-digits</validate>
                 </field>
                 <field id="one_click_unsubscribe" translate="label comment" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
                     <label>One-click unsubscribe</label>
@@ -25,29 +20,14 @@
                     <comment><![CDATA[Adds an unsubscribe option in supported email apps, alongside the unsubscribe link in the email. Requires DKIM signing by your mail provider. See <a href="https://www.rfc-editor.org/rfc/rfc8058" target="_blank" rel="noopener noreferrer">RFC 8058</a>.]]></comment>
                 </field>
             </group>
-            <group id="do_not_contact" translate="label comment" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
-                <label>Do not contact</label>
+            <group id="quiet_hours" translate="label comment" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Sending rules</label>
                 <fieldset_css>commercekings-config-section</fieldset_css>
-                <comment>A recipient can stop all marketing notifications to their address on that channel with one click; messages about orders still arrive.</comment>
-                <field id="link" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
-                    <label>"Stop these emails" link</label>
-                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment>Offered in marketing notifications whose template shows it (e.g. the abandoned cart reminder). Sign-ups for a stopped address are ignored. Always on in opt-out mode, where it is the only way to stop the emails.</comment>
-                </field>
-                <field id="lift_days" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
-                    <label>Lifts after (days without attempts)</label>
-                    <comment>Each sign-up attempt for a stopped address restarts this count. Default: 90 days.</comment>
-                    <validate>required-entry validate-digits validate-greater-than-zero</validate>
-                </field>
-            </group>
-            <group id="quiet_hours" translate="label comment" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
-                <label>Quiet hours</label>
-                <fieldset_css>commercekings-config-section</fieldset_css>
-                <comment>Marketing notifications are held during these hours and go out after them; messages about orders are never held. Times are in the store's time zone (General > Locale Options), unless a provider module keeps them in the recipient's (e.g. for US state rules).</comment>
+                <comment>When marketing notifications may go out, and how often.</comment>
                 <field id="enabled" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
-                    <label>Enabled</label>
+                    <label>Quiet hours</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment>On by default: 20:00 to 08:00 for every channel except email, as US state rules allow texts from 8 am to 8 pm only. Email is held only if you select it below.</comment>
+                    <comment>Marketing notifications are held during these hours and go out after them; messages about orders are never held. On by default: 20:00 to 08:00 for every channel except email, as US state rules allow texts from 8 am to 8 pm only. Times are in the store's time zone (General > Locale Options), unless a provider module keeps them in the recipient's (e.g. for US state rules).</comment>
                 </field>
                 <field id="from" translate="label" type="time" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>From</label>
@@ -62,17 +42,24 @@
                     <label>Channels</label>
                     <source_model>CommerceKings\Notification\Model\Config\Source\Channel</source_model>
                     <can_be_empty>1</can_be_empty>
-                    <comment>None selected: every channel except email (e.g. SMS, WhatsApp).</comment>
+                    <comment>None selected: every channel except email (e.g. SMS, WhatsApp). Email is held only if you select it.</comment>
                     <depends><field id="enabled">1</field></depends>
                 </field>
+                <field id="cooldown_days" translate="label comment" type="text" sortOrder="50" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Cooldown (days)</label>
+                    <comment>Minimum gap between notifications to the same recipient on the same channel (e.g. the same email address), across all notifications that use it and all stores. 0 turns it off. Default: 7 days.</comment>
+                    <validate>required-entry validate-digits</validate>
+                    <!-- shown with the sending rules, stored where it always was -->
+                    <config_path>commercekings_notification/general/cooldown_days</config_path>
+                </field>
             </group>
-            <group id="address_consent" translate="label comment" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+            <group id="address_consent" translate="label comment" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>Consent for an address</label>
                 <fieldset_css>commercekings-config-section</fieldset_css>
-                <comment>The checkbox next to a phone field for notifications that ask for their own consent (e.g. text message offers). Each consent is stored with this exact text, the time and a hashed IP address, for that one number.</comment>
+                <comment>The consent checkbox next to a phone field, per channel.</comment>
                 <field id="wording_sms" translate="label comment" type="textarea" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Checkbox text: text messages</label>
-                    <comment><![CDATA[Name your store and say what you send, how often and how to stop. {{number}} shows the shopper's number (e.g. +381 61 123 4530). Changing it asks visitors who have the old text open to confirm again. Empty: no consent can be given.]]></comment>
+                    <comment><![CDATA[For notifications that ask for their own consent (e.g. text message offers); each consent is stored with this exact text, the time and a hashed IP address, for that one number. Name your store and say what you send, how often and how to stop. {{number}} shows the shopper's number (e.g. +381 61 123 4530). Changing it asks visitors who have the old text open to confirm again. Empty: no consent can be given.]]></comment>
                 </field>
                 <field id="wording_whatsapp" translate="label comment" type="textarea" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Checkbox text: WhatsApp</label>
@@ -85,6 +72,21 @@
                 <field id="keep_withdrawn_days" translate="label comment" type="text" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Keep withdrawn consents (days)</label>
                     <comment>How long the record of a withdrawn consent is kept as evidence, then deleted. Active consents are kept. Default: 1825 days (5 years).</comment>
+                    <validate>required-entry validate-digits validate-greater-than-zero</validate>
+                </field>
+            </group>
+            <group id="do_not_contact" translate="label comment" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Do not contact</label>
+                <fieldset_css>commercekings-config-section</fieldset_css>
+                <comment>One click stops all marketing notifications to an address.</comment>
+                <field id="link" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>"Stop these emails" link</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                    <comment>Stops all marketing notifications to the address on that channel; messages about orders still arrive. Offered in marketing notifications whose template shows it (e.g. the abandoned cart reminder). Sign-ups for a stopped address are ignored. Always on in opt-out mode, where it is the only way to stop the emails.</comment>
+                </field>
+                <field id="lift_days" translate="label comment" type="text" sortOrder="20" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Lifts after (days without attempts)</label>
+                    <comment>Each sign-up attempt for a stopped address restarts this count. Default: 90 days.</comment>
                     <validate>required-entry validate-digits validate-greater-than-zero</validate>
                 </field>
             </group>
