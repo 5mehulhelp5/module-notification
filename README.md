@@ -23,8 +23,6 @@ A feature (e.g. abandoned cart) says *what and when*; Notification handles *who 
 
 Provider modules: [Twilio](https://github.com/commercekings/module-notification-twilio), [Infobip](https://github.com/commercekings/module-notification-infobip) · Features: [Abandoned Cart](https://github.com/commercekings/module-abandoned-cart) (+ [SMS](https://github.com/commercekings/module-abandoned-cart-sms))
 
-Infobip is tested on a live account (outgoing texts and delivery reports); Twilio so far only against a simulated API.
-
 ## The model
 
 - A **notification type** is one kind of message, registered by a feature. It decides when to send and builds
@@ -116,6 +114,15 @@ These modules help you ask for, record and respect your shoppers' choices – th
 their own. You are responsible for your store's privacy: what you collect, the wording you show, your privacy policy and
 whether your setup meets the laws that apply to you (e.g. GDPR, ePrivacy, email and SMS marketing rules). Get legal
 advice if you are unsure.
+
+## Tested (as of 0.1.0)
+
+- **Automated tests:** 252 unit, 31 integration and 16 JavaScript tests (unit and JavaScript tests run on every push).
+- **Line coverage:** 93.8% with unit and integration tests combined.
+- **End to end on Magento 2.4.9:** email reminders through Magento's mail (caught by a test mail server), with RabbitMQ and with the MySQL queue; SMS and WhatsApp against a simulated Twilio API – opt-in confirmation, STOP and START, quiet hours, provider errors and timeouts.
+- **Load:** 100,000 abandoned carts through the sender, about 3 messages a second per worker, growing linearly, none sent twice; 300 of 300 texts delivered to a simulated provider.
+- **Install:** a fresh install of every CommerceKings package from GitHub on an empty Magento database, verified.
+- **Not tested:** a STOP reply from a real phone (STOP is tested with the providers' webhook formats).
 
 ---
 
