@@ -4,9 +4,9 @@ declare(strict_types=1);
 namespace CommerceKings\Notification\Api;
 
 /**
- * The only way a visitor subscribes to a notification. Order: email rules, the type's authorize(),
- * the permission (SubscriptionPermissionInterface, read server-side), the contact, then one INSERT that
- * also checks the permission is still valid - a revocation at the same moment wins.
+ * The only way a visitor subscribes to a notification. Order: address rules (email, or the channel's normalizer),
+ * the type's authorize(), the permission (SubscriptionPermissionInterface, read server-side), the contact, then one
+ * INSERT that also checks the permission is still valid - a revocation at the same moment wins.
  *
  * @api
  */

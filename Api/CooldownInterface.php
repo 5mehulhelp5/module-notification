@@ -4,13 +4,14 @@ declare(strict_types=1);
 namespace CommerceKings\Notification\Api;
 
 /**
- * "Emailed recently?" per address, across notifications and stores. Replaceable through a di.xml
+ * "Notified recently?" per address and channel, across notifications and stores. Replaceable through a di.xml
  * preference; the default keeps keyed hashes only.
  *
  * @api
  */
 interface CooldownInterface
 {
+    /** The email channel's check; isRecentFor() for any channel. */
     public function isRecent(string $email): bool;
 
     /**
@@ -22,9 +23,13 @@ interface CooldownInterface
      */
     public function isRecentFor(string $channel, string $recipient): bool;
 
-    /** Atomic across workers. Returns the claim token, or null while the address is still in cooldown. */
+    /**
+     * Atomic across workers. Returns the claim token, or null while the address is still in cooldown.
+     *
+     * @param string $email the sender's key: Cooldown::key($channel, $recipient)
+     */
     public function claim(string $email): ?string;
 
-    /** Undo a claim whose email was not sent. Never removes another worker's claim. */
+    /** Undo a claim whose notification was not sent. Never removes another worker's claim. */
     public function release(string $email, string $token): void;
 }

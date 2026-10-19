@@ -28,7 +28,7 @@
             <group id="do_not_contact" translate="label comment" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>Do not contact</label>
                 <fieldset_css>commercekings-config-section</fieldset_css>
-                <comment>A recipient can stop all marketing notifications to their address with one click; emails about orders still arrive.</comment>
+                <comment>A recipient can stop all marketing notifications to their address on that channel with one click; messages about orders still arrive.</comment>
                 <field id="link" translate="label comment" type="select" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>"Stop these emails" link</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>

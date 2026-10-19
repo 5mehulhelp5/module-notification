@@ -49,9 +49,10 @@ Each module answers one question:
   for subscription types the reference is the subscription id, and only a subscription that still exists with
   a valid permission is handed over.
 - **Sender** (`Api\SenderInterface`): stop list and quiet hours for stoppable deliveries, optional recipient cooldown,
-  recipient re-check, content built in the delivery's store, then the provider selected for the channel (**Email
-  provider**, per website, default *Magento email*). A failure before the provider accepted it releases the cooldown
-  claim; a failure after it surfaces as `MessageSentException` so it is never sent twice.
+  recipient re-check, content built in the delivery's store, then the provider selected for the channel (for email the
+  **Email provider**, per website, default *Magento email*; a provider module adds its channel's selector). A failure
+  before the provider accepted it releases the cooldown claim; a failure after it surfaces as `MessageSentException` so
+  it is never sent twice.
 - **Providers** (`Api\ProviderInterface`, registered in `Model\ProviderPool`): deliver a notification on one channel.
   The built-in *Magento email* provider uses Magento's email templates and mail transport, with
   optional RFC 8058 one-click unsubscribe headers (**One-click unsubscribe**, Yes/No per website, default No; the
@@ -102,7 +103,7 @@ a script can subscribe addresses.
 They return `true` when stored (including an identical retry) and `false` when refused or removed. An unknown
 type or invalid address is Magento's 400 without echoing it.
 
-- **Guest:** an empty email, a missing permission or a type that is not accepting removes the guest's subscription
+- **Guest:** an empty recipient, a missing permission or a type that is not accepting removes the guest's subscription
   of a single type. Subscriptions of a one-per-person type are removed by the withdrawal link only.
 - **Customer:** email types use the account email; other channels need `recipient`. Without a permission nothing
   changes; a permission from another device stays.

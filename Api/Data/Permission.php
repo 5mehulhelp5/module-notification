@@ -6,7 +6,7 @@ namespace CommerceKings\Notification\Api\Data;
 /**
  * The answer of SubscriptionPermissionInterface: granted (with a reference stored on the subscription),
  * absent (the visitor has no permission: a guest's subscription to a single type is removed, as with an empty
- * email) or refused (not for this request: nothing changes).
+ * recipient) or refused (not for this request: nothing changes).
  *
  * @api
  */

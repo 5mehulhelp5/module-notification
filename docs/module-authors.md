@@ -277,7 +277,7 @@ For notifications a visitor signs up for, also:
      a contact on that channel. An address the channel does not take is Magento's 400. Signed-in customers
      (`subscribeCustomer()`, REST `/mine`) use the account email on email types; on other channels they pass `recipient`
      too (required), stored as their contact next to the customer id;
-   - `isSingle()`: one subscription per reference (a new email replaces it) or one per person;
+   - `isSingle()`: one subscription per reference (a new address replaces it) or one per person;
    - `getPermission()` and `getSubscriber()`: your type's own permission and subscriber, or `null` for the shop-wide
      ones (see [Permission](#permission));
    - `isStoppable()`: can the recipient stop it with Do not contact? true for marketing (a stop removes the

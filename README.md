@@ -27,8 +27,8 @@ Provider modules: [Twilio](https://github.com/commercekings/module-notification-
 
 - A **notification type** is one kind of message, registered by a feature. It decides when to send and builds
   the content.
-- A **subscription** is a shopper's sign-up for a type, e.g. reminders for one cart. Marketing types need one;
-  service messages don't. Its address is a **contact** (one per website, channel and address) or a customer's
+- A **subscription** is a shopper's sign-up for a type, e.g. reminders for one cart. Marketing types need one; service
+  messages don't. Its address is a **contact** (one per website, channel and address) or, on email types, a customer's
   account email.
 - A **permission** decides who may subscribe: everyone (opt-out), only with consent (opt-in, with the privacy bundle),
   or – per type – an **address consent**: a checkbox for one number. The **subscriber** provides the unsubscribe link.
@@ -111,9 +111,9 @@ How to use them, including messaging for provider modules: [for module authors](
 ## Disclaimer
 
 These modules help you ask for, record and respect your shoppers' choices – they don't make your store compliant on
-their own. You are responsible for your store's privacy: what you collect, the wording you show, your privacy policy
-and whether your setup meets the laws that apply to you (e.g. GDPR, ePrivacy, email marketing rules). Get legal advice
-if you are unsure.
+their own. You are responsible for your store's privacy: what you collect, the wording you show, your privacy policy and
+whether your setup meets the laws that apply to you (e.g. GDPR, ePrivacy, email and SMS marketing rules). Get legal
+advice if you are unsure.
 
 ---
 

@@ -5,7 +5,8 @@ namespace CommerceKings\Notification\Api\Data;
 
 /**
  * One visitor's subscription to one reference of a type, with the permission it was given under.
- * A guest has a contact, a customer a customer id (their current account email is used).
+ * A guest has a contact, a customer a customer id (their current account email on email types; on other
+ * channels the address they gave).
  *
  * @api
  */

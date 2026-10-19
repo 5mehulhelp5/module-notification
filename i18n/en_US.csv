@@ -1,5 +1,5 @@
 """Stop these emails"" link","""Stop these emails"" link"
-"A recipient can stop all marketing notifications to their address with one click; emails about orders still arrive.","A recipient can stop all marketing notifications to their address with one click; emails about orders still arrive."
+"A recipient can stop all marketing notifications to their address on that channel with one click; messages about orders still arrive.","A recipient can stop all marketing notifications to their address on that channel with one click; messages about orders still arrive."
 "A recipient is required for this notification.","A recipient is required for this notification."
 "Adds an unsubscribe option in supported email apps, alongside the unsubscribe link in the email. Requires DKIM signing by your mail provider. See <a href=""https://www.rfc-editor.org/rfc/rfc8058"" target=""_blank"" rel=""noopener noreferrer"">RFC 8058</a>.","Adds an unsubscribe option in supported email apps, alongside the unsubscribe link in the email. Requires DKIM signing by your mail provider. See <a href=""https://www.rfc-editor.org/rfc/rfc8058"" target=""_blank"" rel=""noopener noreferrer"">RFC 8058</a>."
 "As above, for Viber messages.","As above, for Viber messages."

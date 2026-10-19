@@ -36,7 +36,7 @@ interface SubscriptionPermissionInterface
 
     /**
      * Send-time recheck in PHP (the SQL condition repeats it in the claim): is the stored permission still valid for
-     * this purpose (SubscriptionTypeInterface::getPurpose()) and the store the email is sent from?
+     * this purpose (SubscriptionTypeInterface::getPurpose()) and the store the notification is sent from?
      */
     public function isValidFor(string $reference, string $purpose, int $storeId): bool;
 

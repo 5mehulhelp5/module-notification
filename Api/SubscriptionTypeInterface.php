@@ -8,7 +8,7 @@ use CommerceKings\Notification\Api\Data\Target;
 /**
  * Who may subscribe to what, for one notification type. Registered by the feature in di.xml
  * (Model\SubscriptionTypePool "types", same code as its NotificationTypeInterface). Notification
- * owns the rest: email rules, the permission for getPurpose(), the contact and the subscription row.
+ * owns the rest: address rules, the permission for getPurpose(), the contact and the subscription row.
  *
  * Messages of a subscription type are queued with the subscription id; the consumer only hands over
  * subscriptions that still exist with a valid permission. Send history belongs to the subscription key (type,
@@ -40,7 +40,7 @@ interface SubscriptionTypeInterface
      */
     public function getChannel(): string;
 
-    /** true: one subscription per reference (a new email replaces it); false: one per person. */
+    /** true: one subscription per reference (a new address replaces it); false: one per person. */
     public function isSingle(): bool;
 
     /**
