@@ -5,6 +5,7 @@ namespace CommerceKings\Notification\Test\Unit\Model\Provider;
 
 use CommerceKings\Notification\Api\Data\Delivery;
 use CommerceKings\Notification\Api\Data\DeliveryContent;
+use CommerceKings\Notification\Exception\MessageSentException;
 use CommerceKings\Notification\Exception\TemporaryFailureException;
 use CommerceKings\Notification\Model\OneClickHeaders;
 use CommerceKings\Notification\Model\Provider\MagentoEmail;
@@ -77,6 +78,61 @@ class MagentoEmailTest extends TestCase
         $this->send();
     }
 
+    /** Symfony Mailer's SMTP transcript (TransportException::getDebug()) up to the failure. */
+    private static function transcript(string ...$lines): string
+    {
+        return implode('', array_map(fn ($line) => '[2026-10-20T10:00:00.000000] ' . $line . "\n", $lines));
+    }
+
+    public function testAConnectionLostAfterTheMessageWasHandedOverMayHaveSent(): void
+    {
+        foreach (['Connection to "smtp:587" has been closed unexpectedly.',
+            'Connection to "smtp:587" timed out.'] as $lost) {
+            $error = new TransportException($lost);
+            $error->appendDebug(self::transcript('> MAIL FROM:<shop@test.com>', '< 250 OK', '> DATA', '< 354 Go ahead',
+                '> ', '> .'));
+            $this->failure = $this->wrapped($error);
+            try {
+                $this->send();
+                $this->fail('Expected "may have been sent"');
+            } catch (MessageSentException $sent) {
+                $this->assertSame($this->failure, $sent->getPrevious());
+                $this->assertStringContainsString('may have taken it', $sent->getMessage());
+            }
+        }
+    }
+
+    public function testALostConnectionBeforeTheEndOfTheMessageIsSafeToRetry(): void
+    {
+        foreach ([self::transcript('> EHLO shop', '< 250 OK'), self::transcript('> DATA', '< 354 Go ahead'),
+            ''] as $debug) {
+            $error = new TransportException('Connection to "smtp:587" has been closed unexpectedly.');
+            $error->appendDebug($debug);
+            $this->failure = $this->wrapped($error);
+            try {
+                $this->send();
+                $this->fail('Expected the failure');
+            } catch (MessageSentException) {
+                $this->fail('the end of the message never went out: not taken - ' . $debug);
+            } catch (\Throwable $error) {
+                $this->assertSame($this->failure, $error, 'rethrown: retried');
+            }
+        }
+    }
+
+    public function testLaminasMailWaitingForTheServersReplyMayHaveSent(): void
+    {
+        foreach (['smtp.test has timed out', 'Could not read from smtp.test'] as $lost) {
+            $this->failure = $this->wrapped(new \Laminas\Mail\Protocol\Exception\RuntimeException($lost));
+            try {
+                $this->send();
+                $this->fail('Expected "may have been sent"');
+            } catch (MessageSentException $sent) {
+                $this->assertSame($this->failure, $sent->getPrevious(), $lost);
+            }
+        }
+    }
+
     public function testPermanentAndOtherFailuresAreRethrownAsTheyAre(): void
     {
         foreach ([
@@ -84,6 +140,14 @@ class MagentoEmailTest extends TestCase
             $this->wrapped(new TransportException('Connection could not be established with host "smtp".')),
             new \RuntimeException('451 not from a mail library'),
             $this->wrapped(new \Laminas\Mail\Protocol\Exception\RuntimeException('554 5.7.1 Rejected')),
+            $this->wrapped(new \Laminas\Mail\Protocol\Exception\RuntimeException(
+                'Could not send request to smtp.test')),
+            // a final reply after the message: refused, not taken
+            $this->wrapped((function () {
+                $refused = new UnexpectedResponseException('Expected response code "250" but got code "554"', 554);
+                $refused->appendDebug(self::transcript('> DATA', '< 354 Go ahead', '> .', '< 554 Rejected'));
+                return $refused;
+            })()),
         ] as $failure) {
             $this->failure = $failure;
             try {

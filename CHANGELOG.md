@@ -8,6 +8,12 @@
   that person's consent and sign-ups. A consent from before 0.1.1 (no cart on it) is withdrawn by unticking from the
   same IP; a STOP, a stop link or the stop list still ends all of a number's consents. A sign-up rests on its own
   cart's consent (or one from before 0.1.1), never on another cart's.
+- **Email, an unknown outcome:** *Magento email* treated every failure that was not an SMTP 4xx as "not sent", so the
+  email was sent again - also when the connection to the mail server ended after the whole email went out and before
+  the server's reply (it may have taken it): a possible duplicate. That case is now a `MessageSentException` (not
+  sent again; Symfony Mailer: by its SMTP transcript, Laminas Mail: a reply that never came). A refusal, no
+  connection, a failed login or a failure before the email ended is still sent again. "Never twice" means a rare loss
+  on that ambiguity, never a duplicate (docs/how-it-works.md).
 
 ## 0.1.0 - 2026-10-19
 

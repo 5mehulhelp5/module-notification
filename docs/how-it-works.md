@@ -54,7 +54,9 @@ Each module answers one question:
   recipient re-check, content built in the delivery's store, then the provider selected for the channel (for email the
   **Email provider**, per website, default *Magento email*; a provider module adds its channel's selector). A failure
   before the provider accepted it releases the cooldown claim; a failure after it surfaces as `MessageSentException` so
-  it is never sent twice.
+  it is never sent twice. "Never twice" is not "exactly once": when the outcome is unknown (the connection to the
+  mail server ended after the whole email went out, before its reply) it counts as sent - on that rare ambiguity an
+  email can be lost, never doubled.
 - **Providers** (`Api\ProviderInterface`, registered in `Model\ProviderPool`): deliver a notification on one channel.
   The built-in *Magento email* provider uses Magento's email templates and mail transport, with
   optional RFC 8058 one-click unsubscribe headers (**One-click unsubscribe**, Yes/No per website, default No; the
