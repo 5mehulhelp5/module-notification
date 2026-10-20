@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.1 - unreleased
+## 0.1.1 - 2026-10-20
 
 - **Address consent (privacy):** a checkbox consent is given for what the type authorized (the cart:
   `ck_notification_address_consent.grant_reference_id`), and unticking withdraws only that one. Before, unticking
