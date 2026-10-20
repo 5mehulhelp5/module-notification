@@ -81,6 +81,7 @@
             "wording_hash": true,
             "wording": true,
             "ip_hash": true,
+            "grant_reference_id": true,
             "given_at": true,
             "withdrawn_at": true
         },

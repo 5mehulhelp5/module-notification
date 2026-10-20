@@ -15,8 +15,9 @@ use Magento\Store\Model\StoreManagerInterface;
 /**
  * Records a checkbox consent for one address, in this order, nothing written before the last step: the type uses
  * address consent, the address is valid for the channel, the type authorizes the reference, the wording the visitor
- * saw is the configured one. Unchecking withdraws the address's consent for the type and website and removes the
- * subscriptions that rested on it. Input errors are Magento's 400 without echoing the input.
+ * saw is the configured one. The consent is given for the reference the type authorized (e.g. the cart): unchecking
+ * withdraws only that one's consent for the address, type and website - never another cart's for the same number -
+ * and removes the subscriptions that rested on it. Input errors are Magento's 400 without echoing the input.
  */
 class AddressConsentManagement implements AddressConsentManagementInterface
 {
@@ -63,10 +64,12 @@ class AddressConsentManagement implements AddressConsentManagementInterface
             return false;
         }
         $websiteId = (int)$this->stores->getStore($target->storeId)->getWebsiteId();
+        $ip = (string)$this->remoteAddress->getRemoteAddress();
+        $ipHash = $ip === '' ? '' : $this->keyedHash->current('commercekings_notification_address_consent_ip|' . $ip);
         if (!$given) {
-            $this->removal->removeByPermission(
-                $this->consents->withdraw($channel, $address, $permission->getTypeCode(), $websiteId)
-            );
+            // only what was given for this cart: anyone can type a number, so unticking ends no one else's consent
+            $this->removal->removeByPermission($this->consents->withdrawGranted($channel, $address,
+                $permission->getTypeCode(), $websiteId, $target->referenceId, $ipHash));
             return true;
         }
         if (!$target->accepting) {
@@ -79,9 +82,8 @@ class AddressConsentManagement implements AddressConsentManagementInterface
         if (!hash_equals(hash('sha256', $wording), $wordingHash)) {
             throw new InputException(__('The consent text has changed. Please read it and confirm again.'));
         }
-        $ip = (string)$this->remoteAddress->getRemoteAddress();
         $this->consents->record($permission->getTypeCode(), $channel, $address, $websiteId, $target->storeId, $wording,
-            $ip === '' ? '' : $this->keyedHash->current('commercekings_notification_address_consent_ip|' . $ip));
+            $ipHash, $target->referenceId);
         return true;
     }
 

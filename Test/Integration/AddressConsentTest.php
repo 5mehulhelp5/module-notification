@@ -69,7 +69,9 @@ class AddressConsentTest extends TestCase
         $type->method('isSingle')->willReturn(true);
         $type->method('isStoppable')->willReturn(true);
         $type->method('getPermission')->willReturn($permission);
-        $type->method('authorize')->willReturnCallback(fn () => new Target($this->referenceId, $this->storeId, true, ''));
+        // "other-cart": another guest's cart (another quote)
+        $type->method('authorize')->willReturnCallback(fn ($reference) => new Target($reference === 'other-cart'
+            ? $this->referenceId + 1 : $this->referenceId, $this->storeId, true, ''));
         $types = new SubscriptionTypePool([$this->code => $type]);
         $shopWide = $this->createStub(SubscriptionPermissionInterface::class);
         $shopWide->method('check')->willReturn(Permission::refused());   // only the address consent may decide
@@ -145,6 +147,29 @@ class AddressConsentTest extends TestCase
         $this->assertNull($this->subscription());
         $this->assertNotNull($this->evidence()[0]['withdrawn_at'], 'the evidence stays, withdrawn');
         $this->assertFalse($this->subscriptions->subscribeGuest($this->code, 'ref', $this->number));
+    }
+
+    public function testAnotherCartCannotWithdrawThisCartsConsent(): void
+    {
+        $this->consents->recordGuest($this->code, 'ref', $this->number, $this->wordingHash());
+        $this->assertTrue($this->subscriptions->subscribeGuest($this->code, 'ref', $this->number));
+        // another guest types the same number and unticks: nothing of the first cart's ends
+        $this->assertTrue($this->consents->recordGuest($this->code, 'other-cart', $this->number, '', false));
+        $this->assertNull($this->evidence()[0]['withdrawn_at'], 'the first cart\'s consent stays');
+        $this->assertNotNull($this->subscription(), 'and its sign-up');
+        // the second guest ticks and unticks: only its own consent ends
+        $this->consents->recordGuest($this->code, 'other-cart', $this->number, $this->wordingHash());
+        $evidence = $this->evidence();
+        $this->assertCount(2, $evidence, 'a consent per cart, not one shared by the number');
+        $this->assertSame([(string)$this->referenceId, (string)($this->referenceId + 1)],
+            array_column($evidence, 'grant_reference_id'));
+        $this->consents->recordGuest($this->code, 'other-cart', $this->number, '', false);
+        $evidence = $this->evidence();
+        $this->assertSame([null, true], [$evidence[0]['withdrawn_at'], $evidence[1]['withdrawn_at'] !== null]);
+        $this->assertSame($evidence[0]['reference'], $this->subscription()['permission_ref'], 'still signed up');
+        // the number's own word (a STOP) ends every cart's
+        $this->stopList->stop('sms', $this->number);
+        $this->assertNotNull($this->evidence()[0]['withdrawn_at']);
     }
 
     public function testAStopWithdrawsTheConsent(): void

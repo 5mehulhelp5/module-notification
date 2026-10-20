@@ -41,7 +41,7 @@ class AddressConsent implements SubscriptionPermissionInterface
             return Permission::absent();
         }
         $reference = $this->consents->findActive($this->typeCode, $type->getChannel(), $recipient,
-            (int)$this->stores->getStore($target->storeId)->getWebsiteId());
+            (int)$this->stores->getStore($target->storeId)->getWebsiteId(), $target->referenceId);
         return $reference === null ? Permission::absent() : Permission::granted($reference);
     }
 

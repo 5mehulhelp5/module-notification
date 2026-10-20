@@ -21,25 +21,37 @@ class AddressConsentRepository
     ) {
     }
 
-    /** The newest active consent's reference for the address, type and website; null when there is none. */
-    public function findActive(string $type, string $channel, string $recipient, int $websiteId): ?string
+    /**
+     * The newest active consent's reference for the address, type and website; null when there is none. With a
+     * grant: only one given for it (another cart's consent for the same number is not this one's), or one from before
+     * 0.1.1 (no grant on it).
+     */
+    public function findActive(string $type, string $channel, string $recipient, int $websiteId,
+        ?int $grantReferenceId = null): ?string
     {
         $db = $this->resource->getConnection();
-        $reference = $db->fetchOne($db->select()->from($this->table(), 'reference')
+        $select = $db->select()->from($this->table(), 'reference')
             ->where('type = ?', $type)->where('channel = ?', $channel)
             ->where('recipient_key IN (?)', $this->keys($channel, $recipient))
-            ->where('website_id = ?', $websiteId)->where('withdrawn_at IS NULL')
-            ->order('consent_id DESC')->limit(1));
+            ->where('website_id = ?', $websiteId)->where('withdrawn_at IS NULL');
+        if ($grantReferenceId !== null) {
+            $select->where('grant_reference_id = ? OR grant_reference_id IS NULL', $grantReferenceId)
+                ->order(new \Zend_Db_Expr('grant_reference_id IS NULL')); // its own first
+        }
+        $reference = $db->fetchOne($select->order('consent_id DESC')->limit(1));
         return is_string($reference) && $reference !== '' ? $reference : null;
     }
 
     /**
-     * Records a consent; an identical active one (same wording) is kept instead of a duplicate.
+     * Records a consent; an identical active one (same wording, given for the same grant) is kept instead of a
+     * duplicate.
      *
+     * @param int|null $grantReferenceId what it is given for (the type's reference id, e.g. the quote): only a
+     *     withdrawal for it (withdrawGranted()) or for the whole address (withdraw(), a stop) ends it
      * @return string the consent's reference
      */
     public function record(string $type, string $channel, string $recipient, int $websiteId, int $storeId,
-        string $wording, string $ipHash): string
+        string $wording, string $ipHash, ?int $grantReferenceId = null): string
     {
         $db = $this->resource->getConnection();
         $wordingHash = hash('sha256', $wording);
@@ -47,6 +59,8 @@ class AddressConsentRepository
             ->where('type = ?', $type)->where('channel = ?', $channel)
             ->where('recipient_key IN (?)', $this->keys($channel, $recipient))
             ->where('website_id = ?', $websiteId)->where('wording_hash = ?', $wordingHash)
+            ->where($grantReferenceId === null ? 'grant_reference_id IS NULL' : $db->quoteInto(
+                'grant_reference_id = ?', $grantReferenceId))
             ->where('withdrawn_at IS NULL')->limit(1));
         if (is_string($existing) && $existing !== '') {
             return $existing;
@@ -62,8 +76,33 @@ class AddressConsentRepository
             'wording_hash' => $wordingHash,
             'wording' => $wording,
             'ip_hash' => $ipHash,
+            'grant_reference_id' => $grantReferenceId,
         ]);
         return $reference;
+    }
+
+    /**
+     * Withdraws the address's active consents for one type and website given for one grant (a checkbox unticked in
+     * that cart) - and one from before 0.1.1 (no grant on it) given from the same IP. Another cart's consent for the
+     * same number stays: only the number itself (a stop, withdraw()) ends all of them.
+     *
+     * @return string[] the withdrawn consents' references
+     */
+    public function withdrawGranted(string $channel, string $recipient, string $type, int $websiteId,
+        int $grantReferenceId, string $ipHash): array
+    {
+        $db = $this->resource->getConnection();
+        $mine = $db->quoteInto('grant_reference_id = ?', $grantReferenceId)
+            . ($ipHash !== '' ? $db->quoteInto(' OR (grant_reference_id IS NULL AND ip_hash = ?)', $ipHash) : '');
+        $references = array_map('strval', $db->fetchCol($db->select()->from($this->table(), 'reference')
+            ->where('channel = ?', $channel)->where('recipient_key IN (?)', $this->keys($channel, $recipient))
+            ->where('type = ?', $type)->where('website_id = ?', $websiteId)->where('withdrawn_at IS NULL')
+            ->where($mine)));
+        if ($references) {
+            $db->update($this->table(), ['withdrawn_at' => new \Zend_Db_Expr('NOW()')],
+                ['reference IN (?)' => $references, 'withdrawn_at IS NULL']);
+        }
+        return $references;
     }
 
     /**

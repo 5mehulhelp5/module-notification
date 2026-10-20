@@ -64,6 +64,10 @@ class AddressConsentTest extends TestCase
             $this->calls[] = ['withdraw', ...$arguments];
             return ['ac:old'];
         });
+        $repository->method('withdrawGranted')->willReturnCallback(function (...$arguments) {
+            $this->calls[] = ['withdrawGranted', ...$arguments];
+            return ['ac:mine'];
+        });
         $repository->method('activeCondition')->willReturnCallback(fn ($column) => 'ACTIVE(' . $column . ')');
         $repository->method('isActive')->willReturnCallback(fn ($reference, $website) => $reference === 'ac:found' && $website === 2);
         return $repository;
@@ -124,8 +128,9 @@ class AddressConsentTest extends TestCase
     {
         $permission = $this->permission();
         $this->assertSame('ac:found', $permission->check($this->type(), $this->target, '+381601234567')->reference);
-        $this->assertSame(['findActive', 'sms_offer', 'sms', '+381601234567', 2], $this->calls[0],
-            'this type, its channel, the store\'s website');
+        $this->assertSame(['findActive', 'sms_offer', 'sms', '+381601234567', 2, 42], $this->calls[0],
+            'this type, its channel, the store\'s website - and the consent given for this cart (42), never another'
+            . ' cart\'s for the same number');
         $other = $permission->check($this->type(), $this->target, '+381609999999');
         $this->assertTrue($other->removesExisting, 'another number: absent, the cart\'s previous sign-up goes');
         $this->assertTrue($permission->check($this->type(), $this->target)->removesExisting, 'no address: absent');
@@ -145,7 +150,7 @@ class AddressConsentTest extends TestCase
         $this->assertTrue($this->management()->recordGuest('sms_offer', 'masked', ' 381 60 123 4567 ', hash('sha256', self::WORDING)));
         $this->assertSame(['authorize', 'masked', 0], $this->calls('authorize')[0]);
         $this->assertSame(['record', 'sms_offer', 'sms', '+381601234567', 2, 3, self::WORDING,
-            'H(commercekings_notification_address_consent_ip|203.0.113.7)'], $this->calls('record')[0]);
+            'H(commercekings_notification_address_consent_ip|203.0.113.7)', 42], $this->calls('record')[0]);
     }
 
     public function testAChangedWordingIsRefusedAndNothingIsRecorded(): void
@@ -176,7 +181,7 @@ class AddressConsentTest extends TestCase
             hash('sha256', 'Yes, text me offers at {{number}}. Reply STOP to stop.')));
         $this->assertSame(['record', 'sms_offer', 'sms', '+12025550123', 2, 3,
             'Yes, text me offers at {{number}}. Reply STOP to stop.',
-            'H(commercekings_notification_address_consent_ip|203.0.113.7)'], $this->calls('record')[0]);
+            'H(commercekings_notification_address_consent_ip|203.0.113.7)', 42], $this->calls('record')[0]);
         try {
             $this->management()->recordGuest('sms_offer', 'masked', '+12025550123',
                 hash('sha256', 'Yes, text me offers at +1 202 555 0123. Reply STOP to stop.'));
@@ -187,12 +192,23 @@ class AddressConsentTest extends TestCase
         $this->assertSame('{{number}}', \CommerceKings\Notification\Api\AddressConsentManagementInterface::NUMBER);
     }
 
-    public function testUncheckingWithdrawsTheConsentAndItsSubscriptions(): void
+    public function testUncheckingWithdrawsOnlyTheConsentGivenForThisCart(): void
     {
         $this->assertTrue($this->management()->recordGuest('sms_offer', 'masked', '+381601234567', '', false));
-        $this->assertSame(['withdraw', 'sms', '+381601234567', 'sms_offer', 2], $this->calls('withdraw')[0]);
-        $this->assertSame([['ac:old']], $this->removed);
+        $this->assertSame(['withdrawGranted', 'sms', '+381601234567', 'sms_offer', 2, 42,
+            'H(commercekings_notification_address_consent_ip|203.0.113.7)'], $this->calls('withdrawGranted')[0],
+            'the cart authorized (42), and for a consent from before 0.1.1 (no cart on it) the same browser\'s IP');
+        $this->assertSame([], $this->calls('withdraw'), 'never the number\'s consents from other carts (a STOP is'
+            . ' the number\'s own word)');
+        $this->assertSame([['ac:mine']], $this->removed);
         $this->assertSame([], $this->calls('record'));
+    }
+
+    public function testAConsentIsRecordedForTheCartItWasGivenIn(): void
+    {
+        $this->management()->recordGuest('sms_offer', 'masked', '+381601234567', hash('sha256', self::WORDING));
+        $this->assertSame(42, $this->calls('record')[0][8], 'its grant: the cart (one cart\'s consent is not'
+            . ' another\'s, even for the same number)');
     }
 
     public function testInvalidInputIsRefusedBeforeTheTypeIsAsked(): void

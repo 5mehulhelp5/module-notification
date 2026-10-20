@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1 - unreleased
+
+- **Address consent (privacy):** a checkbox consent is given for what the type authorized (the cart:
+  `ck_notification_address_consent.grant_reference_id`), and unticking withdraws only that one. Before, unticking
+  withdrew every consent of the number for the type and website - a guest who typed someone else's number could end
+  that person's consent and sign-ups. A consent from before 0.1.1 (no cart on it) is withdrawn by unticking from the
+  same IP; a STOP, a stop link or the stop list still ends all of a number's consents. A sign-up rests on its own
+  cart's consent (or one from before 0.1.1), never on another cart's.
+
 ## 0.1.0 - 2026-10-19
 
 First release. Requires Magento 2.4.4 or later (`magento/framework ^103.0.4`).

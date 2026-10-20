@@ -105,6 +105,7 @@
         <column xsi:type="varchar" name="wording_hash" nullable="false" length="64" comment="sha256 of the wording shown"/>
         <column xsi:type="text" name="wording" nullable="false" comment="The wording shown"/>
         <column xsi:type="varchar" name="ip_hash" nullable="false" length="64" default="" comment="Keyed hash of the IP"/>
+        <column xsi:type="int" name="grant_reference_id" unsigned="true" nullable="true" comment="What it was given for (e.g. the quote id)"/>
         <column xsi:type="timestamp" name="given_at" nullable="false" on_update="false" default="CURRENT_TIMESTAMP" comment="Given"/>
         <column xsi:type="timestamp" name="withdrawn_at" nullable="true" on_update="false" comment="Withdrawn"/>
         <constraint xsi:type="primary" referenceId="PRIMARY">
